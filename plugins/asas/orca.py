@@ -32,21 +32,6 @@ class ORCA(ConflictResolution):
         self.left_cutoff_leg_dir = np.array([])
         self.right_cutoff_leg_dir =np.array([])
         
-    def setprio(self, flag=None, priocode=''):
-        '''Set the prio switch and the type of prio '''
-        if flag is None:
-            return True, "PRIORULES [ON/OFF] [PRIOCODE]" + \
-                            "\nAvailable priority codes: " + \
-                            "\n     NP:  No priority " + \
-                            "\n     RP:  Priority to the right" + \
-                            "\nPriority is currently " + ("ON" if self.swprio else "OFF") + \
-                            "\nPriority code is currently: " + \
-                str(self.priocode)
-        options = ["NP", "RP"]
-        if priocode not in options:
-            return False, "Priority code Not Understood. Available Options: " + str(options)
-        return super().setprio(flag, priocode)
-        
     def resolve(self, conf, ownship, intruder):
         # Total number of aircraft
         ntraf = ownship.ntraf
@@ -98,14 +83,9 @@ class ORCA(ConflictResolution):
             # cut off the VO cone. The asas update time (dt) is used to find the
             # best solution for the next time step in case of LOS.
             dv, n = self.get_avoidance_velocity(conf, ownship, intruder, qdr, dist, idx
-                    , idx_intruder, bs.settings.asas_dtlookahead*5, bs.settings.asas_dt)
+                    , idx_intruder, bs.settings.asas_dtlookahead, bs.settings.asas_dt)
             
-            # if self.priocode == 'RP':
-            #     if qdr < 180:
-            #         factor = 0.6
-            #     else:
-            #         factor = 0.4
-            # else:
+            # Solutions are cooperative
             factor = 0.5
             
             # Create a line corresponding to where the new velocity should be
@@ -119,7 +99,6 @@ class ORCA(ConflictResolution):
         
         # Check if optimisation failed
         if fail_index < len(lines)-1:
-            print('safesolution')
             # Calculate velocity using the safest solution algorithm
             vel = self.safest_solution(lines, fail_index, vel)
         
