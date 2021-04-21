@@ -806,7 +806,8 @@ class RadarWidget(QGLWidget):
                 self.traillines.set_vertex_count(0)
 
     def cmdline_stacked(self, cmd, args):
-        if cmd in ['AREA', 'BOX', 'POLY', 'POLYGON', 'CIRCLE', 'LINE','POLYLINE']:
+        if cmd in ['AREA', 'BOX', 'POLY', 'POLYGON', 'CIRCLE', 'LINE','POLYLINE'
+                   , 'GEOFENCE']:
             self.polyprev.set_vertex_count(0)
 
     def previewpoly(self, shape_type, data_in=None):
@@ -1020,7 +1021,7 @@ class RadarWidget(QGLWidget):
             cmd = console.get_cmd()
             nargs = len(console.get_args())
             if cmd in ['AREA', 'BOX', 'POLY','POLYLINE',
-                       'POLYALT', 'POLYGON', 'CIRCLE', 'LINE'] and nargs >= 2:
+                       'POLYALT', 'POLYGON', 'CIRCLE', 'LINE', 'GEOFENCE'] and nargs >= 2:
                 self.prevmousepos = self.mousepos
                 try:
                     # get the largest even number of points

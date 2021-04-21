@@ -31,6 +31,7 @@ def radarclick(cmdline, lat, lon, acdata=None, route=None):
                 "DIST": "latlon,-,latlon",
                 "DUMPRTE": "acid",
                 "ENG": "acid,-",
+                "GEOFENCE": "-,latlon,...",
                 "GETWIND":"latlon,-",
                 "GROUP":"-,acid,...",
                 "HDG": "acid,hdg",

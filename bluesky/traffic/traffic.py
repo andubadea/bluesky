@@ -19,7 +19,7 @@ from bluesky.tools.aero import cas2tas, casormach2tas, fpm, kts, ft, g0, Rearth,
                          vatmos,  vtas2cas, vtas2mach, vcasormach
 
 
-from bluesky.traffic.asas import ConflictDetection, ConflictResolution
+from bluesky.traffic.asas import ConflictDetection, ConflictResolution, GeofenceSense
 from .windsim import WindSim
 from .conditional import Condition
 from .trails import Trails
@@ -127,6 +127,7 @@ class Traffic(Entity):
             # Flight Models
             self.cd       = ConflictDetection()
             self.cr       = ConflictResolution()
+            self.geos     = GeofenceSense()
             self.ap       = Autopilot()
             self.aporasas = APorASAS()
             self.adsb     = ADSB()
@@ -429,6 +430,7 @@ class Traffic(Entity):
     @timed_function(name='asas', dt=bs.settings.asas_dt, manual=True)
     def update_asas(self):
         # Conflict detection and resolution
+        self.geos.update(self)
         self.cd.update(self, self)
         self.cr.update(self.cd, self, self)
 
