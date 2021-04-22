@@ -2,6 +2,7 @@
 # Geofences need shapely
 import bluesky as bs
 import numpy as np
+import json
 
 def init_plugin():
     # Create new geofences dictionary
@@ -118,7 +119,7 @@ class GeofenceTileData():
     '''
     def __init__(self):
         ''' Z is the zoom level.'''
-        self.z = 10 # Default zoom level
+        self.calcZ(bs.settings.geofence_dlookahead) # Default zoom level
         self.size = self.numTiles(self.z)
         # Dictionary that links tiles to geofence names. This is the one that
         # should be used when detecting geofences in range of an aircraft.
@@ -130,7 +131,36 @@ class GeofenceTileData():
         self.geodictionary = dict()
         
     def setZ(self, z):
+        # Cap the zoom level between 1 and 13
+        if z>13:
+            z = 13
+        if z<1:
+            z = 1
         self.z = z
+        
+    def calcZ(self, dlookahead):
+        # Calculate the zoom level in function of required lookahead distance
+        # Tiles don't all have the same edge distance, so we need to assume the
+        # worst case (i.e., tile is at equator, so work with Earth circumference). 
+        # Aircraft will be looking in a 3x3 tile area. We need to make sure that the
+        # edge of this area is at least twice the lookahead time. This means that the
+        # edge of a tile needs to be 2/3 of dlookahead time at minimum in length. 
+        # So, minimum edge length:
+        min_edge_length = dlookahead * 2 / 3 # dlookahead in meters
+        Earth_circumference = 40075000 # meters
+        max_numtiles = Earth_circumference / min_edge_length # Keep it as float for now
+        
+        # Ok so now we have the maximum amount of numtiles, we need to find the
+        # closest power of two to this number, as the number of tiles spanning
+        # the equator is equal to 2 ** z
+        power = self.power_of_two(max_numtiles)
+        print(power)
+        # This power is basically the zoom level we need. Set the zoom to this
+        self.setZ(power)
+        return
+        
+        
+        
         
     def getGeofenceTiles(self, Geofence):
         ''' Retrieves the tiles spanned by the sides of a geofence.'''
@@ -369,6 +399,19 @@ class GeofenceTileData():
     def sec(self, x):
         return 1 / np.cos(x)
     
+    def power_of_two(self, target):
+        # Returns the power of two that is that closest, but smaller than 
+        # target. 
+        if target > 1:
+            i = 0
+            while True:
+                if (2 ** i >= target):
+                    return (i - 1)
+                i += 1
+        else:
+            return 1
+
+    
 # ----------------------------- End of Helper Classes -----------------------------
 
 # ----------------------------- Plugin Functions ----------------------------------
@@ -397,10 +440,10 @@ def setZ(z):
     If this is done, we need to reset the geofenceTileData dictionaries
     and add all geofences one by one again. This is a lengty process
     if there are a lot of geofences and/or the zoom level is high.
-    The zoom level is capped at 12 for now.'''
-    # Cap the zoom level between 1 and 12
-    if z>12:
-        z = 12
+    The zoom level is capped at 13 for now.'''
+    # Cap the zoom level between 1 and 13
+    if z>13:
+        z = 13
     if z<1:
         z = 1
         
@@ -478,3 +521,13 @@ def bounds(coordinates):
     lats = coordinates[::2]
     lons = coordinates[1::2]
     return (min(lats), min(lons), max(lats), max(lons))
+
+def loadFromFile():
+    # Loads geofences from json file
+    #TODO
+    return
+
+def saveToFile():
+    # Saves current dictionaries to json file
+    #TODO
+    return
