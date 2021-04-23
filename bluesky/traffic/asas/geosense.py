@@ -52,7 +52,7 @@ class GeofenceSense():
         geofenceplugin = bs.core.varexplorer.varlist['geofence'][0]
         
         # Get geofence data from plugin
-        geofenceTileData = geofenceplugin.geofenceTileData
+        geofenceTileData = geofenceplugin.TileData
         geofenceData = geofenceplugin.geofences
         
         # If there are no geofences then there is no point in continuing

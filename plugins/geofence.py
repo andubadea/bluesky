@@ -2,7 +2,8 @@
 # Geofences need shapely
 import bluesky as bs
 import numpy as np
-import json
+import pickle
+import os
 
 def init_plugin():
     # Create new geofences dictionary
@@ -58,6 +59,18 @@ def init_plugin():
             '',
             reset,
             'Delete all geofences']
+        ,
+        'LOADGEOFENCES': [
+            'LOADGEOFENCES name, graphics? [Y/N] ',
+            '[txt,txt]',
+            loadFromFile,
+            'Load geofence data from specified .pkl file.']
+        ,
+        'SAVEGEOFENCES': [
+            'SAVEGEOFENCES name',
+            'txt',
+            saveToFile,
+            'Save geofence data to specified .pkl file.'],
         }
     # init_plugin() should always return these two dicts.
     return config, stackfunctions
@@ -131,36 +144,33 @@ class GeofenceTileData():
         self.geodictionary = dict()
         
     def setZ(self, z):
-        # Cap the zoom level between 1 and 13
-        if z>13:
-            z = 13
+        # Cap the zoom level between 1 and 18
+        if z>18:
+            z = 18
         if z<1:
             z = 1
         self.z = z
         
     def calcZ(self, dlookahead):
         # Calculate the zoom level in function of required lookahead distance
-        # Tiles don't all have the same edge distance, so we need to assume the
-        # worst case (i.e., tile is at equator, so work with Earth circumference). 
+        # Tiles don't all have the same edge distance, so we need to assume an
+        # average case (i.e., tile is at latitude 45 deg). 
         # Aircraft will be looking in a 3x3 tile area. We need to make sure that the
         # edge of this area is at least twice the lookahead time. This means that the
         # edge of a tile needs to be 2/3 of dlookahead time at minimum in length. 
         # So, minimum edge length:
         min_edge_length = dlookahead * 2 / 3 # dlookahead in meters
-        Earth_circumference = 40075000 # meters
-        max_numtiles = Earth_circumference / min_edge_length # Keep it as float for now
+        circumference_45 = 28305000 # meters
+        max_numtiles = circumference_45 / min_edge_length # Keep it as float for now
         
         # Ok so now we have the maximum amount of numtiles, we need to find the
         # closest power of two to this number, as the number of tiles spanning
         # the equator is equal to 2 ** z
         power = self.power_of_two(max_numtiles)
-        print(power)
-        # This power is basically the zoom level we need. Set the zoom to this
-        self.setZ(power)
+        # This power is basically the zoom level we need. But, to account for big erros
+        # for higher lattitudes, subtract 1 from the zoom level.
+        self.setZ(power-1)
         return
-        
-        
-        
         
     def getGeofenceTiles(self, Geofence):
         ''' Retrieves the tiles spanned by the sides of a geofence.'''
@@ -192,7 +202,28 @@ class GeofenceTileData():
             else:
                 # create entry
                 self.geodictionary[name] = set([tile])
-        print(self.geodictionary)
+        return
+        
+    def addGeofenceAndTiles(self, Geofence, tiles):
+        '''Adds a geofence and assumes the tiles are already known, thus avoiding the calculation of tiles.'''
+        name = Geofence.name
+        # Tiles need to be a list of tuples, e.g., [(1,1), (1,2)]
+        for tile in tiles:
+            # Handle tiledictionary
+            if tile in self.tiledictionary:
+                self.tiledictionary[tile].add(name)
+            else:
+                # Create entry
+                self.tiledictionary[tile] = set([name])
+                
+            # Handle geodictionary
+            if name in self.geodictionary:
+                # append tile
+                self.geodictionary[name].add(tile)
+            else:
+                # create entry
+                self.geodictionary[name] = set([tile])
+        return
         
     def removeGeofence(self, GeofenceName):
         ''' Removes a geofence from the tile dictionary. Only uses
@@ -418,7 +449,7 @@ class GeofenceTileData():
 # A dictionary of geofences {name : Geofence object}
 geofences = dict()
 # A container that links tile data and geofence data
-geofenceTileData = GeofenceTileData()
+TileData = GeofenceTileData()
 
 def preupdate():
     return
@@ -432,7 +463,7 @@ def reset():
     for geofencename in geofences:
         bs.scr.objappend('', geofencename, None)
     geofences.clear()
-    geofenceTileData.clear()
+    TileData.clear()
     return
 
 def setZ(z):
@@ -440,20 +471,20 @@ def setZ(z):
     If this is done, we need to reset the geofenceTileData dictionaries
     and add all geofences one by one again. This is a lengty process
     if there are a lot of geofences and/or the zoom level is high.
-    The zoom level is capped at 13 for now.'''
-    # Cap the zoom level between 1 and 13
-    if z>13:
-        z = 13
+    The zoom level is capped at 18 for now.'''
+    # Cap the zoom level between 1 and 18
+    if z>18:
+        z = 18
     if z<1:
         z = 1
         
     # Set the new zoom level
-    geofenceTileData.setZ(z)
+    TileData.setZ(z)
     # Clear dictionaries
-    geofenceTileData.clear()
+    TileData.clear()
     # Add geofences from dictionary one by one
     for geofence in geofences.values():
-        geofenceTileData.addGeofence(geofence)
+        TileData.addGeofence(geofence)
 
     return True, f'Zoom successfully changed to level {z}.'
 
@@ -480,6 +511,7 @@ def defgeofencepoly(*args):
     coordinates = args[1:]
     top=1e9 
     bottom=-1e9
+    
     # Add geofence to dictionary of geofences
     myGeofence = Geofence(geofencename, coordinates, top, bottom)
     geofences[geofencename] = myGeofence
@@ -493,7 +525,7 @@ def defgeofencepoly(*args):
     bs.net.send_event(b'COLOR', data)
     
     # Add geofence to tile data container
-    geofenceTileData.addGeofence(myGeofence)
+    TileData.addGeofence(myGeofence)
     
     return True, f'Created geofence {args[0]}.'
 
@@ -508,7 +540,7 @@ def delgeofence(name=""):
     bs.scr.objappend('', geofencename, None)
     
     # Remove geofence from all dictionaries
-    geofenceTileData.removeGeofence(geofencename)
+    TileData.removeGeofence(geofencename)
     
     return True, f'Deleted geofence {name}'
 
@@ -522,12 +554,89 @@ def bounds(coordinates):
     lons = coordinates[1::2]
     return (min(lats), min(lons), max(lats), max(lons))
 
-def loadFromFile():
-    # Loads geofences from json file
-    #TODO
+def loadFromFile(*args):
+    # Loads geofences and their tile data from .pkl file
+    filename = args[0]
+    graphicsYN = args[1]
+    
+    if graphicsYN in ['Y', 'y']:
+        loadGraphicsBool = True
+    elif graphicsYN in ['N', 'n']:
+        loadGraphicsBool = False
+    else:
+        return 'Could not parse command. Use Y or N. '
+    
+    if filename[-4:] != '.pkl':
+        filename = filename + '.pkl'
+        
+    # Check if file exists
+    if not os.path.exists('data/geofence/' + filename):
+        bs.scr.echo('File does not exist.')
+        return
+    
+    bs.scr.echo('Loading pickle file...')
+    
+    # We need to import the 3 dictionaries, and send geofences to screen if requested
+    with open('data/geofence/' + filename, 'rb') as f:
+        GlobalDict = pickle.load(f)
+    
+    # Take the global instance of variables
+    global geofences
+    global TileData
+    
+    print(GlobalDict)
+    
+    # Set them as such
+    geofences = GlobalDict['geofences']
+    TileData.tiledictionary = GlobalDict['tiledictionary']
+    TileData.geodictionary = GlobalDict['geodictionary']
+    
+    if loadGraphicsBool == True:
+        # Also send the geofences to be drawn
+        for geofence in geofences.values():
+            geofencename = geofence.name
+            coordinates = geofence.coordinates
+            # Create shape on screen
+            bs.scr.objappend('POLY', geofencename, coordinates)
+            
+            # Make geofence red
+            data = dict(color=(255, 0, 0))
+            data['polyid'] = geofencename
+            bs.net.send_event(b'COLOR', data)
+    
+    bs.scr.echo('Load from file successful.')
     return
 
-def saveToFile():
-    # Saves current dictionaries to json file
+def saveToFile(filename):
+    # Saves geofences and their tile data to json file
+    # We need to store: Geofence name, coords, topalt, bottomalt, associated tiles
     #TODO
-    return
+    # Process command
+    if filename[-4:] != '.pkl':
+        filename = filename + '.pkl'
+
+    bs.scr.echo('Saving to pickle file...')
+    
+    # Prepare dictionary. We have an overall dictionary that will serve as a
+    # collection of dictionaries. 
+    GlobalDict = dict()
+    
+    # First store geofences dict
+    GlobalDict['geofences'] = geofences
+    
+    # Then store the two dictionaries from GeofenceTileData
+    GlobalDict['tiledictionary'] = TileData.tiledictionary
+    GlobalDict['geodictionary'] = TileData.geodictionary
+    
+    # Check if geofence folder exists in data
+    dirname = "data/geofence"
+    if not os.path.exists(dirname):
+        os.makedirs(dirname)
+    
+    # Now save this GlobalDict to a .pkl file
+    with open('data/geofence/' + filename, 'wb') as f:
+        pickle.dump(GlobalDict, f, pickle.HIGHEST_PROTOCOL)
+    
+    bs.scr.echo('Save to file successful.')
+    
+    return 'Save to file successful.'
