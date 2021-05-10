@@ -8,6 +8,8 @@ from bluesky.tools.aero import ft, kts, g0, nm, mach2cas, casormach2tas
 from bluesky.tools.misc import degto180, txt2tim, txt2alt, txt2spd
 from bluesky.tools.position import txt2pos
 from bluesky import stack
+from bluesky.stack.cmdparser import Command, command, commandgroup
+
 
 
 class Route(Replaceable):
@@ -45,6 +47,7 @@ class Route(Replaceable):
         self.wpspd  = []    # [m/s] negative value means not specified
         self.wprta  = []    # [m/s] negative value means not specified
         self.wpflyby = []   # Flyby (True)/flyover(False) switch
+        self.wpstack = []   # Stack with command execured when passing this waypoint
 
         # Made for drones: fly turn mode, means use specified turn radius and optionally turn speed
         self.wpflyturn = []   # Flyturn (True) or flyover/flyby (False) switch
@@ -98,7 +101,9 @@ class Route(Replaceable):
     def addwptStack(self, idx, *args):  # args: all arguments of addwpt
         """ADDWPT acid, (wpname/lat,lon),[alt],[spd],[afterwp],[beforewp]"""
 
-#        print "addwptStack:",args
+        #debug print ("addwptStack:",args)
+        #print("active = ",self.wpname[self.iactwp])
+        #print(args)
         # Check FLYBY or FLYOVER switch, instead of adding a waypoint
 
         if len(args) == 1:
@@ -291,18 +296,19 @@ class Route(Replaceable):
         # Recalculate flight plan
         self.calcfp()
 
-        # Check for success by checking insetred locaiton in flight plan >= 0
+        # Check for success by checking inserted location in flight plan >= 0
         if wpidx < 0:
             return False, "Waypoint " + name + " not added."
 
-        # chekc for presence of orig/dest
-        norig = int(bs.traf.ap.orig[idx] != "")
-        ndest = int(bs.traf.ap.dest[idx] != "")
+        # check for presence of orig/dest
+        norig = int(bs.traf.ap.orig[idx] != "") # 1 if orig is present in route
+        ndest = int(bs.traf.ap.dest[idx] != "") # 1 if dest is present in route
 
         # Check whether this is first 'real' waypoint (not orig & dest),
         # And if so, make active
         if self.nwp - norig - ndest == 1:  # first waypoint: make active
             self.direct(idx, self.wpname[norig])  # 0 if no orig
+            #print("direct ",self.wpname[norig])
             bs.traf.swlnav[idx] = True
 
         if afterwp and self.wpname.count(afterwp) == 0:
@@ -335,6 +341,7 @@ class Route(Replaceable):
         return result
 
     def atwptStack(self, idx, *args):  # args: all arguments of addwpt
+        #print("args=",args)
 
         # AT acid, wpinroute [DEL] ALT/SPD spd/alt"
         # args = wpname,SPD/ALT, spd/alt(string)
@@ -347,12 +354,12 @@ class Route(Replaceable):
             if name in self.wpname:
                 wpidx = self.wpname.index(name)
 
-                # acid AT wpinroute: show alt & spd constraints at this waypoint
-                # acid AT wpinroute SPD: show spd constraint at this waypoint
-                # acid AT wpinroute ALT: show alt constraint at this waypoint
-
                 if len(args) == 1 or \
                         (len(args) == 2 and not args[1].count("/") == 1):
+                    # Only show Altitude and/or speed set in route at this waypoint:
+                    #    KL204 AT LOPIK => acid AT wpinroute: show alt & spd constraints at this waypoint
+                    #    KL204 AT LOPIK SPD => acid AT wpinroute SPD: show spd constraint at this waypoint
+                    #    KL204 AT LOPIK ALT => acid AT wpinroute ALT: show alt constraint at this waypoint
 
                     txt = name + " : "
 
@@ -360,14 +367,17 @@ class Route(Replaceable):
                     if len(args)==1:
                         swalt = True
                         swspd = True
+                        swat  = True
                     else:
                         swalt = args[1].upper()=="ALT"
                         swspd = args[1].upper() in ("SPD","SPEED")
+                        swat  = args[1].upper() in ("DO", "STACK")
 
                         # To be safe show both when we do not know what
-                        if not (swalt or swspd):
+                        if not (swalt or swspd or swat):
                             swalt = True
                             swspd = True
+                            swat  = True
 
                     # Show altitude
                     if swalt:
@@ -398,10 +408,19 @@ class Route(Replaceable):
                         elif self.wptype[wpidx] == Route.dest:
                             txt += "[dest]"
 
+                    # Show also stacked commands for when passing this waypoint
+                    if swat:
+                        if len(self.wpstack[wpidx])>0:
+                            txt = txt+"\nStack:\n"
+                            for stackedtxt in self.wpstack[wpidx]:
+                                txt = txt + stackedtxt + "\n"
+
+
                     return True, txt
 
                 elif args[1].count("/")==1:
-                    # acid AT wpinroute alt"/"spd
+                    # Set both alt & speed at this waypoint
+                    #     KL204 AT LOPIK FL090/250  => acid AT wpinroute alt/spd
                     success = True
 
                     # Use parse from stack.py to interpret alt & speed
@@ -432,11 +451,17 @@ class Route(Replaceable):
                     self.calcfp()
                     self.direct(idx, self.wpname[self.iactwp])
 
-
                 #acid AT wpinroute ALT/SPD alt/spd
-                elif len(args)==3 :
+                elif len(args)>=3:
+                    # KL204 AT LOPIK ALT FL090 => set altitude to be reached at this waypoint in route
+                    # KL204 AT LOPIK SPD 250 => Set speed at twhich is set at this waypoint
+                    # KL204 AT LOPIK DO PAN LOPIK => When passing stack command after DO
+                    # KL204 AT LOPIK STACK PAN LOPIK => AT...STACK synonym for AT...DO
+                    # KL204 AT LOPIK DO ALT FL240 => => stack "KL204 ALT FL240" => use acid from beginning if omitted as first argument
+
                     swalt = args[1].upper()=="ALT"
                     swspd = args[1].upper() in ("SPD","SPEED")
+                    swat  = args[1].upper() in ("DO","STACK")
 
                     # Use parse from stack.py to interpret alt & speed
 
@@ -454,17 +479,47 @@ class Route(Replaceable):
                         except ValueError as e:
                             return False, e.args[0]
 
+                    # add stack command: args[1] is DO or STACK, args[2:] contains a command
+                    elif swat:
+                        # Check if first argument is missing aircraft id, if so, use this acid
+
+                        # IF command starts with aircraft id, it is not missing
+                        cmd = args[2].upper()
+                        if not(cmd in bs.traf.id):
+                            # Look up arg types
+                            try:
+                                cmdobj = Command.cmddict.get(cmd)
+
+                                # Command found, check arguments
+                                argtypes = cmdobj.annotations
+
+                                if argtypes[0]=="acid" and not (args[3].upper() in bs.traf.id):
+                                    # missing acid, so add ownship acid
+                                    self.wpstack[wpidx].append(self.acid+" "+" ".join(args[2:]))
+                                else:
+                                    # This command does not need an acid or it is already first argument
+                                    self.wpstack[wpidx].append(" ".join(args[2:]))
+                            except:
+                                return False, "Stacked command "+cmd+"unknown"
+                        else:
+                            # Command line starts with an aircraft id at the beginning of the command line, stack it
+                            self.wpstack[wpidx].append(" ".join(args[2:]))
+
                     # Delete a constraint (or both) at this waypoint
-                    elif args[1]=="DEL" or args[1]=="DELETE":
+                    elif args[1]=="DEL" or args[1]=="DELETE" or args[1]=="CLR" or args[1]=="CLEAR" :
                         swalt = args[2].upper()=="ALT"
                         swspd = args[2].upper() in ("SPD","SPEED")
-                        both  = args[2].upper() in ("ALL","BOTH")
+                        swboth  = args[2].upper()=="BOTH"
+                        swall   = args[2].upper()=="ALL"
 
-                        if swspd or both:
+                        if swspd or swboth or swall:
                             self.wpspd[wpidx]  = -999.
 
-                        if swalt or both:
+                        if swalt or swboth or swall:
                             self.wpalt[wpidx]  = -999.
+
+                        if swall:
+                            self.wpstack[wpidx]=[]
 
                     else:
                         return False,"No "+args[1]+" at ",name
@@ -518,6 +573,7 @@ class Route(Replaceable):
             self.wpturnrad[wpidx] = self.turnrad
             self.wpturnspd[wpidx] = self.turnspd
             self.wprta[wpidx]   = -999.0 # initially no RTA
+            self.wpstack[wpidx] = []
 
         else:
             self.wpname.insert(wpidx, wpname)
@@ -531,6 +587,7 @@ class Route(Replaceable):
             self.wpturnrad.insert(wpidx, self.turnrad)
             self.wpturnspd.insert(wpidx, self.turnspd)
             self.wprta.insert(wpidx,-999.0)       # initially no RTA
+            self.wpstack.insert(wpidx,[])
 
 
     def addwpt(self, iac, name, wptype, lat, lon, alt=-999., spd=-999., afterwp="", beforewp=""):
@@ -907,6 +964,12 @@ class Route(Replaceable):
                self.wpturnspd[self.iactwp], \
                nextqdr
 
+    def runactwpstack(self):
+        for cmdline in self.wpstack[self.iactwp]:
+            stack.stack(cmdline)
+            #debug
+            # stack.stack("ECHO "+self.acid+" AT "+self.wpname[self.iactwp]+" command issued:"+cmdline)
+        return
 
     def delrte(self,iac=None):
         """Delete complete route"""

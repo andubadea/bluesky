@@ -28,7 +28,6 @@ class ActiveWaypoint(Entity, replaceable=True):
             self.xtorta     = np.array([])    # [m] distance ot next RTA
             self.next_qdr   = np.array([])    # [deg] track angle of next leg
 
-
     def create(self, n=1):
         super().create(n)
         # LNAV route navigation
@@ -50,6 +49,9 @@ class ActiveWaypoint(Entity, replaceable=True):
 
     def Reached(self, qdr, dist, flyby, flyturn, turnradnm):
         # Calculate distance before waypoint where to start the turn
+        # Note: this is a vectorized function, called with numpy arrays
+        # It returns the indices where the Reached criterion is True
+        #
         # Turn radius:      R = V2 tan phi / g
         # Distance to turn: wpturn = R * tan (1/2 delhdg) but max 4 times radius
         # using default bank angle per flight phase
@@ -60,8 +62,11 @@ class ActiveWaypoint(Entity, replaceable=True):
 
         self.turndist = np.logical_or(flyby,flyturn)*flybyturndist
 
-        # Avoid circling by checking for flying away
-        away     = np.abs(degto180(bs.traf.trk%360. - qdr%360.)) > 90. # difference large than 90
+        # Avoid circling by checking for flying away on almost straight legs with small turndist
+        # difference between direction to and track larger than 90
+        # but avoid switching wayspoint when trk undefined due to standing still (groundspeed (<1 m/s)
+        away  = (np.abs(bs.traf.gs)>1)*(np.abs(degto180(bs.traf.trk%360. - qdr%360.)) > 90.) # difference large than 90
+
 
         # Ratio between distance close enough to switch to next wp when flying away
         # When within pro1 nm and flying away: switch also
@@ -70,9 +75,10 @@ class ActiveWaypoint(Entity, replaceable=True):
         circling = away*incircle # [True/False] passed wp,used for flyover as well
 
         # Check whether shift based dist is required, set closer than WP turn distance
+        # Detect indices
         swreached = np.where(bs.traf.swlnav * np.logical_or(away,np.logical_or(dist < self.turndist,circling)))[0]
 
-        # Return True/1.0 for a/c where we have reached waypoint
+        # Return indices for which condition is True/1.0 for a/c where we have reached waypoint
         return swreached
 
     # Calculate turn distance for array or scalar
