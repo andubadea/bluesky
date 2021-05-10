@@ -92,6 +92,9 @@ class GeofenceSense():
                     geofence_names = geofence_names.union(geofenceTileData.tiledictionary[tile])
                     print(geofence_names)
 
+            # Now that we have a list of geofences around the aircraft, we need to see
+            # which ones are we truly in danger of crossing.
+            
             if geofence_names:
                 for geofence_name in geofence_names:
                     # Get the geofence itself
@@ -107,7 +110,6 @@ class GeofenceSense():
                     plat, plon = p1.x, p1.y
                     # Get distance between aircraft and geofence
                     distance = geo.latlondist(aclat, aclon, plat, plon)
-                    print(acid, geofence_name, distance)
                     if distance < bs.settings.geofence_dlookahead:
                         self.geoconfs.append((acid, i, geofence_name))
                     
