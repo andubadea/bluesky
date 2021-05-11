@@ -1,6 +1,7 @@
 ''' Plugin that creates and keeps track of geofences.'''
 # Geofences need shapely
 import bluesky as bs
+import shapely
 import numpy as np
 import pickle
 import os
@@ -96,6 +97,7 @@ class Geofence:
         self.edges = self.getEdges()
         self.topalt = topalt
         self.bottomalt = bottomalt
+        self.poly = shapely.geometry.Polygon(self.getPointArray())
         
     def getEdges(self):
         ''' Returns a list of the edges of the geofence as a list of lines.'''
@@ -119,6 +121,9 @@ class Geofence:
         lons = self.coordinates[1::2]
         pointsarr = np.array([lats, lons])
         return pointsarr.T
+    
+    def getPoly(self):
+        return self.poly
         
 # Class for tile data container
 class GeofenceTileData():
@@ -460,10 +465,12 @@ def update(): # Not used
     return
 
 def reset():
+    ''' Resets everything geofence related. '''
     for geofencename in geofences:
         bs.scr.objappend('', geofencename, None)
     geofences.clear()
     TileData.clear()
+    bs.traf.geos.reset()
     return
 
 def setZ(z):
@@ -527,6 +534,8 @@ def defgeofencepoly(*args):
     # Add geofence to tile data container
     TileData.addGeofence(myGeofence)
     
+    print(myGeofence.getPoly())
+    
     return True, f'Created geofence {args[0]}.'
 
 # Delete geofence
@@ -541,6 +550,9 @@ def delgeofence(name=""):
     
     # Remove geofence from all dictionaries
     TileData.removeGeofence(geofencename)
+    
+    # Remove geofence from geosense
+    bs.traf.geos.delgeofence(geofencename)
     
     return True, f'Deleted geofence {name}'
 

@@ -12,22 +12,6 @@ from shapely.geometry.polygon import Polygon, Point
 from bluesky.tools import geo
 from bluesky.tools.aero import nm
 
-
-# Dictionaries to keep track of whether aircraft are inside or
-# outside geofences. The only reason these exist is that, if the geofence is large
-# enough (or tile zoom is large enough) and an aircraft is inside it, because 
-# of the tile-based optimisation, it will not be detected. For this situation 
-# specifically, we need to keep track of aircraft that are inside a geofence. 
-
-# First dictionary can be used to check if an aircraft is inside any geofences.
-# If aircraft ID is not present, then aircraft is not inside any geofence. Same if
-# entry for ACID is empty. 
-acingeofence = dict()
-
-# Second dictionary checks whether a geofence has aircraft inside it. If geofence name
-# is not present, there are no aircraft inside it. Same if entry for geofence name is
-# empty. 
-geofencehasac = dict()
 class Tile:
     def __init__(self, x, y):
         self.x = x
@@ -36,15 +20,60 @@ class Tile:
 class GeofenceSense():
     def __init__(self):
         super().__init__()
-        self.geoconfs = []
+        # Dictionaries to keep track of whether aircraft are inside or
+        # outside geofences. The only reason these exist is that, if the geofence is large
+        # enough (or tile zoom is large enough) and an aircraft is inside it, because 
+        # of the tile-based optimisation, it will not be detected. For this situation 
+        # specifically, we need to keep track of aircraft that are inside a geofence. 
+
+        # First dictionary can be used to check if an aircraft is inside any geofences.
+        # If aircraft ID is not present, then aircraft is not inside any geofence. Same if
+        # entry for ACID is empty. 
+        self.acingeofence = dict()
+
+        # Second dictionary checks whether a geofence has aircraft inside it. If geofence name
+        # is not present, there are no aircraft inside it. Same if entry for geofence name is
+        # empty. 
+        self.geofencehasac = dict()
+
+        # Dictionary to find the geofences in vicinity of aircraft for further use in detecting
+        # conflicts. Dictionary is shaped like this: 
+        # ACID : {geofence objects}
+        self.geoinvicinity = dict()
         return
     
-    def update(self, ownship):
-        self.geoconfs = []
-        self.detect(ownship)
-                
     # This function is called from within traffic
-    def detect(self,ownship):
+    def update(self, ownship):
+        self.detect(ownship)   
+        
+    def reset(self):
+        self.acingeofence = dict()
+        self.geofencehasac = dict()
+        self.geoinvicinity = dict()
+        
+    def delgeofence(self, geofencename):
+        '''Delete geofence from the dictionaries in this class.'''
+        # First do the easy bit, simply remove geofence entry
+        if geofencename in self.geofencehasac:
+            self.geofencehasac.pop(geofencename)
+            
+        # Then the harder part. For loop over dictionary
+        for key in self.acingeofence:
+            if geofencename in self.acingeofence[key]:
+                self.acingeofence[key].remove(geofencename)
+        
+    def delaircraft(self, acid):
+        '''Delete acid from the dictionaries in this class.'''
+        # Easy bit, remove ac entry
+        if acid in self.acingeofence:
+            self.acingeofence.pop(acid)
+            
+        # Loop over geofence dictionary
+        for key in self.geofencehasac:
+            if acid in self.geofencehasac[key]:
+                self.geofencehasac[key].remove(acid)
+                
+    def detect(self, ownship):
         # Check if geofence plugin is enabled
         if 'geofence' not in bs.core.varexplorer.varlist:
             return 'Geofence plugin not loaded.'
@@ -67,11 +96,8 @@ class GeofenceSense():
         # not exaggerated (like, 10k at once), then this is fine. 
         ntraf = ownship.ntraf
         
-        print(geofencehasac)
-        print(acingeofence) 
-        
         # Retain conflicts between aircraft and geofences: (ACID, AC_IDX, GEOFENCE NAME)
-        self.geoconfs = []
+        self.geoinvicinity = dict()
         for i in np.arange(ntraf):
             acid = ownship.id[i]
             # Get aircraft position and tile
@@ -87,13 +113,8 @@ class GeofenceSense():
             # Retrieve names of geofences in considered tiles
             for tile in tiles:
                 tile = (tile.x, tile.y)
-                print(tile)
                 if tile in geofenceTileData.tiledictionary:
                     geofence_names = geofence_names.union(geofenceTileData.tiledictionary[tile])
-                    print(geofence_names)
-
-            # Now that we have a list of geofences around the aircraft, we need to see
-            # which ones are we truly in danger of crossing.
             
             if geofence_names:
                 for geofence_name in geofence_names:
@@ -111,45 +132,51 @@ class GeofenceSense():
                     # Get distance between aircraft and geofence
                     distance = geo.latlondist(aclat, aclon, plat, plon)
                     if distance < bs.settings.geofence_dlookahead:
-                        self.geoconfs.append((acid, i, geofence_name))
+                        # Geofence in vicinity, add the object itself to dictionary
+                        if acid not in self.geoinvicinity:
+                            self.geoinvicinity[acid] = set()
+                        
+                        self.geoinvicinity[acid].add(geofence)
+                        
                     
+                    # Inside check
                     if distance == 0:
                         # We are inside the geofence. First, create entry for aircraft
-                        if acid not in acingeofence:
-                            acingeofence[acid] = list()
+                        if acid not in self.acingeofence:
+                            self.acingeofence[acid] = list()
                         
                         # Append geofence name to the list of geofences if not already there
-                        if geofence_name not in acingeofence[acid]:
-                            acingeofence[acid].append(geofence_name)
+                        if geofence_name not in self.acingeofence[acid]:
+                            self.acingeofence[acid].append(geofence_name)
                         
                         # Do the same for the other dictionary
-                        if geofence_name not in geofencehasac:
-                            geofencehasac[geofence_name] = list()
+                        if geofence_name not in self.geofencehasac:
+                            self.geofencehasac[geofence_name] = list()
                             
                         # Append acid to geofence name entry
-                        if acid not in geofencehasac[geofence_name]:
-                            geofencehasac[geofence_name].append(acid)
+                        if acid not in self.geofencehasac[geofence_name]:
+                            self.geofencehasac[geofence_name].append(acid)
                     
                     else:
                         # We are outside the geofence
                         # If entry for geofence name or acid do not exist in the dictionaries, then
                         # we do nothing
-                        if acid not in acingeofence or geofence_name not in geofencehasac:
+                        if acid not in self.acingeofence or geofence_name not in self.geofencehasac:
                             continue
                         
                         # Remove geofence name from acid dictionary, and vice versa
-                        if geofence_name in acingeofence[acid]:
-                            acingeofence[acid].remove(geofence_name)
+                        if geofence_name in self.acingeofence[acid]:
+                            self.acingeofence[acid].remove(geofence_name)
                             
-                        if acid in geofencehasac[geofence_name]:
-                            geofencehasac[geofence_name].remove(acid)
+                        if acid in self.geofencehasac[geofence_name]:
+                            self.geofencehasac[geofence_name].remove(acid)
                             
                         # Remove the keys entirely if list is now empty
-                        if not acingeofence[acid]:
-                            acingeofence.pop(acid)
+                        if not self.acingeofence[acid]:
+                            self.acingeofence.pop(acid)
                             
-                        if not geofencehasac[geofence_name]:
-                            geofencehasac.pop(geofence_name)   
+                        if not self.geofencehasac[geofence_name]:
+                            self.geofencehasac.pop(geofence_name)   
         return
                 
     # Helper functions   
