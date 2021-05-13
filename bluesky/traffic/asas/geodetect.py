@@ -59,7 +59,6 @@ class GeofenceDetection(Entity):
             # TODO: Might want to make this in function of time instead of a distance
             dlookahead = bs.settings.geofence_dlookahead
             pos_next = geo.qdrpos(pos_ac_2d[0], pos_ac_2d[1], hdg_ac, dlookahead / nm)
-            print(pos_next)
             
             # Create line
             line = shapely.geometry.LineString(np.array([pos_ac[:2], pos_next]))

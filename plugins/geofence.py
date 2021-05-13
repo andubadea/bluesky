@@ -3,8 +3,9 @@
 import bluesky as bs
 import shapely
 import numpy as np
-import pickle
+import dill
 import os
+import sys
 
 def init_plugin():
     # Create new geofences dictionary
@@ -290,35 +291,45 @@ class GeofenceTileData():
             # Stop if we are in final tile
             if (currentTileX, currentTileY) == (endTileX, endTileY):
                 return tiles
-            # Take corner of current tile
-            corner = self.getTileCorners(currentTileX, currentTileY, z)[itp]
             
-            # Get bearing with respect of point 1
-            crnBrg = self.kwikqdr(lat1, lon1, corner[0], corner[1])
-            
-            # Get bearing difference
-            brgDff = self.getBearingDifference(brg, crnBrg)
-            
-            # Bearing difference depends on which direction we're going into. If
-            # we're going either SW or NE, if bearing difference is positive, it
-            # means the line intersects the bottom/top (lattitude) edge of the tile.
-            # The opposite happens if we're going in SE or NW direction.
-            if latdir * londir > 0:
-                if brgDff >= 0:
-                    # Move in y direction to next tile
-                    nextTileX, nextTileY = currentTileX, currentTileY + ytiledir
+            if xtiledir != 0 and ytiledir != 0:
+                # Take corner of current tile
+                corner = self.getTileCorners(currentTileX, currentTileY, z)[itp]
+                
+                # Get bearing with respect of point 1
+                crnBrg = self.kwikqdr(lat1, lon1, corner[0], corner[1])
+                
+                # Get bearing difference
+                brgDff = self.getBearingDifference(brg, crnBrg)
+                
+                # Bearing difference depends on which direction we're going into. If
+                # we're going either SW or NE, if bearing difference is positive, it
+                # means the line intersects the bottom/top (lattitude) edge of the tile.
+                # The opposite happens if we're going in SE or NW direction.
+                if latdir * londir > 0:
+                    if brgDff >= 0:
+                        # Move in y direction to next tile
+                        nextTileX, nextTileY = currentTileX, currentTileY + ytiledir
+                    else:
+                        # Move in x direction to next tile
+                        nextTileX, nextTileY = currentTileX + xtiledir, currentTileY
                 else:
-                    # Move in x direction to next tile
-                    nextTileX, nextTileY = currentTileX + xtiledir, currentTileY
-            else:
-                # Do the opposite of above
-                if brgDff < 0:
-                    # Move in y direction to next tile
-                    nextTileX, nextTileY = currentTileX, currentTileY + ytiledir
-                else:
-                    # Move in x direction to next tile
-                    nextTileX, nextTileY = currentTileX + xtiledir, currentTileY
-            
+                    # Do the opposite of above
+                    if brgDff < 0:
+                        # Move in y direction to next tile
+                        nextTileX, nextTileY = currentTileX, currentTileY + ytiledir
+                    else:
+                        # Move in x direction to next tile
+                        nextTileX, nextTileY = currentTileX + xtiledir, currentTileY
+                
+            elif ytiledir == 0:
+                # We're going in the x direction only
+                nextTileX, nextTileY = currentTileX + xtiledir, currentTileY
+                
+            elif xtiledir == 0:
+                # We're moving in the y direction only
+                nextTileX, nextTileY = currentTileX, currentTileY + ytiledir
+                
             # Add to tile list
             tiles.append((int(nextTileX), int(nextTileY)))
             
@@ -360,7 +371,14 @@ class GeofenceTileData():
         """ Gives the direction in which we're moving in lat/lon. """
         difflat = latb - lata
         difflon = lonb - lona
-        return difflat/abs(difflat), difflon/abs(difflon)
+        if difflat != 0 and difflon != 0:
+            return difflat/abs(difflat), difflon/abs(difflon)
+        
+        if difflat == 0:
+            return 0, difflon/abs(difflon)
+        
+        if difflon == 0:
+            return difflat/abs(difflat), 0
     
     def getCornerIndex(self, latdir, londir):
         '''Gets the tile corner index that is going to be used for tile calculation'''
@@ -446,7 +464,6 @@ class GeofenceTileData():
                 i += 1
         else:
             return 1
-
     
 # ----------------------------- End of Helper Classes -----------------------------
 
@@ -590,13 +607,14 @@ def loadFromFile(*args):
     
     # We need to import the 3 dictionaries, and send geofences to screen if requested
     with open('data/geofence/' + filename, 'rb') as f:
-        GlobalDict = pickle.load(f)
+        GlobalDict = dill.load(f)
+        
+    print(GlobalDict)
+            
     
     # Take the global instance of variables
     global geofences
     global TileData
-    
-    print(GlobalDict)
     
     # Set them as such
     geofences = GlobalDict['geofences']
@@ -622,7 +640,6 @@ def loadFromFile(*args):
 def saveToFile(filename):
     # Saves geofences and their tile data to json file
     # We need to store: Geofence name, coords, topalt, bottomalt, associated tiles
-    #TODO
     # Process command
     if filename[-4:] != '.pkl':
         filename = filename + '.pkl'
@@ -647,7 +664,7 @@ def saveToFile(filename):
     
     # Now save this GlobalDict to a .pkl file
     with open('data/geofence/' + filename, 'wb') as f:
-        pickle.dump(GlobalDict, f, pickle.HIGHEST_PROTOCOL)
+        dill.dump(GlobalDict, f, dill.HIGHEST_PROTOCOL)
     
     bs.scr.echo('Save to file successful.')
     
