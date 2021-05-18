@@ -3,9 +3,8 @@
 import bluesky as bs
 import shapely
 import numpy as np
-import dill
+import pickle
 import os
-import sys
 
 def init_plugin():
     # Create new geofences dictionary
@@ -137,9 +136,6 @@ class GeofenceTileData():
     the global 'geofences' dictionary.
     '''
     def __init__(self):
-        ''' Z is the zoom level.'''
-        self.calcZ(bs.settings.geofence_dlookahead) # Default zoom level
-        self.size = self.numTiles(self.z)
         # Dictionary that links tiles to geofence names. This is the one that
         # should be used when detecting geofences in range of an aircraft.
         # {tile: [geofence names]}
@@ -148,6 +144,9 @@ class GeofenceTileData():
         # make geofence deletion faster from the other dictionary.
         # {geofence name: [tiles]}
         self.geodictionary = dict()
+        # Zoom level related
+        self.calcZ(bs.settings.geofence_dlookahead) # Default zoom level
+        self.size = self.numTiles(self.z)
         
     def setZ(self, z):
         # Cap the zoom level between 1 and 18
@@ -156,6 +155,8 @@ class GeofenceTileData():
         if z<1:
             z = 1
         self.z = z
+        self.tiledictionary['ZOOM'] = self.z
+        self.geodictionary['ZOOM'] = self.z
         
     def calcZ(self, dlookahead):
         # Calculate the zoom level in function of required lookahead distance
@@ -249,6 +250,8 @@ class GeofenceTileData():
     def clear(self):
         self.tiledictionary.clear()
         self.geodictionary.clear()
+        self.tiledictionary['ZOOM'] = self.z
+        self.geodictionary['ZOOM'] = self.z
     
     def getVertexTiles(self, lat1, lon1, lat2, lon2):
         '''Returns the tiles crossed by the geofence vertex.'''
@@ -584,6 +587,8 @@ def bounds(coordinates):
     return (min(lats), min(lons), max(lats), max(lons))
 
 def loadFromFile(*args):
+    # Clear previous geofences
+    reset()
     # Loads geofences and their tile data from .pkl file
     filename = args[0]
     graphicsYN = args[1]
@@ -607,19 +612,30 @@ def loadFromFile(*args):
     
     # We need to import the 3 dictionaries, and send geofences to screen if requested
     with open('data/geofence/' + filename, 'rb') as f:
-        GlobalDict = dill.load(f)
-        
-    print(GlobalDict)
-            
+        GlobalDict = pickle.load(f)  
     
     # Take the global instance of variables
     global geofences
     global TileData
     
+    # Process the geofences
+    geodict = GlobalDict['geodict']
+    for geofencename in geodict:
+        data = geodict[geofencename]
+        geofences[geofencename] = Geofence(geofencename, data['coordinates'], data['topalt'], data['bottomalt'])
+           
     # Set them as such
-    geofences = GlobalDict['geofences']
     TileData.tiledictionary = GlobalDict['tiledictionary']
     TileData.geodictionary = GlobalDict['geodictionary']
+    
+    # Set the zoom level to match the one in TileData
+    #try:
+    TileData.setZ(GlobalDict['tiledictionary']['ZOOM'])
+    #except:
+        #bs.scr.echo('File is missing zoom level data. Load failed.')
+        #reset()
+        #return
+    
     
     if loadGraphicsBool == True:
         # Also send the geofences to be drawn
@@ -650,8 +666,20 @@ def saveToFile(filename):
     # collection of dictionaries. 
     GlobalDict = dict()
     
-    # First store geofences dict
-    GlobalDict['geofences'] = geofences
+    # First store geofences dict. We create some temp dictionaries for this
+    geodict = dict()
+    for geofencename in geofences:
+        geofence = geofences[geofencename]
+        # secondary dict with data
+        data = dict()
+        # We basically need to extract data from the geofence objects
+        data['coordinates'] = geofence.coordinates
+        data['topalt'] = geofence.topalt
+        data['bottomalt'] = geofence.bottomalt
+        geodict[geofence.name] = data
+        
+    # Save the geodict
+    GlobalDict['geodict'] = geodict
     
     # Then store the two dictionaries from GeofenceTileData
     GlobalDict['tiledictionary'] = TileData.tiledictionary
@@ -664,7 +692,7 @@ def saveToFile(filename):
     
     # Now save this GlobalDict to a .pkl file
     with open('data/geofence/' + filename, 'wb') as f:
-        dill.dump(GlobalDict, f, dill.HIGHEST_PROTOCOL)
+        pickle.dump(GlobalDict, f, pickle.HIGHEST_PROTOCOL)
     
     bs.scr.echo('Save to file successful.')
     
