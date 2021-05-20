@@ -52,8 +52,6 @@ class GeofenceDetection(Entity):
             self.GeodetectTiles(ownship)   
         elif bs.traf.geod.method == 'RTREE':
             self.GeodetectRtree(ownship)
-            
-        print(self.geoconfs)
         return
         
     def reset(self):

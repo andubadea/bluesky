@@ -696,6 +696,7 @@ def loadFromFile(*args):
     
     
     if loadGraphicsBool == True:
+        bs.scr.echo('Loading graphics...')
         # Also send the geofences to be drawn
         for geofence in geofences.values():
             geofencename = geofence.name
