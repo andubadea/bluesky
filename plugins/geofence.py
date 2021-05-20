@@ -5,6 +5,7 @@ import shapely
 import numpy as np
 import pickle
 import os
+from rtree import index
 
 def init_plugin():
     # Create new geofences dictionary
@@ -71,7 +72,13 @@ def init_plugin():
             'SAVEGEOFENCES name',
             'txt',
             saveToFile,
-            'Save geofence data to specified .pkl file.'],
+            'Save geofence data to specified .pkl file.']
+        ,
+        'GEODETECTMETHOD': [
+            'GEODETECTMETHOD name',
+            'txt',
+            detectmethod,
+            'Set the geofence detection method. TILE is slower but more accurate, RTREE is faster but less accurate.']
         }
     # init_plugin() should always return these two dicts.
     return config, stackfunctions
@@ -93,11 +100,15 @@ class Geofence:
     def __init__(self, name, coordinates, topalt=1e9, bottomalt=-1e9):
         self.name = name
         self.coordinates = coordinates
+        self.lats = self.coordinates[::2]
+        self.lons = self.coordinates[1::2]
+        self.pointsarr = self.getPointArray()
         self.points = self.getPoints()
         self.edges = self.getEdges()
         self.topalt = topalt
         self.bottomalt = bottomalt
         self.poly = shapely.geometry.Polygon(self.getPointArray())
+        self.bbox = self.poly.bounds
         
     def getEdges(self):
         ''' Returns a list of the edges of the geofence as a list of lines.'''
@@ -109,9 +120,8 @@ class Geofence:
     
     def getPoints(self):
         ''' Returns a list of points created from the latlon coord list.'''
-        pointsarr = self.getPointArray()
         points = []
-        for point in pointsarr:
+        for point in self.pointsarr:
             points.append(Point(point[0], point[1]))
         return points
     
@@ -124,6 +134,9 @@ class Geofence:
     
     def getPoly(self):
         return self.poly
+        
+        
+        
         
 # Class for tile data container
 class GeofenceTileData():
@@ -471,17 +484,27 @@ class GeofenceTileData():
 # ----------------------------- End of Helper Classes -----------------------------
 
 # ----------------------------- Plugin Functions ----------------------------------
+
 # A dictionary of geofences {name : Geofence object}
 geofences = dict()
 # A container that links tile data and geofence data
 TileData = GeofenceTileData()
+# geofence rtree
+geoidx = index.Index()
+# Dict to keep track of IDs, format: ID : {Geofence Name}
+geoidx_idtogeo = dict()
+geoidx_geotoid = dict()
+# First ID. 
+geoidx_id = 0
 
-def preupdate():
-    return
 
-### Periodic update functions that are called by the simulation. You can replace
-### this by anything, so long as you communicate this in init_plugin
-def update(): # Not used
+def detectmethod(name):
+    if name in ['TILE', 'tile']:
+        bs.traf.geod.method = 'TILE'
+    elif name in ['RTREE', 'rtree']:
+        bs.traf.geod.method = 'RTREE'
+    else:
+        bs.scr.echo('Available geofence detection methods: TILE, RTREE.')
     return
 
 def reset():
@@ -490,7 +513,13 @@ def reset():
         bs.scr.objappend('', geofencename, None)
     geofences.clear()
     TileData.clear()
-    bs.traf.geos.reset()
+    bs.traf.geod.reset()
+    geoidx_idtogeo.clear()
+    geoidx_geotoid.clear()
+    
+    global geoidx, geoidx_id
+    geoidx = index.Index()
+    geoidx_id = 0
     return
 
 def setZ(z):
@@ -554,25 +583,44 @@ def defgeofencepoly(*args):
     # Add geofence to tile data container
     TileData.addGeofence(myGeofence)
     
-    print(myGeofence.getPoly())
+    global geoidx_id
+    # Add geofence bounds to rtree
+    geoidx.insert(geoidx_id, myGeofence.bbox)
+    
+    # Register this in geoid dict
+    geoidx_idtogeo[geoidx_id] = geofencename
+    geoidx_geotoid[geofencename] = geoidx_id
+    
+    # Increment ID
+    geoidx_id += 1
     
     return True, f'Created geofence {args[0]}.'
 
 # Delete geofence
 def delgeofence(name=""):
     geofencename = 'GF:'+name
+  
+    try:
+        myGeofence = geofences[geofencename]
+    except: 
+        return False, f'No geofence found for {name}'
+        
     # Delete geofence if name exists
     found = geofences.pop(geofencename)
     if not found:
         return False, f'No geofence found for {name}'
+    
     # Remove geofence from screen
     bs.scr.objappend('', geofencename, None)
     
     # Remove geofence from all dictionaries
     TileData.removeGeofence(geofencename)
     
-    # Remove geofence from geosense
-    bs.traf.geos.delgeofence(geofencename)
+    # Remove geofence from geodetect
+    bs.traf.geod.delgeofence(geofencename)
+    
+    # Remove geofence from rtree
+    geoidx.delete(geoidx_geotoid[geofencename], myGeofence.bbox)
     
     return True, f'Deleted geofence {name}'
 
@@ -617,12 +665,22 @@ def loadFromFile(*args):
     # Take the global instance of variables
     global geofences
     global TileData
+    global geoidx_id
     
     # Process the geofences
     geodict = GlobalDict['geodict']
     for geofencename in geodict:
         data = geodict[geofencename]
-        geofences[geofencename] = Geofence(geofencename, data['coordinates'], data['topalt'], data['bottomalt'])
+        myGeofence = Geofence(geofencename, data['coordinates'], data['topalt'], data['bottomalt'])
+        geofences[geofencename] = myGeofence
+        geoidx.insert(geoidx_id, myGeofence.bbox)
+    
+        # Register this in geoid dicts
+        geoidx_idtogeo[geoidx_id] = geofencename
+        geoidx_geotoid[geofencename] = geoidx_id
+        
+        # Increment
+        geoidx_id += 1
            
     # Set them as such
     TileData.tiledictionary = GlobalDict['tiledictionary']

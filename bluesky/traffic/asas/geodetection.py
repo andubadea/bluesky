@@ -1,14 +1,9 @@
-''' This file serves to "sense" geofences around aircraft, it does
-not output geofences that are in conflict with aircraft, but it servers
-as an input to such a file. It was created to avoid for loops over all
-geofences when detecting them. It also keeps track whether an aircraft is
-inside a geofence or outside using a dictionary. The condition for this is
-that aircraft NEED to have a starting position outside ANY geofence.'''
+""" Detection of geofence conflicts."""
 import numpy as np
 import bluesky as bs
-from bluesky.traffic import traffic
+from bluesky.core import Entity
 from shapely.ops import nearest_points
-from shapely.geometry.polygon import Polygon, Point
+from shapely.geometry.polygon import Polygon, Point, LineString
 from bluesky.tools import geo
 from bluesky.tools.aero import nm
 
@@ -17,7 +12,7 @@ class Tile:
         self.x = x
         self.y = y
         
-class GeofenceSense():
+class GeofenceDetection(Entity):
     def __init__(self):
         super().__init__()
         # Dictionaries to keep track of whether aircraft are inside or
@@ -35,21 +30,41 @@ class GeofenceSense():
         # is not present, there are no aircraft inside it. Same if entry for geofence name is
         # empty. 
         self.geofencehasac = dict()
-
-        # Dictionary to find the geofences in vicinity of aircraft for further use in detecting
-        # conflicts. Dictionary is shaped like this: 
-        # ACID : {geofence objects}
-        self.geoinvicinity = dict()
+        
+        # Conflict detection
+        self.geoconfs = dict() # Stores current conflicts
+        self.geobreaches = dict() # Stores current breaches
+        self.method = 'RTREE'
+        
+        # Array to store if an aircraft is in conflict with a geofence
+        with self.settrafarrays():
+            self.active = np.array([]) 
+        
+        # Historic lists
+        self.allgeobreaches = [] # Stores all pastgeofence breaches 
+        self.allgeoconfs = [] # Stores all past geofence conflicts
         return
     
     # This function is called from within traffic
     def update(self, ownship):
-        self.detect(ownship)   
+        # Select detection method
+        if bs.traf.geod.method == 'TILES':
+            self.GeodetectTiles(ownship)   
+        elif bs.traf.geod.method == 'RTREE':
+            self.GeodetectRtree(ownship)
+            
+        print(self.geoconfs)
+        return
         
     def reset(self):
         self.acingeofence = dict()
         self.geofencehasac = dict()
-        self.geoinvicinity = dict()
+        self.geoconfs = dict()
+        self.geobreaches = dict()
+        self.allgeobreaches = []
+        self.allgeoconfs = []
+        self.active = np.array([]) 
+        return
         
     def delgeofence(self, geofencename):
         '''Delete geofence from the dictionaries in this class.'''
@@ -61,6 +76,7 @@ class GeofenceSense():
         for key in self.acingeofence:
             if geofencename in self.acingeofence[key]:
                 self.acingeofence[key].remove(geofencename)
+        return
         
     def delaircraft(self, acid):
         '''Delete acid from the dictionaries in this class.'''
@@ -72,8 +88,13 @@ class GeofenceSense():
         for key in self.geofencehasac:
             if acid in self.geofencehasac[key]:
                 self.geofencehasac[key].remove(acid)
+        return
                 
-    def detect(self, ownship):
+    def GeodetectTiles(self, ownship):
+        '''The tiles based method is more accurate than the Rtree method, as it does not assume the Earth to be
+        flat. However, it is about 10x slower. It also performes badly if geofences are really big while the zoom
+        level is really small.'''
+        self.geoconfs = dict()
         # Check if geofence plugin is enabled
         if 'geofence' not in bs.core.varexplorer.varlist:
             return 'Geofence plugin not loaded.'
@@ -91,18 +112,29 @@ class GeofenceSense():
         # Get zoom level
         z = geofenceTileData.z
         
+        # Lookahead distance
+        dlookahead = bs.settings.geofence_dlookahead
+        
         # For now, detection is a bit unoptimised as in we need to loop over all aircraft and
         # see if there are geofences in their tiles. But as long as the number of aircraft is
         # not exaggerated (like, 10k at once), then this is fine. 
         ntraf = ownship.ntraf
-        
-        # Retain conflicts between aircraft and geofences: (ACID, AC_IDX, GEOFENCE NAME)
-        self.geoinvicinity = dict()
         for i in np.arange(ntraf):
             acid = ownship.id[i]
+            geoinvicinity = []
             # Get aircraft position and tile
             aclat, aclon = ownship.lat[i], ownship.lon[i]
             actileX, actileY = self.tileXY(aclat, aclon, z)
+            
+            # Get aircraft position and tile
+            pos_ac = np.array([ownship.lat[i], ownship.lon[i], ownship.alt[i]])
+            hdg_ac = ownship.trk[i]
+            
+            # Project the current position of the aircraft in the direction of the heading
+            pos_next = geo.qdrpos(pos_ac[0], pos_ac[1], hdg_ac, dlookahead / nm)
+            
+            # Create a line for convenience, as line.bounds gives the correct format for the rtree
+            trajectory = LineString(np.array([pos_ac[:2], pos_next]))
             
             # This is a set to automatically avoid duplicate geofence names
             geofence_names = set()
@@ -133,52 +165,79 @@ class GeofenceSense():
                     distance = geo.latlondist(aclat, aclon, plat, plon)
                     if distance < bs.settings.geofence_dlookahead:
                         # Geofence in vicinity, add the object itself to dictionary
-                        if acid not in self.geoinvicinity:
-                            self.geoinvicinity[acid] = set()
+                        geoinvicinity.append(geofence) 
                         
-                        self.geoinvicinity[acid].add(geofence)
-                        
-                    
-                    # Inside check
-                    if distance == 0:
-                        # We are inside the geofence. First, create entry for aircraft
-                        if acid not in self.acingeofence:
-                            self.acingeofence[acid] = list()
-                        
-                        # Append geofence name to the list of geofences if not already there
-                        if geofence_name not in self.acingeofence[acid]:
-                            self.acingeofence[acid].append(geofence_name)
-                        
-                        # Do the same for the other dictionary
-                        if geofence_name not in self.geofencehasac:
-                            self.geofencehasac[geofence_name] = list()
-                            
-                        # Append acid to geofence name entry
-                        if acid not in self.geofencehasac[geofence_name]:
-                            self.geofencehasac[geofence_name].append(acid)
-                    
-                    else:
-                        # We are outside the geofence
-                        # If entry for geofence name or acid do not exist in the dictionaries, then
-                        # we do nothing
-                        if acid not in self.acingeofence or geofence_name not in self.geofencehasac:
-                            continue
-                        
-                        # Remove geofence name from acid dictionary, and vice versa
-                        if geofence_name in self.acingeofence[acid]:
-                            self.acingeofence[acid].remove(geofence_name)
-                            
-                        if acid in self.geofencehasac[geofence_name]:
-                            self.geofencehasac[geofence_name].remove(acid)
-                            
-                        # Remove the keys entirely if list is now empty
-                        if not self.acingeofence[acid]:
-                            self.acingeofence.pop(acid)
-                            
-                        if not self.geofencehasac[geofence_name]:
-                            self.geofencehasac.pop(geofence_name)   
+            # Detect conflicts with geofences
+            self.GeoconfDetect(acid, i, trajectory, geoinvicinity)
         return
+    
+    def GeodetectRtree(self, ownship):
+        ''' This detection method uses spacial indexing and bounding boxes. It is only accurate
+        on a small scale as it basically assumes the world is flat.'''
+        self.geoconfs = dict()
+
+        # Check if geofence plugin is enabled
+        if 'geofence' not in bs.core.varexplorer.varlist:
+            return 'Geofence plugin not loaded.'
+        
+        # Load the plugin
+        geofenceplugin = bs.core.varexplorer.varlist['geofence'][0]
+        
+        # Get the necessary data from the plugin
+        geofenceData = geofenceplugin.geofences
+        geoidx = geofenceplugin.geoidx
+        geoidx_idtogeo = geofenceplugin.geoidx_idtogeo
+        
+        # Skip everything if no geofences are defined.
+        if not geofenceData:
+            return
+        
+        # Create the dict
+        self.geoinvicinity = dict()
+        ntraf = ownship.ntraf
+        dlookahead = bs.settings.geofence_dlookahead
+        
+        for i in range(ntraf):
+            geoinvicinity = []
+            acid = ownship.id[i]
+            # Get aircraft position and tile
+            pos_ac = np.array([ownship.lat[i], ownship.lon[i], ownship.alt[i]])
+            hdg_ac = ownship.trk[i]
+            
+            # Project the current position of the aircraft in the direction of the heading
+            pos_next = geo.qdrpos(pos_ac[0], pos_ac[1], hdg_ac, dlookahead / nm)
+            
+            # Create a line for convenience, as line.bounds gives the correct format for the rtree
+            trajectory = LineString(np.array([pos_ac[:2], pos_next]))
+            
+            # Find the list of potentially intersecting geofences
+            intersectionlist = list(geoidx.intersection(trajectory.bounds))
+            
+            for id in intersectionlist:
+                geofencename = geoidx_idtogeo[id]
+                geoinvicinity.append(geofenceData[geofencename])
                 
+            # Detect conflicts with geofences
+            self.GeoconfDetect(acid, i, trajectory, geoinvicinity)
+        return
+            
+    def GeoconfDetect(self, acid, idx_ac, trajectory, geoinvicinity):
+        ''' Detects conflicts between an aircraft an the geofences in its vicinity.
+        Assumes flat earth.'''
+        # Iterate over geofence objects and check if there is an intersection
+        for geofence in geoinvicinity:
+            # First do horizontal check. We check using shapely if projected line intersects polygon.
+            geopoly = geofence.getPoly()
+            if trajectory.intersects(geopoly):
+                # We have a conflict, add conflict to dictionary
+                if acid not in self.geoconfs:
+                    self.geoconfs[acid] = set()
+                
+                # Add geofence to this set
+                self.geoconfs[acid].add(geofence)
+                self.active[idx_ac] = True 
+        return
+ 
     # Helper functions   
     def getAdjacentTiles(self, tileX, tileY, z):
         # We want to look inside a 3x3 grid of tiles around the aircraft
