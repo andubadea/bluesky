@@ -30,6 +30,7 @@ from .activewpdata import ActiveWaypoint
 from .turbulence import Turbulence
 from .trafficgroups import TrafficGroups
 from .performance.perfbase import PerfBase
+from .intent import Intent
 
 # Register settings defaults
 bs.settings.set_variable_defaults(performance_model='openap', asas_dt=1.0)
@@ -127,6 +128,7 @@ class Traffic(Entity):
             # Flight Models
             self.cd       = ConflictDetection()
             self.cr       = ConflictResolution()
+            self.intent   = Intent()
             self.ap       = Autopilot()
             self.aporasas = APorASAS()
             self.adsb     = ADSB()
@@ -401,6 +403,7 @@ class Traffic(Entity):
 
         #---------- Fly the Aircraft --------------------------
         self.ap.update()  # Autopilot logic
+        self.intent.update(self)
         self.update_asas()  # Airborne Separation Assurance
         self.aporasas.update()   # Decide to use autopilot or ASAS for commands
 

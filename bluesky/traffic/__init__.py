@@ -8,3 +8,4 @@ from .aporasas import APorASAS
 from .turbulence import Turbulence
 from .windfield import Windfield
 from .windsim import WindSim
+from .intent import Intent
