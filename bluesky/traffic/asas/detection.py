@@ -27,7 +27,9 @@ class ConflictDetection(Entity, replaceable=True):
         self.confpairs = list()
         self.lospairs = list()
         self.qdr = np.array([])
+        self.qdr_mat = np.array([])
         self.dist = np.array([])
+        self.dist_mat = np.array([])
         self.dcpa = np.array([])
         self.tcpa = np.array([])
         self.tLOS = np.array([])
@@ -147,7 +149,7 @@ class ConflictDetection(Entity, replaceable=True):
     def update(self, ownship, intruder):
         ''' Perform an update step of the Conflict Detection implementation. '''
         self.confpairs, self.lospairs, self.inconf, self.tcpamax, self.qdr, \
-            self.dist, self.dcpa, self.tcpa, self.tLOS = \
+            self.dist, self.dcpa, self.tcpa, self.tLOS, self.qdr_mat, self.dist_mat = \
                 self.detect(ownship, intruder, self.rpz, self.hpz, self.dtlookahead)
 
         # confpairs has conflicts observed from both sides (a, b) and (b, a)
@@ -177,4 +179,6 @@ class ConflictDetection(Entity, replaceable=True):
         dcpa = np.array([])
         tcpa = np.array([])
         tLOS = np.array([])
-        return confpairs, lospairs, inconf, tcpamax, qdr, dist, dcpa, tcpa, tLOS
+        qdr_mat = np.array([])
+        dist_mat = np.array([])
+        return confpairs, lospairs, inconf, tcpamax, qdr, dist, dcpa, tcpa, tLOS, qdr_mat, dist_mat

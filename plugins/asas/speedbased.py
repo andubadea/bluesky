@@ -11,7 +11,6 @@ from bluesky.tools.aero import nm
 import bluesky as bs
 import numpy as np
 import itertools
-det = np.linalg.det
 
 def init_plugin():
 
@@ -49,7 +48,7 @@ class SpeedBased(ConflictResolution):
             idx_pairs = self.pairs(conf, ownship, intruder, idx)
             
             # Find ORCA solution for aircraft 'idx'
-            gs_new = self.ORCA(conf, ownship, intruder, idx, idx_pairs)
+            gs_new = self.SpeedBased(conf, ownship, intruder, idx, idx_pairs)
             
             # Write the new velocity of aircraft 'idx' to traffic data
             newgscapped[idx] = gs_new           
@@ -62,7 +61,7 @@ class SpeedBased(ConflictResolution):
         return newtrack, newgscapped, vscapped, alt
 
 
-    def ORCA(self, conf, ownship, intruder, idx, idx_pairs):
+    def SpeedBased(self, conf, ownship, intruder, idx, idx_pairs):
         # Extract ownship data
         v_ownship = np.array([ownship.gseast[idx], ownship.gsnorth[idx]])# [m/s]
         # Take minimum separation and multiply it with safely factor

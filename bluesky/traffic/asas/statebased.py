@@ -98,7 +98,7 @@ class StateBased(ConflictDetection):
 
         return confpairs, lospairs, inconf, tcpamax, \
             qdr[swconfl], dist[swconfl], np.sqrt(dcpa2[swconfl]), \
-                tcpa[swconfl], tinconf[swconfl]
+                tcpa[swconfl], tinconf[swconfl], qdr, dist
 
 
 try:
