@@ -48,7 +48,10 @@ class SpeedBased(ConflictResolution):
             idx_pairs = self.pairs(conf, ownship, intruder, idx)
             
             # Find ORCA solution for aircraft 'idx'
-            gs_new = self.SpeedBased(conf, ownship, intruder, idx, idx_pairs)
+            try:
+                gs_new = self.SpeedBased(conf, ownship, intruder, idx, idx_pairs)
+            except:
+                gs_new = 10
             
             # Write the new velocity of aircraft 'idx' to traffic data
             newgscapped[idx] = gs_new           
@@ -79,10 +82,16 @@ class SpeedBased(ConflictResolution):
             dist= conf.dist[idx_pair]
             
             # TODO: Introduce proper priority.
-            # For now, if aircraft is coming from the front right, then it has priority.
-            if -180 <= ((qdr - ownship.trk[idx]) + 180)%360 - 180 < 0:
+            qdr_intruder = ((qdr - ownship.trk[idx]) + 180)%360 - 180
+            # Check if intruder is coming from the right or the back.
+            if (-180 <= qdr_intruder  < -135) or (135 <= qdr_intruder  < 180):
                 # go to next pair
                 continue
+            # Not coming from the back, but is it coming from the right?
+            if not (0 <= qdr_intruder  <= 180):
+                # go to next pair
+                continue            
+                 
             
             # Let's also do some intent check
             own_intent = ownship.intent.intent[idx]
@@ -94,7 +103,6 @@ class SpeedBased(ConflictResolution):
             
             if point_distance > r:
                 continue
-            
             
             # Determine the index of the intruder
             idx_intruder = intruder.id.index(conf.confpairs[idx_pair][1])
@@ -230,3 +238,87 @@ class SpeedBased(ConflictResolution):
     
     def dist_sq(self, a, b):
         return self.norm_sq(b - a)
+    
+    ### Modified resumenav function
+    def resumenav(self, conf, ownship, intruder):
+        '''
+            Decide for each aircraft in the conflict list whether the ASAS
+            should be followed or not, based on if the aircraft pairs passed
+            their CPA AND if ownship is a certain distance away from the intruding
+            aircraft.
+        '''
+        # Add new conflicts to resopairs and confpairs_all and new losses to lospairs_all
+        self.resopairs.update(conf.confpairs)
+
+        # Conflict pairs to be deleted
+        delpairs = set()
+        changeactive = dict()
+
+        # Look at all conflicts, also the ones that are solved but CPA is yet to come
+        for conflict in self.resopairs:
+            idx1, idx2 = bs.traf.id2idx(conflict)
+            # If the ownship aircraft is deleted remove its conflict from the list
+            if idx1 < 0:
+                delpairs.add(conflict)
+                continue
+
+            if idx2 >= 0:
+                # Distance vector using flat earth approximation
+                re = 6371000.
+                dist = re * np.array([np.radians(intruder.lon[idx2] - ownship.lon[idx1]) *
+                                      np.cos(0.5 * np.radians(intruder.lat[idx2] +
+                                                              ownship.lat[idx1])),
+                                      np.radians(intruder.lat[idx2] - ownship.lat[idx1])])
+
+                # Relative velocity vector
+                vrel = np.array([intruder.gseast[idx2] - ownship.gseast[idx1],
+                                 intruder.gsnorth[idx2] - ownship.gsnorth[idx1]])
+
+                # Check if conflict is past CPA
+                past_cpa = np.dot(dist, vrel) > 0.0
+                
+                # Also check the distance between the two aircraft.
+
+                # hor_los:
+                # Aircraft should continue to resolve until there is no horizontal
+                # LOS. This is particularly relevant when vertical resolutions
+                # are used.
+                hdist = np.linalg.norm(dist)
+                hor_los = hdist < conf.rpz
+
+                # Bouncing conflicts:
+                # If two aircraft are getting in and out of conflict continously,
+                # then they it is a bouncing conflict. ASAS should stay active until
+                # the bouncing stops.
+                is_bouncing = \
+                    abs(ownship.trk[idx1] - intruder.trk[idx2]) < 30.0 and \
+                    hdist < conf.rpz * self.resofach
+
+            # Start recovery for ownship if intruder is deleted, or if past CPA
+            # and not in horizontal LOS or a bouncing conflict
+            if idx2 >= 0 and (not past_cpa or hor_los or is_bouncing):
+                # Enable ASAS for this aircraft
+                changeactive[idx1] = True
+            else:
+                # Switch ASAS off for ownship if there are no other conflicts
+                # that this aircraft is involved in.
+                changeactive[idx1] = changeactive.get(idx1, False)
+                # If conflict is solved, remove it from the resopairs list
+                delpairs.add(conflict)
+
+        for idx, active in changeactive.items():
+            # Loop a second time: this is to avoid that ASAS resolution is
+            # turned off for an aircraft that is involved simultaneously in
+            # multiple conflicts, where the first, but not all conflicts are
+            # resolved.
+            self.active[idx] = active
+            if not active:
+                # Waypoint recovery after conflict: Find the next active waypoint
+                # and send the aircraft to that waypoint.
+                iwpid = bs.traf.ap.route[idx].findact(idx)
+                if iwpid != -1:  # To avoid problems if there are no waypoints
+                    bs.traf.ap.route[idx].direct(
+                        idx, bs.traf.ap.route[idx].wpname[iwpid])
+
+        # Remove pairs from the list that are past CPA or have deleted aircraft
+        self.resopairs -= delpairs
