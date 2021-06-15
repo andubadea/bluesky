@@ -48,10 +48,7 @@ class SpeedBased(ConflictResolution):
             idx_pairs = self.pairs(conf, ownship, intruder, idx)
             
             # Find ORCA solution for aircraft 'idx'
-            try:
-                gs_new = self.SpeedBased(conf, ownship, intruder, idx, idx_pairs)
-            except:
-                gs_new = 10
+            gs_new = self.SpeedBased(conf, ownship, intruder, idx, idx_pairs)
             
             # Write the new velocity of aircraft 'idx' to traffic data
             newgscapped[idx] = gs_new           
@@ -90,8 +87,11 @@ class SpeedBased(ConflictResolution):
             # Not coming from the back, but is it coming from the right?
             if not (0 <= qdr_intruder  <= 180):
                 # go to next pair
-                continue            
-                 
+                continue       
+            
+            # If we have a loss of separation, just brake
+            if dist < r:
+                return 1      
             
             # Let's also do some intent check
             own_intent = ownship.intent.intent[idx]
