@@ -41,6 +41,7 @@ class SpeedBased(ConflictResolution):
         # Make a copy of traffic data, track and ground speed
         newtrack    = np.copy(ownship.trk)
         newgscapped = np.copy(ownship.gs)
+        newvs       = np.copy(ownship.vs)
         
         # Iterate over aircraft in conflict
         for idx in list(itertools.compress(range(len(bs.traf.cr.active)), bs.traf.cr.active)):
@@ -48,17 +49,17 @@ class SpeedBased(ConflictResolution):
             idx_pairs = self.pairs(conf, ownship, intruder, idx)
             
             # Find ORCA solution for aircraft 'idx'
-            gs_new = self.SpeedBased(conf, ownship, intruder, idx, idx_pairs)
+            gs_new, vs_new = self.SpeedBased(conf, ownship, intruder, idx, idx_pairs)
             
             # Write the new velocity of aircraft 'idx' to traffic data
-            newgscapped[idx] = gs_new           
+            newgscapped[idx] = gs_new    
+            newvs[idx] = vs_new       
         
         # Speed based, and 2D, for now.
-        vscapped       = ownship.ap.vs
         alt            = ownship.ap.alt 
         newtrack       = ownship.ap.trk
         
-        return newtrack, newgscapped, vscapped, alt
+        return newtrack, newgscapped, newvs, alt
 
 
     def SpeedBased(self, conf, ownship, intruder, idx, idx_pairs):
@@ -89,9 +90,10 @@ class SpeedBased(ConflictResolution):
                 # go to next pair
                 continue       
             
-            # If we have a loss of separation, just brake
+            # If we have a loss of separation, or the conflict is vertical,
+            # just break, and stop the vertical speed
             if dist < r:
-                return 1      
+                return 1, 0   
             
             # Let's also do some intent check
             own_intent = ownship.intent.intent[idx]
@@ -103,6 +105,8 @@ class SpeedBased(ConflictResolution):
             
             if point_distance > r:
                 continue
+            
+            #r = r * 1.1
             
             # Determine the index of the intruder
             idx_intruder = intruder.id.index(conf.confpairs[idx_pair][1])
@@ -119,15 +123,16 @@ class SpeedBased(ConflictResolution):
             circle = Point(x/t).buffer(r/t)
 
             # Get cutoff legs
-            right_leg_circle_point = self.right_cutoff_leg(x, r, t)
-            left_leg_circle_point = self.left_cutoff_leg(x, r, t)
+            left_leg_circle_point, right_leg_circle_point = self.cutoff_legs(x, r, t)
 
             right_leg_extended = right_leg_circle_point * t
             left_leg_extended = left_leg_circle_point * t
 
-            triangle_poly = Polygon([right_leg_extended, right_leg_circle_point, left_leg_circle_point, left_leg_extended])
+            #triangle_poly = Polygon([right_leg_extended, right_leg_circle_point, left_leg_circle_point, left_leg_extended])
 
-            final_poly = cascaded_union([triangle_poly, circle])
+            #final_poly = cascaded_union([triangle_poly, circle])
+            
+            final_poly = Polygon([right_leg_extended, (0,0), left_leg_extended])
             
             final_poly_translated = translate(final_poly, v_intruder[0], v_intruder[1])
             
@@ -161,7 +166,7 @@ class SpeedBased(ConflictResolution):
         else:
             gs_new = ownship.ap.tas[idx]
         
-        return gs_new
+        return gs_new, ownship.ap.vs[idx]
     
     def pairs(self, conf, ownship, intruder, idx):
         '''Returns the indices of conflict pairs that involve aircraft idx
@@ -188,35 +193,71 @@ class SpeedBased(ConflictResolution):
         b[1] = -a[0]
         return b/np.linalg.norm(b)
     
-    def left_cutoff_leg(self, x, r, t):
-        '''Gives the cutoff point of the left leg.'''
-        # Find vector that describes radius
-        r_vec = self.perp_left(x) * r
-        # Find the big left leg vector
-        left_leg = x + r_vec
-        # Find the left leg direction
-        left_cutoff_leg_dir = self.normalized(left_leg)
-        # Save this for later
-        self.left_cutoff_leg_dir = left_cutoff_leg_dir
-        # Find the length of the left cutoff leg
-        left_cutoff_leg = np.sqrt(self.norm_sq(x/t) - (r/t)*(r/t))
-        # Return left cutoff vector
-        return left_cutoff_leg * left_cutoff_leg_dir
+    # def cutoff_legs(self, x, r, t):
+    #     '''Gives the cutoff point of the left leg.'''
+    #     # Find vector that describes radius
+    #     r_vec = self.perp_left(x) * r
+    #     # Find the big left leg vector
+    #     left_leg = x + r_vec
+    #     # Find the left leg direction
+    #     left_cutoff_leg_dir = self.normalized(left_leg)
+    #     # Save this for later
+    #     self.left_cutoff_leg_dir = left_cutoff_leg_dir
+    #     # Find the length of the left cutoff leg
+    #     left_cutoff_leg = np.sqrt(self.norm_sq(x/t) - (r/t)*(r/t))
+    #     # Return left cutoff vector
+    #     return left_cutoff_leg * left_cutoff_leg_dir
         
-    def right_cutoff_leg(self, x, r, t):
+    def cutoff_legs(self, x, r, t):
         '''Gives the cutoff point of the right leg.'''
-        # Find vector that describes radius
-        r_vec = self.perp_right(x) * r
-        # Find the big right leg vector
-        right_leg = x + r_vec
-        # Find the right leg direction
+        x = np.array(x)
+        # First get the length of x
+        x_len = self.norm(x)
+        # Find the sine of the angle
+        anglesin = r / x_len
+        # Find the angle itself
+        angle = np.arcsin(anglesin) # Radians
+        
+        print(angle, anglesin, x, x_len, r)
+        # Find the rotation matrices
+        rotmat_left = np.array([[np.cos(angle), -np.sin(angle)],
+                           [np.sin(angle), np.cos(angle)]])
+        
+        rotmat_right = np.array([[np.cos(-angle), -np.sin(-angle)],
+                           [np.sin(-angle), np.cos(-angle)]])
+        
+        # Compute rotated legs
+        left_leg = rotmat_left.dot(x)
+        right_leg = rotmat_right.dot(x)  
+        
+        circ = x/t
+        xc = circ[0]
+        yc = circ[1]
+        xp_r = right_leg[0]
+        yp_r = right_leg[1]
+        xp_l = left_leg[0]
+        yp_l = left_leg[1]
+        
+        b_r = (-2 * xc - 2 * yp_r / xp_r * yc)
+        a_r = 1 + (yp_r / xp_r) ** 2    
+         
+        b_l = (-2 * xc - 2 * yp_l / xp_l * yc)
+        a_l = 1 + (yp_l / xp_l) ** 2    
+        
+        x_r = -b_r / (2 * a_r)
+        x_l = -b_l / (2 * a_l)
+        
+        y_r = yp_r / xp_r * x_r
+        y_l = yp_l / xp_l * x_l 
+
+        # Compute normalised directions
         right_cutoff_leg_dir = self.normalized(right_leg)
-        # Save this for later
         self.right_cutoff_leg_dir = right_cutoff_leg_dir
-        # Find the length of the right cutoff leg
-        right_cutoff_leg = np.sqrt(self.norm_sq(x/t) - (r/t)*(r/t))
-        # Return right cutoff vector
-        return right_cutoff_leg * right_cutoff_leg_dir
+        
+        left_cutoff_leg_dir = self.normalized(left_leg)
+        self.left_cutoff_leg_dir = left_cutoff_leg_dir
+        
+        return np.array([x_l, y_l]), np.array([x_r, y_r])
                 
     def perp(self, a):
         return np.array((a[1], -a[0]))
@@ -238,6 +279,16 @@ class SpeedBased(ConflictResolution):
     
     def dist_sq(self, a, b):
         return self.norm_sq(b - a)
+    
+    ### Modified hdgactive function
+    @property
+    def hdgactive(self):
+        ''' Return a boolean array sized according to the number of aircraft
+            with True for all elements where heading is currently controlled by
+            the conflict resolution algorithm.
+        '''
+        #TODO: Here is a good place to implement Open Airpace vs Restricted Airspace logic
+        return np.array([False] * len(self.active))
     
     ### Modified resumenav function
     def resumenav(self, conf, ownship, intruder):
@@ -276,7 +327,8 @@ class SpeedBased(ConflictResolution):
 
                 # Check if conflict is past CPA
                 past_cpa = np.dot(dist, vrel) > 0.0
-                
+                distance = self.norm(dist)
+                dist_ok = distance > 100
                 # Also check the distance between the two aircraft.
 
                 # hor_los:
@@ -296,7 +348,7 @@ class SpeedBased(ConflictResolution):
 
             # Start recovery for ownship if intruder is deleted, or if past CPA
             # and not in horizontal LOS or a bouncing conflict
-            if idx2 >= 0 and (not past_cpa or hor_los or is_bouncing):
+            if idx2 >= 0 and (not past_cpa or hor_los or is_bouncing or not dist_ok):
                 # Enable ASAS for this aircraft
                 changeactive[idx1] = True
             else:

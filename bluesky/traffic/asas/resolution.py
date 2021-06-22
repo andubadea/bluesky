@@ -53,8 +53,7 @@ class ConflictResolution(Entity, replaceable=True):
             with True for all elements where heading is currently controlled by
             the conflict resolution algorithm.
         '''
-        #TODO: Here is a good place to implement Open Airpace vs Restricted Airspace logic
-        return np.array([False] * len(self.active))
+        return self.active
 
     @property
     def vsactive(self):
