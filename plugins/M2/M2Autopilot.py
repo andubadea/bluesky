@@ -67,6 +67,7 @@ class M2Autopilot(Autopilot):
 
     #no longer timed @timed_function(name='fms', dt=bs.settings.fms_dt, manual=True)
     def update_fms(self, qdr, dist):
+        print('USING M2 AUTOPILOT')
         # Check which aircraft i have reached the ir active waypoint
         # Shift waypoints for aircraft i where necessary
         # Reached function return list of indices where reached logic is True

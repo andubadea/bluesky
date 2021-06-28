@@ -12,7 +12,7 @@ def init_plugin():
     # Configuration parameters
     config = {
         # The name of your plugin
-        'plugin_name':     'NEWSTATEBASED',
+        'plugin_name':     'M2STATEBASED',
 
         # The type of this plugin. For now, only simulation plugins are possible.
         'plugin_type':     'sim'
@@ -21,7 +21,7 @@ def init_plugin():
     return config
 
 
-class NewStateBased(ConflictDetection):
+class M2StateBased(ConflictDetection):
     def __init__(self):
         super().__init__()
         self.dist_mat = np.array([])

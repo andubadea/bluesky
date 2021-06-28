@@ -42,7 +42,7 @@ class ORCA(ConflictResolution):
         
         # Iterate over all aircraft
         for idx in np.arange(ntraf):
-            # Calculate ORCA only for aircraft in conflict
+            # Calculate ORCA only for aircraft within the lookahead time
             if conf.inconf[idx]:
                 # Find the indices for the conflict pairs
                 idx_pairs = self.pairs(conf, ownship, intruder, idx)
