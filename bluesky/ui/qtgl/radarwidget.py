@@ -48,8 +48,8 @@ palette.set_default_colours(
 MAX_NAIRCRAFT         = 10000
 MAX_NCONFLICTS        = 25000
 MAX_ROUTE_LENGTH      = 500
-MAX_POLYPREV_SEGMENTS = 100
-MAX_ALLPOLYS_SEGMENTS = 2000
+MAX_POLYPREV_SEGMENTS = 10000000
+MAX_ALLPOLYS_SEGMENTS = 20000000
 MAX_CUST_WPT          = 1000
 MAX_TRAILLEN          = MAX_NAIRCRAFT * 1000
 
@@ -806,7 +806,8 @@ class RadarWidget(QGLWidget):
                 self.traillines.set_vertex_count(0)
 
     def cmdline_stacked(self, cmd, args):
-        if cmd in ['AREA', 'BOX', 'POLY', 'POLYGON', 'CIRCLE', 'LINE','POLYLINE']:
+        if cmd in ['AREA', 'BOX', 'POLY', 'POLYGON', 'CIRCLE', 'LINE','POLYLINE'
+                   , 'GEOFENCE']:
             self.polyprev.set_vertex_count(0)
 
     def previewpoly(self, shape_type, data_in=None):
@@ -1020,7 +1021,7 @@ class RadarWidget(QGLWidget):
             cmd = console.get_cmd()
             nargs = len(console.get_args())
             if cmd in ['AREA', 'BOX', 'POLY','POLYLINE',
-                       'POLYALT', 'POLYGON', 'CIRCLE', 'LINE'] and nargs >= 2:
+                       'POLYALT', 'POLYGON', 'CIRCLE', 'LINE', 'GEOFENCE'] and nargs >= 2:
                 self.prevmousepos = self.mousepos
                 try:
                     # get the largest even number of points
