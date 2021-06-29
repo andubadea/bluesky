@@ -90,29 +90,11 @@ class Geofence:
         self.coordinates = coordinates
         self.lats = self.coordinates[::2]
         self.lons = self.coordinates[1::2]
-        self.pointsarr = self.getPointArray()
-        self.points = self.getPoints()
-        self.edges = self.getEdges()
         self.topalt = topalt
         self.bottomalt = bottomalt
         self.poly = shapely.geometry.Polygon(self.getPointArray())
         self.bbox = self.poly.bounds
-        
-    def getEdges(self):
-        ''' Returns a list of the edges of the geofence as a list of lines.'''
-        edges = []
-        for i,point in enumerate(self.points):
-            edge = Line(self.points[i-1], self.points[i])
-            edges.append(edge)
-        return edges
-    
-    def getPoints(self):
-        ''' Returns a list of points created from the latlon coord list.'''
-        points = []
-        for point in self.pointsarr:
-            points.append(Point(point[0], point[1]))
-        return points
-    
+
     def getPointArray(self):
         '''Returns the points not as point objects but as an array.'''
         lats = self.coordinates[::2]
@@ -274,7 +256,6 @@ def loadFromFile(*args):
     
     # Take the global instance of variables
     global geofences
-    global TileData
     global geoidx_id
     
     # Process the geofences
