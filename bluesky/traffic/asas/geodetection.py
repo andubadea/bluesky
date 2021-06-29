@@ -34,7 +34,6 @@ class GeofenceDetection(Entity):
         # Conflict detection
         self.geoconfs = dict() # Stores current conflicts
         self.geobreaches = dict() # Stores current breaches
-        self.method = 'RTREE'
         
         # Array to store if an aircraft is in conflict with a geofence
         with self.settrafarrays():
@@ -47,11 +46,7 @@ class GeofenceDetection(Entity):
     
     # This function is called from within traffic
     def update(self, ownship):
-        # Select detection method
-        if bs.traf.geod.method == 'TILES':
-            self.GeodetectTiles(ownship)   
-        elif bs.traf.geod.method == 'RTREE':
-            self.GeodetectRtree(ownship)
+        self.Geodetect(ownship)
         return
         
     def reset(self):
@@ -87,89 +82,8 @@ class GeofenceDetection(Entity):
             if acid in self.geofencehasac[key]:
                 self.geofencehasac[key].remove(acid)
         return
-                
-    def GeodetectTiles(self, ownship):
-        '''The tiles based method is more accurate than the Rtree method, as it does not assume the Earth to be
-        flat. However, it is about 10x slower. It also performes badly if geofences are really big while the zoom
-        level is really small.'''
-        self.geoconfs = dict()
-        # Check if geofence plugin is enabled
-        if 'geofence' not in bs.core.varexplorer.varlist:
-            return 'Geofence plugin not loaded.'
-        # Retrieve geofence plugin instance
-        geofenceplugin = bs.core.varexplorer.varlist['geofence'][0]
-        
-        # Get geofence data from plugin
-        geofenceTileData = geofenceplugin.TileData
-        geofenceData = geofenceplugin.geofences
-        
-        # If there are no geofences then there is no point in continuing
-        if not geofenceData:
-            return
-        
-        # Get zoom level
-        z = geofenceTileData.z
-        
-        # Lookahead distance
-        dlookahead = bs.settings.geofence_dlookahead
-        
-        # For now, detection is a bit unoptimised as in we need to loop over all aircraft and
-        # see if there are geofences in their tiles. But as long as the number of aircraft is
-        # not exaggerated (like, 10k at once), then this is fine. 
-        ntraf = ownship.ntraf
-        for i in np.arange(ntraf):
-            acid = ownship.id[i]
-            geoinvicinity = []
-            # Get aircraft position and tile
-            aclat, aclon = ownship.lat[i], ownship.lon[i]
-            actileX, actileY = self.tileXY(aclat, aclon, z)
-            
-            # Get aircraft position and tile
-            pos_ac = np.array([ownship.lat[i], ownship.lon[i], ownship.alt[i]])
-            hdg_ac = ownship.trk[i]
-            
-            # Project the current position of the aircraft in the direction of the heading
-            pos_next = geo.qdrpos(pos_ac[0], pos_ac[1], hdg_ac, dlookahead / nm)
-            
-            # Create a line for convenience, as line.bounds gives the correct format for the rtree
-            trajectory = LineString(np.array([pos_ac[:2], pos_next]))
-            
-            # This is a set to automatically avoid duplicate geofence names
-            geofence_names = set()
-            
-            # Get adjacent tiles depending on lookahead distance or time
-            tiles = self.getAdjacentTiles(actileX, actileY, z)
-            
-            # Retrieve names of geofences in considered tiles
-            for tile in tiles:
-                tile = (tile.x, tile.y)
-                if tile in geofenceTileData.tiledictionary:
-                    geofence_names = geofence_names.union(geofenceTileData.tiledictionary[tile])
-            
-            if geofence_names:
-                for geofence_name in geofence_names:
-                    # Get the geofence itself
-                    geofence = geofenceData[geofence_name]
-                    # Create shapely polygon
-                    geofencepoly = Polygon(geofence.getPointArray())
-                    # Find closest point on this polygon w.r.t aircraft, p2 unused
-                    # When geofences are very big, this becomes inaccurate, as this does
-                    # not take into account the curvature of the Earth. 
-                    # TODO: find a solution for this to follow curvature of Earth. 
-                    p1, p2 = nearest_points(geofencepoly, Point(aclat, aclon))
-                    # Get closest point Coordinates
-                    plat, plon = p1.x, p1.y
-                    # Get distance between aircraft and geofence
-                    distance = geo.latlondist(aclat, aclon, plat, plon)
-                    if distance < bs.settings.geofence_dlookahead:
-                        # Geofence in vicinity, add the object itself to dictionary
-                        geoinvicinity.append(geofence) 
-                        
-            # Detect conflicts with geofences
-            self.GeoconfDetect(acid, i, trajectory, geoinvicinity)
-        return
     
-    def GeodetectRtree(self, ownship):
+    def Geodetect(self, ownship):
         ''' This detection method uses spacial indexing and bounding boxes. It is only accurate
         on a small scale as it basically assumes the world is flat.'''
         self.geoconfs = dict()
@@ -234,6 +148,9 @@ class GeofenceDetection(Entity):
                 # Add geofence to this set
                 self.geoconfs[acid].add(geofence)
                 self.active[idx_ac] = True 
+        
+        print(self.geoconfs)
+        
         return
  
     # Helper functions   
