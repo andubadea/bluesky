@@ -71,28 +71,17 @@ def init_plugin():
     # init_plugin() should always return these two dicts.
     return config, stackfunctions
 
-#------------------------------ Helper Classes -----------------------------------------
-class Point:
-    '''A point [latlon] that has a geofence name attached to it.'''
-    def __init__(self, lat, lon):
-        self.lat = lat
-        self.lon = lon
-        
-class Line:
-    def __init__(self, Point1, Point2):
-        self.Point1 = Point1
-        self.Point2 = Point2
-        
+#------------------------------ Helper Classes ----------------------------------------   
 class Geofence:
     ''' Geofence specification class. '''
     def __init__(self, name, coordinates, topalt=1e9, bottomalt=-1e9):
         self.name = name
         self.coordinates = coordinates
-        self.lats = self.coordinates[::2]
-        self.lons = self.coordinates[1::2]
+        lats = self.coordinates[::2]
+        lons = self.coordinates[1::2]
         self.topalt = topalt
         self.bottomalt = bottomalt
-        self.poly = shapely.geometry.Polygon(self.getPointArray())
+        self.poly = shapely.geometry.Polygon(np.array([lats, lons]).T)
         self.bbox = self.poly.bounds
 
     def getPointArray(self):
@@ -181,6 +170,7 @@ def defgeofencepoly(*args):
     global geoidx_id
     # Add geofence bounds to rtree
     geoidx.insert(geoidx_id, myGeofence.bbox)
+    print(myGeofence.bbox)
     
     # Register this in geoid dict
     geoidx_idtogeo[geoidx_id] = geofencename
