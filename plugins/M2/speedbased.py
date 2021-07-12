@@ -48,7 +48,7 @@ class SpeedBased(ConflictResolution):
             # Find the pairs in which IDX is involved in a conflict
             idx_pairs = self.pairs(conf, ownship, intruder, idx)
             
-            # Find ORCA solution for aircraft 'idx'
+            # Find solution for aircraft 'idx'
             gs_new, vs_new = self.SpeedBased(conf, ownship, intruder, idx, idx_pairs)
             
             # Write the new velocity of aircraft 'idx' to traffic data
@@ -67,6 +67,10 @@ class SpeedBased(ConflictResolution):
         v_ownship = np.array([ownship.gseast[idx], ownship.gsnorth[idx]])# [m/s]
         # Take minimum separation and multiply it with safely factor
         r = conf.rpz * self.resofach
+        
+        # Also take distance to other aircraft
+        dist2others = conf.dist_mat[idx]
+        
         # Get the T factor, set it as bs.settings.asas_dtlookahead
         t = bs.settings.asas_dtlookahead
 
