@@ -42,7 +42,6 @@ class SpeedBased(ConflictResolution):
         newtrack    = np.copy(ownship.trk)
         newgscapped = np.copy(ownship.gs)
         newvs       = np.copy(ownship.vs)
-        newalt      = np.copy(ownship.alt)
         
         # Iterate over aircraft in conflict
         for idx in list(itertools.compress(range(len(bs.traf.cr.active)), bs.traf.cr.active)):
@@ -50,44 +49,42 @@ class SpeedBased(ConflictResolution):
             idx_pairs = self.pairs(conf, ownship, intruder, idx)
             
             # Find solution for aircraft 'idx'
-            gs_new, vs_new, alt_new = self.SpeedBased(conf, ownship, intruder, idx, idx_pairs)
+            gs_new, vs_new = self.SpeedBased(conf, ownship, intruder, idx, idx_pairs)
             
             # Write the new velocity of aircraft 'idx' to traffic data
-            newgscapped[idx] = gs_new      
-            newalt[idx] = alt_new   
-            newvs[idx] = vs_new
+            newgscapped[idx] = gs_new    
+            newvs[idx] = vs_new       
         
         # Speed based, and 2D, for now.
+        alt            = ownship.ap.alt 
         newtrack       = ownship.ap.trk
         
-        return newtrack, newgscapped, newvs, newalt
+        return newtrack, newgscapped, newvs, alt
 
 
     def SpeedBased(self, conf, ownship, intruder, idx, idx_pairs):
         # Extract ownship data
         v_ownship = np.array([ownship.gseast[idx], ownship.gsnorth[idx]])# [m/s]
         # Take minimum separation and multiply it with safely factor
-        r_own = conf.rpz[idx] * self.resofach
+        r = conf.rpz[idx] * self.resofach
+        
+        print(conf.rpz[idx])
         
         # Also take distance to other aircraft
         dist2others = conf.dist_mat[idx]
         
         # Get the T factor, set it as bs.settings.asas_dtlookahead
         t = bs.settings.asas_dtlookahead
-        
-        # We want to account for all aircraft around the ownship within the lookahead timestep
-        mindist = t * ownship.gs[idx]
 
         VelocityObstacles = []
-        # Go through all aircraft that are close to this one.
-        for jdx, dist in enumerate(dist2others):
-            if dist > mindist:
-                continue
-            idx_intruder = jdx #intruder.id.index(conf.confpairs[idx_pair][1])
-            r = conf.rpz[jdx] + r_own
+        # Go through all conflict pairs for aircraft "idx", basically take
+        # intruders one by one, and create their polygons
+        for i, idx_pair in enumerate(idx_pairs):
+            idx_intruder = intruder.id.index(conf.confpairs[idx_pair][1])
             # Extract conflict bearing and distance information
-            qdr = conf.qdr_mat[idx,jdx]
-            dist= conf.dist_mat[idx,jdx]
+            qdr = conf.qdr[idx_pair]
+            dist= conf.dist[idx_pair]
+            print(dist)
             
             # TODO: Introduce proper priority.
             qdr_intruder = ((qdr - ownship.trk[idx]) + 180)%360 - 180
@@ -103,7 +100,7 @@ class SpeedBased(ConflictResolution):
             # If we have a loss of separation, or the conflict is vertical,
             # just break, and stop the vertical speed
             if dist < r:
-                return 1, 0 , ownship.ap.alt  
+                return 1, 0   
             
             # Let's also do some intent check
             own_intent = ownship.intent.intent[idx]
@@ -116,8 +113,10 @@ class SpeedBased(ConflictResolution):
             if point_distance > r:
                 continue
             
-            # Now that we got rid of all the cases, first thing we want to do is
-            # see if we can just hop up a layer. TODO
+            #r = r * 1.1
+            
+            # Determine the index of the intruder
+            idx_intruder = intruder.id.index(conf.confpairs[idx_pair][1])
             
             # Convert qdr from degrees to radians
             qdr = np.radians(qdr)
@@ -133,17 +132,17 @@ class SpeedBased(ConflictResolution):
             # Get cutoff legs
             left_leg_circle_point, right_leg_circle_point = self.cutoff_legs(x, r, t)
 
-            # Extend cutoff points
             right_leg_extended = right_leg_circle_point * t
             left_leg_extended = left_leg_circle_point * t
+
+            #triangle_poly = Polygon([right_leg_extended, right_leg_circle_point, left_leg_circle_point, left_leg_extended])
+
+            #final_poly = cascaded_union([triangle_poly, circle])
             
-            # Final polygon
             final_poly = Polygon([right_leg_extended, (0,0), left_leg_extended])
             
-            # Translate it by the speed of the intruder
             final_poly_translated = translate(final_poly, v_intruder[0], v_intruder[1])
             
-            # Append this to velocity obstacles
             VelocityObstacles.append(final_poly_translated)
         
         # Combine all velocity obstacles into one figure
@@ -174,9 +173,7 @@ class SpeedBased(ConflictResolution):
         else:
             gs_new = ownship.ap.tas[idx]
         
-        alt_new = ownship.ap.alt[idx]
-        
-        return gs_new, ownship.ap.vs[idx], alt_new
+        return gs_new, ownship.ap.vs[idx]
     
     def pairs(self, conf, ownship, intruder, idx):
         '''Returns the indices of conflict pairs that involve aircraft idx
@@ -346,7 +343,7 @@ class SpeedBased(ConflictResolution):
                 # LOS. This is particularly relevant when vertical resolutions
                 # are used.
                 hdist = np.linalg.norm(dist)
-                hor_los = hdist < conf.rpz
+                hor_los = hdist < conf.rpz[idx1]
 
                 # Bouncing conflicts:
                 # If two aircraft are getting in and out of conflict continously,
@@ -354,7 +351,7 @@ class SpeedBased(ConflictResolution):
                 # the bouncing stops.
                 is_bouncing = \
                     abs(ownship.trk[idx1] - intruder.trk[idx2]) < 30.0 and \
-                    hdist < conf.rpz * self.resofach
+                    hdist < conf.rpz[idx1] * self.resofach
 
             # Start recovery for ownship if intruder is deleted, or if past CPA
             # and not in horizontal LOS or a bouncing conflict
