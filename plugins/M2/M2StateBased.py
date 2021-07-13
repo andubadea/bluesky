@@ -1,6 +1,7 @@
 ''' State-based conflict detection. '''
 import numpy as np
 from bluesky import stack
+import bluesky as bs
 from bluesky.tools import geo
 from bluesky.tools.aero import nm
 from bluesky.traffic.asas import ConflictDetection

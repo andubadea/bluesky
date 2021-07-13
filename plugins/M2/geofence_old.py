@@ -15,7 +15,7 @@ def init_plugin():
     # Configuration parameters
     config = {
         # The name of your plugin
-        'plugin_name'      : 'GEOFENCE',
+        'plugin_name'      : 'GEOFENCEOLD',
         'plugin_type'      : 'sim',
         'update_interval'  :  1.0,
 

@@ -42,6 +42,7 @@ class SpeedBased(ConflictResolution):
         newtrack    = np.copy(ownship.trk)
         newgscapped = np.copy(ownship.gs)
         newvs       = np.copy(ownship.vs)
+        newalt      = np.copy(ownship.alt)
         
         # Iterate over aircraft in conflict
         for idx in list(itertools.compress(range(len(bs.traf.cr.active)), bs.traf.cr.active)):
@@ -49,39 +50,44 @@ class SpeedBased(ConflictResolution):
             idx_pairs = self.pairs(conf, ownship, intruder, idx)
             
             # Find solution for aircraft 'idx'
-            gs_new, vs_new = self.SpeedBased(conf, ownship, intruder, idx, idx_pairs)
+            gs_new, vs_new, alt_new = self.SpeedBased(conf, ownship, intruder, idx, idx_pairs)
             
             # Write the new velocity of aircraft 'idx' to traffic data
-            newgscapped[idx] = gs_new    
-            newvs[idx] = vs_new       
+            newgscapped[idx] = gs_new      
+            newalt[idx] = alt_new   
+            newvs[idx] = vs_new
         
         # Speed based, and 2D, for now.
-        alt            = ownship.ap.alt 
         newtrack       = ownship.ap.trk
         
-        return newtrack, newgscapped, newvs, alt
+        return newtrack, newgscapped, newvs, newalt
 
 
     def SpeedBased(self, conf, ownship, intruder, idx, idx_pairs):
         # Extract ownship data
         v_ownship = np.array([ownship.gseast[idx], ownship.gsnorth[idx]])# [m/s]
         # Take minimum separation and multiply it with safely factor
-        r = conf.rpz * self.resofach
+        r_own = conf.rpz[idx] * self.resofach
         
         # Also take distance to other aircraft
         dist2others = conf.dist_mat[idx]
         
         # Get the T factor, set it as bs.settings.asas_dtlookahead
         t = bs.settings.asas_dtlookahead
+        
+        # We want to account for all aircraft around the ownship within the lookahead timestep
+        mindist = t * ownship.gs[idx]
 
         VelocityObstacles = []
-        # Go through all conflict pairs for aircraft "idx", basically take
-        # intruders one by one, and create their polygons
-        for i, idx_pair in enumerate(idx_pairs):
-            idx_intruder = intruder.id.index(conf.confpairs[idx_pair][1])
+        # Go through all aircraft that are close to this one.
+        for jdx, dist in enumerate(dist2others):
+            if dist > mindist:
+                continue
+            idx_intruder = jdx #intruder.id.index(conf.confpairs[idx_pair][1])
+            r = conf.rpz[jdx] + r_own
             # Extract conflict bearing and distance information
-            qdr = conf.qdr[idx_pair]
-            dist= conf.dist[idx_pair]
+            qdr = conf.qdr_mat[idx,jdx]
+            dist= conf.dist_mat[idx,jdx]
             
             # TODO: Introduce proper priority.
             qdr_intruder = ((qdr - ownship.trk[idx]) + 180)%360 - 180
@@ -97,7 +103,7 @@ class SpeedBased(ConflictResolution):
             # If we have a loss of separation, or the conflict is vertical,
             # just break, and stop the vertical speed
             if dist < r:
-                return 1, 0   
+                return 1, 0 , ownship.ap.alt  
             
             # Let's also do some intent check
             own_intent = ownship.intent.intent[idx]
@@ -110,10 +116,8 @@ class SpeedBased(ConflictResolution):
             if point_distance > r:
                 continue
             
-            #r = r * 1.1
-            
-            # Determine the index of the intruder
-            idx_intruder = intruder.id.index(conf.confpairs[idx_pair][1])
+            # Now that we got rid of all the cases, first thing we want to do is
+            # see if we can just hop up a layer. TODO
             
             # Convert qdr from degrees to radians
             qdr = np.radians(qdr)
@@ -129,17 +133,17 @@ class SpeedBased(ConflictResolution):
             # Get cutoff legs
             left_leg_circle_point, right_leg_circle_point = self.cutoff_legs(x, r, t)
 
+            # Extend cutoff points
             right_leg_extended = right_leg_circle_point * t
             left_leg_extended = left_leg_circle_point * t
-
-            #triangle_poly = Polygon([right_leg_extended, right_leg_circle_point, left_leg_circle_point, left_leg_extended])
-
-            #final_poly = cascaded_union([triangle_poly, circle])
             
+            # Final polygon
             final_poly = Polygon([right_leg_extended, (0,0), left_leg_extended])
             
+            # Translate it by the speed of the intruder
             final_poly_translated = translate(final_poly, v_intruder[0], v_intruder[1])
             
+            # Append this to velocity obstacles
             VelocityObstacles.append(final_poly_translated)
         
         # Combine all velocity obstacles into one figure
@@ -170,7 +174,9 @@ class SpeedBased(ConflictResolution):
         else:
             gs_new = ownship.ap.tas[idx]
         
-        return gs_new, ownship.ap.vs[idx]
+        alt_new = ownship.ap.alt[idx]
+        
+        return gs_new, ownship.ap.vs[idx], alt_new
     
     def pairs(self, conf, ownship, intruder, idx):
         '''Returns the indices of conflict pairs that involve aircraft idx
