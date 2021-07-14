@@ -147,11 +147,10 @@ class M2StateBased(ConflictDetection):
         # Ownship conflict flag and max tCPA
         inconf = np.any(swconfl, 1)
         tcpamax = np.max(tcpa * swconfl, 1)
-        
-        print(dist)
 
         # Select conflicting pairs: each a/c gets their own record
         confpairs = [(ownship.id[i], ownship.id[j]) for i, j in zip(*np.where(swconfl))]
+        print(confpairs)
         swlos = (dist < rpz) * (np.abs(dalt) < hpz)
         lospairs = [(ownship.id[i], ownship.id[j]) for i, j in zip(*np.where(swlos))]
 

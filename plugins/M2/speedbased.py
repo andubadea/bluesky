@@ -1,13 +1,16 @@
+from threading import ThreadError
 from bluesky.traffic.asas import ConflictResolution
 import bluesky as bs
 import numpy as np
+from bluesky import core
+from bluesky import stack
 from bluesky.traffic.asas import ConflictResolution
 from shapely.geometry import Point, LineString
 from shapely.geometry.polygon import Polygon
 from shapely.ops import cascaded_union, nearest_points
 from shapely.affinity import translate
-from bluesky.tools.geo import kwikdist
-from bluesky.tools.aero import nm
+from bluesky.tools.geo import kwikdist, kwikqdrdist
+from bluesky.tools.aero import nm, ft
 import bluesky as bs
 import numpy as np
 import itertools
@@ -31,6 +34,9 @@ class SpeedBased(ConflictResolution):
     # Define some variables
     def __init__(self):
         super().__init__()
+        self.cruiselayerdiff = 75 * ft
+        with self.settrafarrays():
+            self.last_conflicts = []
         
     def resolve(self, conf, ownship, intruder):
         '''We want to only solve in the velocity direction while still following the heading
@@ -47,6 +53,8 @@ class SpeedBased(ConflictResolution):
         for idx in list(itertools.compress(range(len(bs.traf.cr.active)), bs.traf.cr.active)):
             # Find the pairs in which IDX is involved in a conflict
             idx_pairs = self.pairs(conf, ownship, intruder, idx)
+            
+            self.last_conflicts[idx] = [ownship.id[x] for x in idx_pairs]
             
             # Find solution for aircraft 'idx'
             gs_new, vs_new = self.SpeedBased(conf, ownship, intruder, idx, idx_pairs)
@@ -65,17 +73,37 @@ class SpeedBased(ConflictResolution):
     def SpeedBased(self, conf, ownship, intruder, idx, idx_pairs):
         # Extract ownship data
         v_ownship = np.array([ownship.gseast[idx], ownship.gsnorth[idx]])# [m/s]
-        # Take minimum separation and multiply it with safely factor
-        r = conf.rpz[idx] * self.resofach
-        
-        print(conf.rpz[idx])
         
         # Also take distance to other aircraft
         dist2others = conf.dist_mat[idx]
         
-        # Get the T factor, set it as bs.settings.asas_dtlookahead
+        # Descend and ascend checks
+        can_ascend = True
+        can_descend = True
+        should_ascend = True
+        should_descend = True
+        
+        # Check if aircraft can ascend or descend to another cruise layer
+        # Basically, we check if there are other aircraft above or below
+        for idx_other, dist in enumerate(dist2others):
+            # First, check if distance is smaller than rpz * 1.5
+            if dist < (conf.rpz[idx] + conf.rpz[idx_other]) * 1.5:
+                # Check if the vertical distance is smaller than one layer hop, but also
+                # that we're not already in a conflict with this aircraft
+                vertical_dist = ownship.alt[idx] - intruder.alt[idx_other]
+                if abs(vertical_dist) < self.cruiselayerdiff * 1.1 and abs(vertical_dist) > conf.hpz[idx]:
+                    # Ok so this basically means we cannot ascend or descend
+                    if vertical_dist < 0:
+                        # An aircraft is above
+                        can_ascend = False
+                    elif vertical_dist > 0:
+                        # An aircraft is below
+                        can_descend = False
+        
+        # Initialise some variables
         t = bs.settings.asas_dtlookahead
-
+        target_alt = ownship.alt[idx]
+        
         VelocityObstacles = []
         # Go through all conflict pairs for aircraft "idx", basically take
         # intruders one by one, and create their polygons
@@ -84,18 +112,17 @@ class SpeedBased(ConflictResolution):
             # Extract conflict bearing and distance information
             qdr = conf.qdr[idx_pair]
             dist= conf.dist[idx_pair]
-            print(dist)
+
+            # Get the separation distance
+            r = (conf.rpz[idx] + conf.rpz[idx_intruder]) * 1.1
             
             # TODO: Introduce proper priority.
-            qdr_intruder = ((qdr - ownship.trk[idx]) + 180)%360 - 180
-            # Check if intruder is coming from the right or the back.
-            if (-180 <= qdr_intruder  < -135) or (135 <= qdr_intruder  < 180):
+            qdr_intruder = ((qdr - ownship.trk[idx]) + 180) % 360 - 180
+            # Check if intruder is coming from the back or left.
+            if (-180 <= qdr_intruder  < -135) or (135 <= qdr_intruder  < 180) \
+                    or not (0 <= qdr_intruder  <= 180):
                 # go to next pair
-                continue
-            # Not coming from the back, but is it coming from the right?
-            if not (0 <= qdr_intruder  <= 180):
-                # go to next pair
-                continue       
+                continue      
             
             # If we have a loss of separation, or the conflict is vertical,
             # just break, and stop the vertical speed
@@ -103,17 +130,43 @@ class SpeedBased(ConflictResolution):
                 return 1, 0   
             
             # Let's also do some intent check
-            own_intent = ownship.intent.intent[idx]
-            intruder_intent = intruder.intent.intent[idx_intruder]
+            own_intent, own_target_alt = ownship.intent.intent[idx]
+            intruder_intent, intruder_target_alt = intruder.intent.intent[idx_intruder]
             # Find closest points between the two intent paths
             pown, pint = nearest_points(own_intent, intruder_intent)
             # Find the distance between the points
             point_distance = kwikdist(pown.y, pown.x, pint.y, pint.x) * nm #[m]
-            
-            if point_distance > r:
+            # Also do vertical intent
+            # Difference between own altitude and intruder target
+            diff = ownship.alt[idx] - intruder_target_alt
+            # Basically, there are three conditions to be met in order to skip
+            # a conflict due to intent:
+            # 1. The minimum distance between the horizontal intent lines is greater than r;
+            # 2. The difference between the current altitude and the target altitude of the 
+            # intruder is greater than the vertical separation margin;
+            # 3. The altitude difference and vertical velocity of the intruder have the same sign.
+            # This means that if the aircraft is coming from above (negative), and the altitude difference
+            # is positive (thus target altitude is below ownship), then their paths will intersect. 
+            if (point_distance > r) and (abs(diff) >= conf.hpz[idx]) and \
+                (diff *  intruder.vs[idx_intruder] > 0):
                 continue
             
-            #r = r * 1.1
+            # --------------- Actual conflict resolution calculation------------
+            # Until now we had exceptions, now we do actual maneuvers.
+            
+            # First, let's clear some vertical matters. If an intruder is in front and
+            # is performing a vertical maneuver, then prevent aircraft in back from
+            # performing the same maneuver.
+            if (-20 < qdr_intruder < 20):
+                if intruder.vs[idx_intruder] > 0.1:
+                    # Aircraft in front is performing an ascent maneuver
+                    should_ascend = False
+                elif intruder.vs[idx_intruder] < -0.1:
+                    # Aircraft in front is performing a descent maneuver
+                    should_descend = False
+            
+            # Set the target altitude in case we can ascend
+            target_alt = intruder.alt[idx] + self.cruiselayerdiff
             
             # Determine the index of the intruder
             idx_intruder = intruder.id.index(conf.confpairs[idx_pair][1])
@@ -144,6 +197,10 @@ class SpeedBased(ConflictResolution):
             final_poly_translated = translate(final_poly, v_intruder[0], v_intruder[1])
             
             VelocityObstacles.append(final_poly_translated)
+            
+        # Went through all intruders, now let's try to hop a layer
+        if can_ascend and should_ascend:
+            stack.stack(f'ALT {ownship.id[idx]} {target_alt/ft}')
         
         # Combine all velocity obstacles into one figure
         CombinedObstacles = cascaded_union(VelocityObstacles)
@@ -158,18 +215,14 @@ class SpeedBased(ConflictResolution):
         
         # Create velocity line
         line = LineString([v_line_min, v_line_max])
-
         intersection = CombinedObstacles.intersection(line)
-        
 
-        
         # For now let's just go with the slowest solution
         if intersection:
             solutions = []
             for velocity in list(intersection.coords):
                 solutions.append(self.norm(velocity))
             gs_new = min(solutions)
-
         else:
             gs_new = ownship.ap.tas[idx]
         
@@ -265,6 +318,71 @@ class SpeedBased(ConflictResolution):
         self.left_cutoff_leg_dir = left_cutoff_leg_dir
         
         return np.array([x_l, y_l]), np.array([x_r, y_r])
+    
+    @core.timed_function(dt=5)
+    def check_stuck(self):
+        traf = bs.traf
+        conf = traf.cd
+        ownship = traf
+        intruder = traf
+        changeactive = dict()
+        for idx in list(itertools.compress(range(len(bs.traf.cr.active)), bs.traf.cr.active)):
+            if not self.check_in_pair(idx):    
+                # Check distance to other aircraft
+                dist2others = conf.dist_mat[idx]
+                
+                dlookahead = bs.settings.asas_dtlookahead * ownship.gs[idx]
+                # Descend and ascend checks
+                can_ascend = True
+                can_descend = True
+                should_ascend = True
+                should_descend = True
+                
+                target_alt = ownship.alt[idx]
+                
+                # Check if aircraft can ascend or descend to another cruise layer
+                # Basically, we check if there are other aircraft above or below
+                for idx_other, dist in enumerate(dist2others):
+                    # Check if there is any aircraft in front within the lookahead time that
+                    # is doing a vertical maneuvering
+                    if dist < dlookahead:
+                        qdr, dummy = kwikqdrdist(ownship.lat[idx], ownship.lon[idx], 
+                                          intruder.lat[idx_other], intruder.lon[idx_other])
+                        qdr_intruder = ((qdr - ownship.trk[idx]) + 180) % 360 - 180
+                        if (-20 < qdr_intruder < 20 and intruder.vs[idx_other] > 0.1) or \
+                                    not (-20 < qdr_intruder < 20):
+                            should_ascend = False
+                            
+                        # Checking if any aircraft are above
+                        # Check if distance is smaller than rpz * 1.5
+                        if dist < (conf.rpz[idx] + conf.rpz[idx_other]) * 1.5:
+                            # Check if the vertical distance is smaller than one layer hop, but also
+                            # that we're not already in a conflict with this aircraft
+                            vertical_dist = ownship.alt[idx] - intruder.alt[idx_other]
+                            if abs(vertical_dist) < self.cruiselayerdiff * 1.1 and abs(vertical_dist) > conf.hpz[idx]:
+                                # Ok so this basically means we cannot ascend or descend
+                                if vertical_dist < 0:
+                                    # An aircraft is above
+                                    can_ascend = False
+                                elif vertical_dist > 0:
+                                    # An aircraft is below
+                                    can_descend = False    
+                        if abs(intruder.alt[idx_other] - ownship.alt[idx]) < 1:
+                            # Only do this for the aircraft on the same level
+                            target_alt = intruder.alt[idx_other] + self.cruiselayerdiff
+                if can_ascend and should_ascend:
+                    stack.stack(f'ALT {ownship.id[idx]} {target_alt/ft}')
+                    print(f'ALT {ownship.id[idx]} {target_alt/ft}')
+                                           
+        return
+    
+    def check_in_pair(self, idx):
+        in_bool = False
+        for pair in bs.traf.cd.confpairs:
+            if idx in pair:
+                in_bool = True
+                break
+        return in_bool
                 
     def perp(self, a):
         return np.array((a[1], -a[0]))
@@ -295,6 +413,14 @@ class SpeedBased(ConflictResolution):
             the conflict resolution algorithm.
         '''
         #TODO: Here is a good place to implement Open Airpace vs Restricted Airspace logic
+        return np.array([False] * len(self.active))
+
+    @property
+    def altactive(self):
+        ''' Return a boolean array sized according to the number of aircraft
+            with True for all elements where altitude is currently controlled by
+            the conflict resolution algorithm.
+        '''
         return np.array([False] * len(self.active))
     
     ### Modified resumenav function
@@ -334,9 +460,12 @@ class SpeedBased(ConflictResolution):
 
                 # Check if conflict is past CPA
                 past_cpa = np.dot(dist, vrel) > 0.0
+
+                # Also check the distance and altitude between the two aircraft.
                 distance = self.norm(dist)
-                dist_ok = distance > 100
-                # Also check the distance between the two aircraft.
+                dist_ok = (distance > 100)
+                alt_ok = abs((ownship.alt[idx1]-intruder.alt[idx2])/ft) >= (self.cruiselayerdiff - 1)
+
 
                 # hor_los:
                 # Aircraft should continue to resolve until there is no horizontal
@@ -355,7 +484,7 @@ class SpeedBased(ConflictResolution):
 
             # Start recovery for ownship if intruder is deleted, or if past CPA
             # and not in horizontal LOS or a bouncing conflict
-            if idx2 >= 0 and (not past_cpa or hor_los or is_bouncing or not dist_ok):
+            if idx2 >= 0 and (((not past_cpa or not dist_ok) and (not alt_ok)) or hor_los or is_bouncing):
                 # Enable ASAS for this aircraft
                 changeactive[idx1] = True
             else:
@@ -364,6 +493,8 @@ class SpeedBased(ConflictResolution):
                 changeactive[idx1] = changeactive.get(idx1, False)
                 # If conflict is solved, remove it from the resopairs list
                 delpairs.add(conflict)
+                # Re-enable vnav
+                stack.stack(f'VNAV {ownship.id[idx1]} ON')
 
         for idx, active in changeactive.items():
             # Loop a second time: this is to avoid that ASAS resolution is

@@ -29,6 +29,17 @@ class Intent(Entity, replaceable = True):
         ntraf = ownship.ntraf
         
         for idx in range(ntraf):
+            #------------ Vertical----------------
+            # If there is a vertical maneuver going on, target altitude is intent.
+            # Otherwise, intent is simply current altitude.
+            if abs(ownship.selalt[idx] - ownship.alt[idx]) > 1:
+                # There is a maneuver going on
+                intentAlt = ownship.selalt[idx]
+            else:
+                # No maneuver going on
+                intentAlt = ownship.alt[idx]
+
+
             # First, get route
             ac_route = ownship.ap.route[idx]
             # Current waypoint index
@@ -53,7 +64,7 @@ class Intent(Entity, replaceable = True):
                     # Just make a line between current position and the one within dtlookahead
                     end_lat, end_lon = kwikpos(prev_lat, prev_lon, ownship.trk[idx], distance_max / nm)
                     intentLine = LineString([(prev_lon, prev_lat), (end_lon, end_lat)])
-                    self.intent[idx] = intentLine
+                    self.intent[idx] = (intentLine, intentAlt)
                     break
 
                 # Get waypoint data
@@ -85,7 +96,7 @@ class Intent(Entity, replaceable = True):
                     linecoords.append((end_lon, end_lat))
                     intentLine = LineString(linecoords)
                     # Append intentLine to overall intent
-                    self.intent[idx] = intentLine
+                    self.intent[idx] = (intentLine, intentAlt)
                     # Stop the while loop, go to next aircraft
                     break
         return
