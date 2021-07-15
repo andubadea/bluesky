@@ -35,6 +35,7 @@ class SpeedBased(ConflictResolution):
     def __init__(self):
         super().__init__()
         self.cruiselayerdiff = 75 * ft
+        self.min_alt = 50 * ft
         with self.settrafarrays():
             self.last_conflicts = []
         
@@ -278,7 +279,6 @@ class SpeedBased(ConflictResolution):
         # Find the angle itself
         angle = np.arcsin(anglesin) # Radians
         
-        print(angle, anglesin, x, x_len, r)
         # Find the rotation matrices
         rotmat_left = np.array([[np.cos(angle), -np.sin(angle)],
                            [np.sin(angle), np.cos(angle)]])
@@ -319,64 +319,109 @@ class SpeedBased(ConflictResolution):
         
         return np.array([x_l, y_l]), np.array([x_r, y_r])
     
-    @core.timed_function(dt=5)
-    def check_stuck(self):
+    @core.timed_function(name = 'stuck_checker', dt=5)
+    def check_traffic(self):
+        """This function does a periodic sweep of all aircraft and
+        checks whether they are stuck behind a slow moving aircraft
+        or whether they can descend.
+        """        
+        # Get the required variables from Bluesky
         traf = bs.traf
         conf = traf.cd
         ownship = traf
         intruder = traf
-        changeactive = dict()
-        for idx in list(itertools.compress(range(len(bs.traf.cr.active)), bs.traf.cr.active)):
-            if not self.check_in_pair(idx):    
-                # Check distance to other aircraft
-                dist2others = conf.dist_mat[idx]
-                
-                dlookahead = bs.settings.asas_dtlookahead * ownship.gs[idx]
-                # Descend and ascend checks
-                can_ascend = True
-                can_descend = True
-                should_ascend = True
-                should_descend = True
-                
-                target_alt = ownship.alt[idx]
-                
-                # Check if aircraft can ascend or descend to another cruise layer
-                # Basically, we check if there are other aircraft above or below
-                for idx_other, dist in enumerate(dist2others):
-                    # Check if there is any aircraft in front within the lookahead time that
-                    # is doing a vertical maneuvering
-                    if dist < dlookahead:
-                        qdr, dummy = kwikqdrdist(ownship.lat[idx], ownship.lon[idx], 
-                                          intruder.lat[idx_other], intruder.lon[idx_other])
-                        qdr_intruder = ((qdr - ownship.trk[idx]) + 180) % 360 - 180
-                        if (-20 < qdr_intruder < 20 and intruder.vs[idx_other] > 0.1) or \
-                                    not (-20 < qdr_intruder < 20):
-                            should_ascend = False
-                            
-                        # Checking if any aircraft are above
-                        # Check if distance is smaller than rpz * 1.5
-                        if dist < (conf.rpz[idx] + conf.rpz[idx_other]) * 1.5:
-                            # Check if the vertical distance is smaller than one layer hop, but also
-                            # that we're not already in a conflict with this aircraft
-                            vertical_dist = ownship.alt[idx] - intruder.alt[idx_other]
-                            if abs(vertical_dist) < self.cruiselayerdiff * 1.1 and abs(vertical_dist) > conf.hpz[idx]:
-                                # Ok so this basically means we cannot ascend or descend
-                                if vertical_dist < 0:
-                                    # An aircraft is above
-                                    can_ascend = False
-                                elif vertical_dist > 0:
-                                    # An aircraft is below
-                                    can_descend = False    
-                        if abs(intruder.alt[idx_other] - ownship.alt[idx]) < 1:
-                            # Only do this for the aircraft on the same level
-                            target_alt = intruder.alt[idx_other] + self.cruiselayerdiff
+        for idx, acid in enumerate(traf.id):
+            # First, check if we can actually do anything with this aircraft
+            # We ignore an aircraft if it is currently performing a vertical maneuver
+            if abs(ownship.vs[idx]) > 0.01:
+                continue
+            
+            # Descend and ascend checks
+            can_ascend, can_descend, should_ascend, should_descend = \
+                    self.check_ascent_descent(conf, ownship, intruder, idx)
+                    
+            if (not can_ascend and not can_descend) or (not should_ascend and not should_descend):
+                # Stop here, there's nothing to do anyway with this aircraft
+                continue
+            
+            # We check if conflict resolution is active for this aircraft but it
+            # is no longer in conflict pairs. It means it is stuck in CR mode behind some
+            # slower aircraft.
+            if ownship.cr.active[idx] and not self.in_confpairs(idx):
+                # If aircraft is stuck, we stop here as is_stuck also
+                # unstucks it if possible. 
+                target_alt = ownship.alt[idx] + self.cruiselayerdiff
                 if can_ascend and should_ascend:
-                    stack.stack(f'ALT {ownship.id[idx]} {target_alt/ft}')
-                    print(f'ALT {ownship.id[idx]} {target_alt/ft}')
-                                           
+                    # Aircraft can ascend to next layer
+                    stack.stack(f'ALT {ownship.id[idx]} {target_alt/ft}') 
+                    # Continue to next aircraft
+                    continue
+            
+            # Now we descend if we can
+            if can_descend and should_descend:
+                target_alt = ownship.alt[idx] - self.cruiselayerdiff
+                # Check if we're above the minimum altitude
+                if target_alt >= self.min_alt:
+                    stack.stack(f'ALT {ownship.id[idx]} {target_alt/ft}') 
+                    continue
         return
+                
     
-    def check_in_pair(self, idx):
+    def check_ascent_descent(self, conf, ownship, intruder, idx):
+        # Check distance to other aircraft
+        dist2others = conf.dist_mat[idx]
+        
+        dlookahead = bs.settings.asas_dtlookahead * ownship.gs[idx]
+        # Descend and ascend checks
+        # These two tell me if there is any aircraft above and below
+        can_ascend = True 
+        can_descend = True 
+        # These two tell me if the aircraft in front is ascending or descending
+        should_ascend = True
+        should_descend = True
+        
+        # Also check the bearing of all the neighbors to see if there is anyone in
+        # front, otherwise we don't need to ascend.
+        qdr_list = np.array([])
+        
+        # Check if aircraft can ascend or descend to another cruise layer
+        # Basically, we check if there are other aircraft above or below
+        for idx_other, dist in enumerate(dist2others):
+            # Check if there is any aircraft in front within the lookahead time that
+            # is doing a vertical maneuver
+            if dist < dlookahead:
+                qdr, dummy = kwikqdrdist(ownship.lat[idx], ownship.lon[idx], 
+                                    intruder.lat[idx_other], intruder.lon[idx_other])
+                qdr_intruder = ((qdr - ownship.trk[idx]) + 180) % 360 - 180
+                qdr_list = np.append(qdr_list, qdr_intruder)
+                
+                # Check if there is any aircraft in front that is doing a maneuver
+                if (-10 < qdr_intruder < 10 and intruder.vs[idx_other] > 0.01):
+                    should_ascend = False
+                elif (-10 < qdr_intruder < 10 and intruder.vs[idx_other] < -0.01):
+                    should_descend = False
+                    
+                # Checking if any aircraft are above
+                # Check if distance is smaller than rpz * 1.5
+                if dist < (conf.rpz[idx] + conf.rpz[idx_other]) * 2:
+                    # Check if the vertical distance is smaller than one layer hop, but also
+                    # that we're not already in a conflict with this aircraft
+                    vertical_dist = ownship.alt[idx] - intruder.alt[idx_other]
+                    if abs(vertical_dist) < self.cruiselayerdiff * 1.1 and abs(vertical_dist) > conf.hpz[idx]:
+                        # Ok so this basically means we cannot ascend or descend
+                        if vertical_dist < 0:
+                            # An aircraft is above
+                            can_ascend = False
+                        elif vertical_dist > 0:
+                            # An aircraft is below
+                            can_descend = False  
+        # Finally, if nobody is in front of us, then don't ascend
+        if any([not(-10 < x < 10) for x in qdr_list]):
+            should_ascend = False 
+        return can_ascend, can_descend, should_ascend, should_descend
+        
+    
+    def in_confpairs(self, idx):
         in_bool = False
         for pair in bs.traf.cd.confpairs:
             if idx in pair:

@@ -150,7 +150,6 @@ class M2StateBased(ConflictDetection):
 
         # Select conflicting pairs: each a/c gets their own record
         confpairs = [(ownship.id[i], ownship.id[j]) for i, j in zip(*np.where(swconfl))]
-        print(confpairs)
         swlos = (dist < rpz) * (np.abs(dalt) < hpz)
         lospairs = [(ownship.id[i], ownship.id[j]) for i, j in zip(*np.where(swlos))]
 
