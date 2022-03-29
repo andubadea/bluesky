@@ -1,0 +1,53 @@
+00:00:00>SCEN Flight_intention_very_low_40_0
+00:00:00>PCALL UoPPaper/Flight_intention_very_low_40_0.scn
+00:00:00>FF
+00:00:00>SCHEDULE 01:30:00 HOLD
+00:00:00>SCHEDULE 01:30:00 DELETEALL
+
+00:00:00>SCEN Flight_intention_very_low_40_1
+00:00:00>PCALL UoPPaper/Flight_intention_very_low_40_1.scn
+00:00:00>FF
+00:00:00>SCHEDULE 01:30:00 HOLD
+00:00:00>SCHEDULE 01:30:00 DELETEALL
+
+00:00:00>SCEN Flight_intention_very_low_40_2
+00:00:00>PCALL UoPPaper/Flight_intention_very_low_40_2.scn
+00:00:00>FF
+00:00:00>SCHEDULE 01:30:00 HOLD
+00:00:00>SCHEDULE 01:30:00 DELETEALL
+
+00:00:00>SCEN Flight_intention_low_40_0
+00:00:00>PCALL UoPPaper/Flight_intention_low_40_0.scn
+00:00:00>FF
+00:00:00>SCHEDULE 01:30:00 HOLD
+00:00:00>SCHEDULE 01:30:00 DELETEALL
+
+00:00:00>SCEN Flight_intention_low_40_1
+00:00:00>PCALL UoPPaper/Flight_intention_low_40_1.scn
+00:00:00>FF
+00:00:00>SCHEDULE 01:30:00 HOLD
+00:00:00>SCHEDULE 01:30:00 DELETEALL
+
+00:00:00>SCEN Flight_intention_low_40_2
+00:00:00>PCALL UoPPaper/Flight_intention_low_40_0.scn
+00:00:00>FF
+00:00:00>SCHEDULE 01:30:00 HOLD
+00:00:00>SCHEDULE 01:30:00 DELETEALL
+
+00:00:00>SCEN Flight_intention_medium_40_0
+00:00:00>PCALL UoPPaper/Flight_intention_medium_40_0.scn
+00:00:00>FF
+00:00:00>SCHEDULE 01:30:00 HOLD
+00:00:00>SCHEDULE 01:30:00 DELETEALL
+
+00:00:00>SCEN Flight_intention_medium_40_1
+00:00:00>PCALL UoPPaper/Flight_intention_medium_40_1.scn
+00:00:00>FF
+00:00:00>SCHEDULE 01:30:00 HOLD
+00:00:00>SCHEDULE 01:30:00 DELETEALL
+
+00:00:00>SCEN Flight_intention_medium_40_2
+00:00:00>PCALL UoPPaper/Flight_intention_medium_40_2.scn
+00:00:00>FF
+00:00:00>SCHEDULE 01:30:00 HOLD
+00:00:00>SCHEDULE 01:30:00 DELETEALL

@@ -331,7 +331,6 @@ class SpeedBasedV3(ConflictResolution):
                                     # We try to jump up 30 ft
                                     alt = ownship.alt[idx1] + 30*ft
                         else:
-                            #We're in constrained  
                             alt_ascend = self.get_above_cruise_layer(ownship, idx1)
                             alt_descend = self.get_below_cruise_layer(ownship, idx1)
                             if alt_ascend > 0 and can_ascend:
@@ -360,7 +359,7 @@ class SpeedBasedV3(ConflictResolution):
                         
                     self.in_headon[idx1] = True
                 
-                elif abs(intruder.vs[idx2]) > 0.1:
+                elif abs(intruder.vs[idx2]) > 0.1 or open_airspace:
                     #print('In front, intruder is performing a manoeuver.')
                     should_hold_altitude[i] = True
                     should_ascend[i] = False
@@ -537,6 +536,7 @@ class SpeedBasedV3(ConflictResolution):
                 # solution.
                 # Add big circle ring around polygon so we make sure that the solution will
                 # not be beyond vmax
+                print(f'I DID THIS FOR {ownship.id[idx1]}.')
                 limit_vmax = Point(0,0).buffer(100)-Point(0,0).buffer(vmax)
                 # Get the union of these two polygons
                 bad_states = limit_vmax.union(CombinedObstacles)
