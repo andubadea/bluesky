@@ -9,6 +9,7 @@ data/performance/BADA/*
 data/cache/py3/m2_hybrid/
 data/cache/py3/m2/
 data/cache/py3/m2_dark/
+plugins/streets/path_plan_dills
 
 # Sphinx documentation
 docs/_build/
