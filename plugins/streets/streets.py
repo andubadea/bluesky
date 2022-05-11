@@ -1304,6 +1304,8 @@ class FlightLayers(Entity):
         self.layer_levels = np.array([], dtype=int)
         self.layer_dist_center = np.array([], dtype=float)
 
+        self.dist_between_cruise_layers = 0.0
+
         # vectorize function to extract layer_info
         self.layer_info = np.vectorize(self.get_layer_type)
     
@@ -1346,6 +1348,13 @@ class FlightLayers(Entity):
         self.layer_dist_center = self.layer_levels - self.layer_dict['info']['spacing']/2
         self.heading_levels = self.layer_dict['config']['open']['heading']['heights']['center']
         self.layer_heading_level_choices = self.layer_dict['config']['open']['heading']['angle']['center']
+
+        # get distance between cruise layers
+        const_pattern = np.array(self.layer_dict['config']['0']['pattern'])
+        cruise_layers = self.layer_levels[np.where(const_pattern == 'C')]
+        self.dist_between_cruise_layers = cruise_layers[1] - cruise_layers[0]
+        
+        bs.traf.dist_between_cruise_layers = self.dist_between_cruise_layers
 
     def layer_tracking(self):
         

@@ -98,7 +98,8 @@ class M2Navigation(core.Entity):
         # Always aim for the bottom cruise layer. However, if both bottom and top
         # are 0, then remain at the same altitude.
         # First, check if we can go up or down
-        can_ascend_cruise, can_descend_cruise = self.ascent_descent(64, 70, -70)
+        check_distance = bs.traf.dist_between_cruise_layers - 20
+        can_ascend_cruise, can_descend_cruise = self.ascent_descent(64, check_distance, -check_distance)
         
         # This array is true for aircraft that can simply go down
         can_go_down = np.logical_and(bs.traf.closest_cruise_layer_bottom != 0, can_descend_cruise)
@@ -160,7 +161,10 @@ class M2Navigation(core.Entity):
         if hopping:
             turn_close = bs.traf.ap.dist2turn < 150 #m
             
-            can_ascend, can_descend = self.ascent_descent(150, 200, -100)
+            # 250, -150 for 1_to_1
+            check_dist_below = bs.traf.dist_between_cruise_layers + 10
+            check_dist_above = bs.traf.dist_between_cruise_layers*2 + 10
+            can_ascend, can_descend = self.ascent_descent(150, check_dist_above, -check_dist_below)
             
             # Descent command for aircraft that can
             target_descent_layer = np.where(emergency, bs.traf.closest_empty_layer_bottom,
