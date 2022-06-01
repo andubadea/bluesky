@@ -35,6 +35,9 @@ def geofence(name: 'txt', top: float = 999999, bottom: float = -999999, *coordin
         - coordinates: three or more lat/lon coordinates in degrees.
     '''
     Geofence(name, coordinates, top, bottom)
+
+    # DRAW the geofence
+    bs.scr.objappend("POLY", f'AIGEO', coordinates)
     return True, f'Created geofence {name}'
 
 
