@@ -11,10 +11,14 @@ from collections import deque
 import torch.nn as nn
 from torch.distributions import Normal
 from geofence import Geofence
-from bluesky.tools.geo import kwikqdrdist_matrix, kwikqdrdist
+from bluesky.tools.geo import kwikqdrdist_matrix, kwikqdrdist, qdrpos
 from bluesky.stack import stack
 import geopandas as gpd
 import shapely.geometry as geom
+from bluesky.tools.aero import nm
+
+import os
+os.environ["KMP_DUPLICATE_LIB_OK"]="TRUE"
 
 def init_plugin():
 
@@ -30,6 +34,8 @@ def init_plugin():
         # The type of this plugin. For now, only simulation plugins are possible.
         'plugin_type':     'sim'
         }
+    
+    return config
 
 GAMMMA = 0.97 # The rate at which the future is uncertain and not counted towards the reward
 TAU =5e-3 # Low pass filter factor for the neural network that stops it from going too wild from one time step from another
@@ -45,15 +51,14 @@ LR_Q = 3e-4 # Learn rate of the critic
 MEANS = [57000,57000,0,0,0,0,0,0]
 STDS = [31500,31500,100000,100000,1,1,1,1]
 
-STATE_SIZE = 5
-ACTION_SIZE = 1
-
 ML_DT = 1.0 #seconds
 ML_STEPS = 1 #Steps
 
 MAX_HEADING_CHANGE = 6 * ML_DT # degrees
 
-AC_DESTINATION_LATLON = [0,0]
+episode_counter = 0
+
+avg_rewards = []
 
 class MaSacAgent:
     def __init__(self, num_agents, action_dim, state_dim):                
@@ -98,13 +103,13 @@ class MaSacAgent:
     def do_step(self, state, test = False):
 
         if not test and self.total_step < INITIAL_RANDOM_STEPS and not self.is_test:
-            selected_action = np.random.uniform(-1, 1, (len(state), self.actiondim))
+            selected_action = np.random.uniform(-1, 1)
         else:
-            action = self.actor(torch.FloatTensor(state[i]).to(self.device))[0].detach().cpu().numpy()
-            selected_action = np.clip(action, -1, 1)
+            action = self.actor(torch.FloatTensor(state).to(self.device))[0].detach().cpu().numpy()
+            selected_action = np.clip(action, -1, 1)[0]
 
         self.total_step += 1
-        return selected_action.tolist()
+        return selected_action
     
     def setResult(self,episode_name, state, new_state, reward, action, done):       
         if not self.is_test:
@@ -112,6 +117,10 @@ class MaSacAgent:
                 self.transition[i] = [state[i], action[i], reward, new_state[i], done]
                 self.memory.store(*self.transition[i])
 
+        if (len(self.memory) >  BATCH_SIZE and self.total_step > INITIAL_RANDOM_STEPS):
+            self.update_model()
+            
+    def trainChooChoo(self):
         if (len(self.memory) >  BATCH_SIZE and self.total_step > INITIAL_RANDOM_STEPS):
             self.update_model()
     
@@ -381,37 +390,48 @@ class MedRL(Entity):
     def __init__(self):
         super().__init__()
         # Initialise stuff
-        self.Agent = MaSacAgent(1, 1, STATE_SIZE)
+        self.Agent = MaSacAgent(1, 1, 5)
         
         self.step_counter = 0
         
-        with self.settrafarrays():
-            self.state = [] # dr, dd, aL, aR, bd
-            self.state_ = []
-            self.action = []
+        self.reward_history = []
+        self.state = [0,0,0,0,0] # dr, dd, aL, aR, bd
+        self.state_ = [0,0,0,0,0]
+        self.action = 0
             
-        
-        return
+        # Create the scenario
+        create_scenario()
     
-    def create(self, n=1):
-        super().create(n)
-        
-        self.state[-n:] = [0]*STATE_SIZE
-        self.state_[-n:] = [0]*STATE_SIZE
-        self.action[-n:] = [0]*ACTION_SIZE
+        return
     
     @timed_function(dt=ML_DT)
     def step(self):
-        
         # Get current state
-        self.state = self.state_[0]
+        self.state = self.state_
         
         self.state_ = self.get_state(0)
         
         reward, done = self.get_reward(0, self.state, self.state_)
         
+        if self.step_counter == 0:
+            self.step_counter += 1
+            return
+        
+        self.reward_history.append(reward)
+        
         if done:
-            self.reset()
+            stack('HOLD')
+            global episode_counter
+            episode_counter += 1
+            avg_rewards.append(sum(self.reward_history)/len(self.reward_history))
+            while len(avg_rewards) > 100:
+                avg_rewards.pop(0)
+            # Print episode number, average reward, and average loss
+            print(f'----------------- EPISODE {episode_counter} -----------------')
+            print(f'Rolling average reward: {np.mean(avg_rewards):.3f}')
+            print(f'Average reward for this episode: {sum(self.reward_history)/len(self.reward_history):.3f}')
+            print('\n')
+            self.ML_reset()
             return
         
         if self.step_counter != 0:
@@ -423,10 +443,12 @@ class MedRL(Entity):
         heading_change = self.action * MAX_HEADING_CHANGE
         
         # Execute action
-        bs.traf.ap.trk[0] = bs.traf.trk[0] + heading_change
+        stack(f'HDG {bs.traf.id[0]} {heading_change}')
         
         if self.step_counter % ML_STEPS == 0:
-            self.Agent.update_model()
+            self.Agent.trainChooChoo()
+            
+        self.step_counter += 1
         
         return
     
@@ -455,8 +477,8 @@ class MedRL(Entity):
         dr = ac_lat
         
         # Distance to destination
-        dd, bd_abs = kwikqdrdist(ac_lat, ac_lon, AC_DESTINATION_LATLON[0], AC_DESTINATION_LATLON[1])
-        
+        bd_abs, dd = kwikqdrdist(ac_lat, ac_lon, AC_DESTINATION_LATLON[0], AC_DESTINATION_LATLON[1])
+        dd = dd * 1852
         bd = ((bd_abs - ac_hdg) + 180) % 360 - 180 
         
         return [dr, dd, a1, a2, bd]
@@ -464,24 +486,43 @@ class MedRL(Entity):
     def get_reward(self, acidx, state, state_):
         ac_lat = bs.traf.lat[acidx]
         ac_lon = bs.traf.lon[acidx]
+        ac_hdg = bs.traf.hdg[acidx]
         done = False
         reward = 0
         # If distance to destination is less than 100m we are done
-        if state[4] < 100:
+        if state[1] < 100 and state[1] != 0:
+            print('Reached destination.')
             done = True
             reward += 1
         
         # Check if we hit the geofence
         bbox = Geofence.geo_by_name['AIGEO'].bbox
-        if bbox[0] < ac_lat < bbox[2] and bbox[1] < ac_lon < bbox[3]
+        if bbox[0] < ac_lat < bbox[2] and bbox[1] < ac_lon < bbox[3]:
+            print('Hit geofence.')
             done = True
             reward -= 2
             
-        # 
-        
-        
+        # Reward the aircraft as it gets closer to the destination
+        _, dist2dest = kwikqdrdist(ac_lat, ac_lon, AC_DESTINATION_LATLON[0], AC_DESTINATION_LATLON[1])
+        reward -= dist2dest
         
         return reward, done
+    
+    def ML_reset(self):
+        # This is called when we are done. First, call a simulation-wide reset
+        bs.sim.reset()
+        
+        # Reset the rest
+        self.step_counter = 0
+        
+        self.reward_history = []
+        self.state = [0,0,0,0,0] # dr, dd, aL, aR, bd
+        self.state_ = [0,0,0,0,0]
+        self.action = 0
+            
+        # Create the scenario again
+        create_scenario()
+        return
     
 def create_scenario():
     ##### TUNING PARAMETERS #####
@@ -490,6 +531,7 @@ def create_scenario():
     origin_lon = 0
 
     # set the width and depth of a rectangle meters
+    # To randomize?
     depth = 500 # meters
     width = 4000 # meters
 
@@ -539,4 +581,10 @@ def create_scenario():
     global AC_DESTINATION_LATLON
     AC_DESTINATION_LATLON = [destination_df.geometry.y.values[0], destination_df.geometry.x.values[0]]
     # add a waypoint
-    stack(addwpt_command = f'ADDWPT AI01 {destination_df.geometry.y.values[0]} {destination_df.geometry.x.values[0]}')
+    stack(f'ADDWPT AI01 {destination_df.geometry.y.values[0]} {destination_df.geometry.x.values[0]}')
+    stack('OP')
+    stack('SCHEDULE 00:00:01 PAN 0,0')
+    stack('SCHEDULE 00:00:01 ZOOM 10')
+    stack('FF')
+    
+    return
