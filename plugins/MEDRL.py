@@ -411,11 +411,11 @@ class MedRL(Entity):
         
         self.state_ = self.get_state(0)
         
-        reward, done = self.get_reward(0, self.state, self.state_)
-        
         if self.step_counter == 0:
             self.step_counter += 1
             return
+        
+        reward, done = self.get_reward(0, self.state, self.state_)
         
         self.reward_history.append(reward)
         
@@ -430,7 +430,7 @@ class MedRL(Entity):
             print(f'----------------- EPISODE {episode_counter} -----------------')
             print(f'Rolling average reward: {np.mean(avg_rewards):.3f}')
             print(f'Average reward for this episode: {sum(self.reward_history)/len(self.reward_history):.3f}')
-            print('\n')
+            print('--------------------------------------------------------------')
             self.ML_reset()
             return
         
@@ -465,13 +465,20 @@ class MedRL(Entity):
         geolats = geofence.coordinates[::2]
         geolons = geofence.coordinates[1::2]
         
-        # Get the relative bearing of all points of the rectangle
-        abs_brg, _ = kwikqdrdist_matrix(ac_lat, ac_lon, geolats, geolons)
+        # Give the guy the angles to the middle of the sides of the geofence
+        bbox = geofence.bbox
         
-        bearings = ((abs_brg - ac_hdg) + 180) % 360 - 180  
+        # bbox is a tuple of the form (minlat, minlon, maxlat, maxlon)
+        point_left = ((bbox[0] + bbox[2]) / 2, bbox[1])
+        point_right = ((bbox[0] + bbox[2]) / 2, bbox[3])
         
-        a1 = max(bearings)
-        a2 = min(bearings)
+        # a1 and a2 are the bearings to point_left and point_right
+        a1_abs, _ = kwikqdrdist(ac_lat, ac_lon, point_left[0], point_left[1])
+        a2_abs, _ = kwikqdrdist(ac_lat, ac_lon, point_right[0], point_right[1])
+        
+        # Get a1 and a2 relative to the aircraft
+        a1 = ((a1_abs - ac_hdg) + 180) % 360 - 180  
+        a2 = ((a2_abs - ac_hdg) + 180) % 360 - 180
         
         # Distance to geofence, just take the lat
         dr = ac_lat
@@ -493,14 +500,19 @@ class MedRL(Entity):
         if state[1] < 100 and state[1] != 0:
             print('Reached destination.')
             done = True
-            reward += 1
+            reward += 3
         
         # Check if we hit the geofence
         bbox = Geofence.geo_by_name['AIGEO'].bbox
         if bbox[0] < ac_lat < bbox[2] and bbox[1] < ac_lon < bbox[3]:
             print('Hit geofence.')
             done = True
-            reward -= 2
+            reward -= 3
+            
+        # Stop if simulation time is more than 1 minute
+        if bs.sim.simt > 120:
+            print('Simulation time is more than 2 minutes.')
+            done = True
             
         # Reward the aircraft as it gets closer to the destination
         _, dist2dest = kwikqdrdist(ac_lat, ac_lon, AC_DESTINATION_LATLON[0], AC_DESTINATION_LATLON[1])
@@ -574,9 +586,12 @@ def create_scenario():
     xy_values = rectangle_df.geometry.values[0].exterior.coords.xy
     lat_lon = [f'{lat}, {lon}' for lon, lat in zip(xy_values[0], xy_values[1])]
     stack('GEOFENCE,AIGEO,25000,0, ' + ','.join(lat_lon))
+    
+    # Get a random heading between -90 and 90 mapped to 0-360
+    hdg = np.random.randint(-90, 90)
 
     # create an aircraft
-    stack(f'CRE AI01 B744 {origin_df.geometry.y.values[0]} {origin_df.geometry.x.values[0]} 0 FL250 200')
+    stack(f'CRE AI01 B744 {origin_df.geometry.y.values[0]} {origin_df.geometry.x.values[0]} {hdg} FL250 200')
 
     global AC_DESTINATION_LATLON
     AC_DESTINATION_LATLON = [destination_df.geometry.y.values[0], destination_df.geometry.x.values[0]]
@@ -585,6 +600,7 @@ def create_scenario():
     stack('OP')
     stack('SCHEDULE 00:00:01 PAN 0,0')
     stack('SCHEDULE 00:00:01 ZOOM 10')
+    stack('SCHEDULE 00:00:01 AI01')
     stack('FF')
     
     return
