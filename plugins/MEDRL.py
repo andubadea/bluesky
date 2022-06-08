@@ -11,10 +11,12 @@ from collections import deque
 import torch.nn as nn
 from torch.distributions import Normal
 from geofence import Geofence
-from bluesky.tools.geo import kwikqdrdist_matrix, kwikqdrdist, qdrpos
+from bluesky.tools.geo import kwikqdrdist_matrix, kwikqdrdist
+from bluesky.tools import areafilter
 from bluesky.stack import stack
 import geopandas as gpd
 import shapely.geometry as geom
+from shapely.ops import nearest_points
 from bluesky.tools.aero import nm
 
 import os
@@ -53,8 +55,13 @@ STDS = [31500,31500,100000,100000,1,1,1,1]
 
 ML_DT = 1.0 #seconds
 ML_STEPS = 1 #Steps
+ML_ACTION_DT = 10 # seconds
 
-MAX_HEADING_CHANGE = 6 * ML_DT # degrees
+MAX_HEADING_CHANGE = 90 # degrees
+MAX_SIMT = 70 # seconds
+
+SHOW_LINES = False
+FAST = True
 
 episode_counter = 0
 
@@ -393,6 +400,7 @@ class MedRL(Entity):
         self.Agent = MaSacAgent(1, 1, 5)
         
         self.step_counter = 0
+        self.time_passed_counter = 0
         
         self.reward_history = []
         self.state = [0,0,0,0,0] # dr, dd, aL, aR, bd
@@ -413,6 +421,7 @@ class MedRL(Entity):
         
         if self.step_counter == 0:
             self.step_counter += 1
+            self.time_passed_counter += 1
             return
         
         reward, done = self.get_reward(0, self.state, self.state_)
@@ -436,8 +445,12 @@ class MedRL(Entity):
         
         if self.step_counter != 0:
             self.Agent.memory.store(self.state, self.action, reward, self.state_, done)
-            
-        self.action = self.Agent.do_step(self.state_)
+        
+        # Only get a new action if enough seconds passed
+        time_passed = ML_DT * self.time_passed_counter
+        if time_passed > ML_ACTION_DT or self.step_counter == 1:
+            self.time_passed_counter = 0
+            self.action = self.Agent.do_step(self.state_)
         
         # Compute heading change
         heading_change = self.action * MAX_HEADING_CHANGE
@@ -449,6 +462,7 @@ class MedRL(Entity):
             self.Agent.trainChooChoo()
             
         self.step_counter += 1
+        self.time_passed_counter += 1
         
         return
     
@@ -465,27 +479,49 @@ class MedRL(Entity):
         geolats = geofence.coordinates[::2]
         geolons = geofence.coordinates[1::2]
         
-        # Give the guy the angles to the middle of the sides of the geofence
-        bbox = geofence.bbox
+        # Compute the absolute qdrs to all the points of the geofence
+        geoqdrs, _ = kwikqdrdist_matrix(ac_lat, ac_lon, geolats, geolons)
         
-        # bbox is a tuple of the form (minlat, minlon, maxlat, maxlon)
-        point_left = ((bbox[0] + bbox[2]) / 2, bbox[1])
-        point_right = ((bbox[0] + bbox[2]) / 2, bbox[3])
+        # Compute the relative bearings for all the geoqdrs
+        geoqdr_rel = ((geoqdrs - ac_hdg) + 180) % 360 - 180
         
-        # a1 and a2 are the bearings to point_left and point_right
-        a1_abs, _ = kwikqdrdist(ac_lat, ac_lon, point_left[0], point_left[1])
-        a2_abs, _ = kwikqdrdist(ac_lat, ac_lon, point_right[0], point_right[1])
+        # a1 is the smallest absolute qdr, a2 is the biggest
+        a1 = min(geoqdr_rel)
+        a2 = max(geoqdr_rel)
         
-        # Get a1 and a2 relative to the aircraft
-        a1 = ((a1_abs - ac_hdg) + 180) % 360 - 180  
-        a2 = ((a2_abs - ac_hdg) + 180) % 360 - 180
+        # Get the point index
+        a1idx = np.where(geoqdr_rel == a1)[0][0]
+        a2idx = np.where(geoqdr_rel == a2)[0][0]
         
-        # Distance to geofence, just take the lat
-        dr = ac_lat
+        # Smallest distance to geofence, just take the lat
+        # First, get the nearest point to the aircraft in the geofence
+        geopoly = geom.Polygon(zip(geolats, geolons))
+        # Then create a point out of the aircraft position
+        ac_point = geom.Point(ac_lat, ac_lon)
+        # Find the nearest point to the aircraft in the geofence
+        p1, _ = nearest_points(geopoly, ac_point)
+        
+        # Now use kwikdist to find the distance
+        _, dr = kwikqdrdist(ac_lat, ac_lon, p1.x, p1.y)
+        
+        # Convert dr to metres
+        dr = dr * nm
+        
+        if SHOW_LINES:
+            if self.step_counter > 0:
+                areafilter.deleteArea('a1LINE')
+                areafilter.deleteArea('a2LINE')
+                areafilter.deleteArea('drLINE')
+                
+            
+            # We can actually draw these lines so we see how the aircraft functions
+            areafilter.defineArea('a1LINE', "LINE", [ac_lat, ac_lon, geolats[a1idx], geolons[a1idx]])
+            areafilter.defineArea('a2LINE', "LINE", [ac_lat, ac_lon, geolats[a2idx], geolons[a2idx]])
+            areafilter.defineArea('drLINE', "LINE", [ac_lat, ac_lon, p1.x, p1.y])
         
         # Distance to destination
         bd_abs, dd = kwikqdrdist(ac_lat, ac_lon, AC_DESTINATION_LATLON[0], AC_DESTINATION_LATLON[1])
-        dd = dd * 1852
+        dd = dd * nm
         bd = ((bd_abs - ac_hdg) + 180) % 360 - 180 
         
         return [dr, dd, a1, a2, bd]
@@ -493,7 +529,6 @@ class MedRL(Entity):
     def get_reward(self, acidx, state, state_):
         ac_lat = bs.traf.lat[acidx]
         ac_lon = bs.traf.lon[acidx]
-        ac_hdg = bs.traf.hdg[acidx]
         done = False
         reward = 0
         # If distance to destination is less than 100m we are done
@@ -507,15 +542,14 @@ class MedRL(Entity):
         if bbox[0] < ac_lat < bbox[2] and bbox[1] < ac_lon < bbox[3]:
             print('Hit geofence.')
             done = True
-            reward -= 3
+            reward -= 5
             
         # Stop if simulation time is more than 1 minute
-        if bs.sim.simt > 120:
+        if bs.sim.simt > MAX_SIMT:
             print('Simulation time is more than 2 minutes.')
             done = True
-            
-        # Reward the aircraft as it gets closer to the destination
-        _, dist2dest = kwikqdrdist(ac_lat, ac_lon, AC_DESTINATION_LATLON[0], AC_DESTINATION_LATLON[1])
+        
+        dist2dest = state[1] / nm # Get it in nautical miles as it's a good order of magnitude
         reward -= dist2dest
         
         return reward, done
@@ -545,7 +579,7 @@ def create_scenario():
     # set the width and depth of a rectangle meters
     # To randomize?
     depth = 500 # meters
-    width = 4000 # meters
+    width = 2000 # meters
 
     # now set the origin of the aircraft to be a certain distance from the border of rectangle
     dist_origin_x = 0 # meters
@@ -588,7 +622,7 @@ def create_scenario():
     stack('GEOFENCE,AIGEO,25000,0, ' + ','.join(lat_lon))
     
     # Get a random heading between -90 and 90 mapped to 0-360
-    hdg = np.random.randint(-90, 90)
+    hdg = 0 #np.random.randint(-90, 90)
 
     # create an aircraft
     stack(f'CRE AI01 B744 {origin_df.geometry.y.values[0]} {origin_df.geometry.x.values[0]} {hdg} FL250 200')
@@ -601,6 +635,7 @@ def create_scenario():
     stack('SCHEDULE 00:00:01 PAN 0,0')
     stack('SCHEDULE 00:00:01 ZOOM 10')
     stack('SCHEDULE 00:00:01 AI01')
-    stack('FF')
+    if FAST:
+        stack('FF')
     
     return
