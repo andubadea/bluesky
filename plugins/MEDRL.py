@@ -55,7 +55,7 @@ STDS = [31500,31500,100000,100000,1,1,1,1]
 
 ML_DT = 1.0 #seconds
 ML_STEPS = 1 #Steps
-ML_ACTION_DT = 10 # seconds
+ML_ACTION_DT = 1 # seconds
 
 MAX_HEADING_CHANGE = 90 # degrees
 MAX_SIMT = 70 # seconds
@@ -397,14 +397,14 @@ class MedRL(Entity):
     def __init__(self):
         super().__init__()
         # Initialise stuff
-        self.Agent = MaSacAgent(1, 1, 5)
+        self.Agent = MaSacAgent(1, 1, 8)
         
         self.step_counter = 0
         self.time_passed_counter = 0
         
         self.reward_history = []
-        self.state = [0,0,0,0,0] # dr, dd, aL, aR, bd
-        self.state_ = [0,0,0,0,0]
+        self.state = [0,0,0,0,0,0,0,0] # dr, dd, sina1, cosa1, sina2, cosa2, sinbd, cosbd
+        self.state_ = [0,0,0,0,0,0,0,0]
         self.action = 0
             
         # Create the scenario
@@ -424,7 +424,7 @@ class MedRL(Entity):
             self.time_passed_counter += 1
             return
         
-        reward, done = self.get_reward(0, self.state, self.state_)
+        reward, done, reason = self.get_reward(0, self.state, self.state_)
         
         self.reward_history.append(reward)
         
@@ -432,13 +432,14 @@ class MedRL(Entity):
             stack('HOLD')
             global episode_counter
             episode_counter += 1
-            avg_rewards.append(sum(self.reward_history)/len(self.reward_history))
+            avg_rewards.append(sum(self.reward_history))
             while len(avg_rewards) > 100:
                 avg_rewards.pop(0)
             # Print episode number, average reward, and average loss
             print(f'----------------- EPISODE {episode_counter} -----------------')
             print(f'Rolling average reward: {np.mean(avg_rewards):.3f}')
             print(f'Average reward for this episode: {sum(self.reward_history)/len(self.reward_history):.3f}')
+            print(reason)
             print('--------------------------------------------------------------')
             self.ML_reset()
             return
@@ -489,6 +490,12 @@ class MedRL(Entity):
         a1 = min(geoqdr_rel)
         a2 = max(geoqdr_rel)
         
+        sina1 = np.sin(np.deg2rad(a1))
+        cosa1 = np.cos(np.deg2rad(a1))
+        sina2 = np.sin(np.deg2rad(a2))
+        cosa2 = np.cos(np.deg2rad(a2))
+        
+        
         # Get the point index
         a1idx = np.where(geoqdr_rel == a1)[0][0]
         a2idx = np.where(geoqdr_rel == a2)[0][0]
@@ -524,35 +531,42 @@ class MedRL(Entity):
         dd = dd * nm
         bd = ((bd_abs - ac_hdg) + 180) % 360 - 180 
         
-        return [dr, dd, a1, a2, bd]
+        sinbd = np.sin(np.deg2rad(bd))
+        cosbd = np.cos(np.deg2rad(bd))
+        
+        return [dr/2500, (dd-2500)/5000, sina1, cosa1, sina2, cosa2, sinbd, cosbd]
         
     def get_reward(self, acidx, state, state_):
         ac_lat = bs.traf.lat[acidx]
         ac_lon = bs.traf.lon[acidx]
         done = False
+        reason = None
         reward = 0
         # If distance to destination is less than 100m we are done
-        if state[1] < 100 and state[1] != 0:
-            print('Reached destination.')
+        dist2dest = state_[1] * 5000 + 2500
+        if dist2dest < 100  and dist2dest != 0:
+            reason = 'Reached destination.'
             done = True
-            reward += 3
+            reward += 1
         
         # Check if we hit the geofence
         bbox = Geofence.geo_by_name['AIGEO'].bbox
         if bbox[0] < ac_lat < bbox[2] and bbox[1] < ac_lon < bbox[3]:
-            print('Hit geofence.')
+            reason = 'Hit geofence.'
             done = True
-            reward -= 5
+            reward -= 1
             
         # Stop if simulation time is more than 1 minute
         if bs.sim.simt > MAX_SIMT:
-            print('Simulation time is more than 2 minutes.')
+            reason = 'Simulation time is more than MAX_SIMT.'
             done = True
         
-        dist2dest = state[1] / nm # Get it in nautical miles as it's a good order of magnitude
-        reward -= dist2dest
+        # Look at previous state and new state, and give a reward based on the change in state
+        diff_in_state = state[1] - state_[1]
+        #dist2dest = dist2dest / nm # Get it in nautical miles as it's a good order of magnitude
+        reward += diff_in_state
         
-        return reward, done
+        return reward, done, reason
     
     def ML_reset(self):
         # This is called when we are done. First, call a simulation-wide reset
@@ -562,8 +576,8 @@ class MedRL(Entity):
         self.step_counter = 0
         
         self.reward_history = []
-        self.state = [0,0,0,0,0] # dr, dd, aL, aR, bd
-        self.state_ = [0,0,0,0,0]
+        self.state = [0,0,0,0,0,0,0,0] # dr, dd, aL, aR, bd
+        self.state_ = [0,0,0,0,0,0,0,0]
         self.action = 0
             
         # Create the scenario again
@@ -573,6 +587,7 @@ class MedRL(Entity):
 def create_scenario():
     ##### TUNING PARAMETERS #####
     # create a point where the center is at
+    # Get the point as a random number between -1 and 1
     origin_lat = 0
     origin_lon = 0
 
@@ -607,8 +622,12 @@ def create_scenario():
     destination_y = point_df.geometry.y.values[0] + depth/2 + dist_destination_y
     destination_df = gpd.GeoDataFrame(geometry=[geom.Point(destination_x, destination_y)], crs="EPSG:3857")
 
+    # create random width offset 
+    width_left = np.random.uniform(low=0, high=width)
+    width_right = np.random.uniform(low=0, high=width)
+    
     # create a rectangle centered at point_df with depth and width
-    rectangle = geom.box(point_df.geometry.x.values[0] - width/2, point_df.geometry.y.values[0] - depth/2, point_df.geometry.x.values[0] + width/2, point_df.geometry.y.values[0] + depth/2)
+    rectangle = geom.box(point_df.geometry.x.values[0] - width_left, point_df.geometry.y.values[0] - depth/2, point_df.geometry.x.values[0] + width_right, point_df.geometry.y.values[0] + depth/2)
     rectangle_df = gpd.GeoDataFrame(geometry=[rectangle], crs="EPSG:3857")
 
     # convert everything to lat lon
