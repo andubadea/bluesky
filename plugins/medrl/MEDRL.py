@@ -1,29 +1,51 @@
+import torch
 import numpy as np
-import geopandas as gpd
-import shapely.geometry as geom
-
 import bluesky as bs
 from bluesky.core import Entity, timed_function
-from bluesky.tools.geo import kwikqdrdist_matrix, kwikqdrdist, qdrpos
-from bluesky.stack import stack
-from bluesky.tools.aero import nm
-
+import matplotlib.pyplot as plt
+import torch.nn.functional as F
+import torch.optim as optim
+from torch.nn.utils.clip_grad import clip_grad_norm_
+from typing import Dict, List, Deque, Tuple
+from collections import deque
+import torch.nn as nn
+from torch.distributions import Normal
 from geofence import Geofence
-from sac_agent import SAC
+from bluesky.tools.geo import kwikqdrdist_matrix, kwikqdrdist
+from bluesky.tools import areafilter
+from bluesky.stack import stack
+import geopandas as gpd
+import shapely.geometry as geom
+from shapely.ops import nearest_points
+from bluesky.tools.aero import nm
+import os
+from plugins.medrl.sac_agent import SAC as Agent
+os.environ["KMP_DUPLICATE_LIB_OK"]="TRUE"
 
-# import os
-# os.environ["KMP_DUPLICATE_LIB_OK"]="TRUE"
+ML_DT = 1.0 #seconds
+ML_STEPS = 1 #Steps
+ML_ACTION_DT = 1 # seconds
+
+MAX_HEADING_CHANGE = 20 # degrees
+MAX_SIMT = 200 # seconds
+
+SHOW_LINES = False
+FAST = True
+
+episode_counter = 0
+
+avg_rewards = []
 
 def init_plugin():
 
     # Addtional initilisation code
     global medrl
-    medrl = IcratRL()
+    medrl = MedRL()
 
     # Configuration parameters
     config = {
         # The name of your plugin
-        'plugin_name':     'ICRATRL',
+        'plugin_name':     'MEDRL',
 
         # The type of this plugin. For now, only simulation plugins are possible.
         'plugin_type':     'sim'
@@ -31,28 +53,18 @@ def init_plugin():
     
     return config
 
-
-ML_DT = 1.0 #seconds
-ML_STEPS = 1 #Steps
-
-MAX_HEADING_CHANGE = 6 * ML_DT # degrees
-
-episode_counter = 0
-
-avg_rewards = []
-
-    
-class IcratRL(Entity):
+class MedRL(Entity):
     def __init__(self):
         super().__init__()
         # Initialise stuff
-        self.Agent = SAC(1, 5)
+        self.Agent = Agent(1, 8)
         
         self.step_counter = 0
+        self.time_passed_counter = 0
         
         self.reward_history = []
-        self.state = [0,0,0,0,0] # dr, dd, aL, aR, bd
-        self.state_ = [0,0,0,0,0]
+        self.state = [0,0,0,0,0,0,0,0] # dr, dd, sina1, cosa1, sina2, cosa2, sinbd, cosbd
+        self.state_ = [0,0,0,0,0,0,0,0]
         self.action = 0
             
         # Create the scenario
@@ -67,11 +79,12 @@ class IcratRL(Entity):
         
         self.state_ = self.get_state(0)
         
-        reward, done = self.get_reward(0, self.state, self.state_)
-        
         if self.step_counter == 0:
             self.step_counter += 1
+            self.time_passed_counter += 1
             return
+        
+        reward, done, reason = self.get_reward(0, self.state, self.state_)
         
         self.reward_history.append(reward)
         
@@ -79,21 +92,26 @@ class IcratRL(Entity):
             stack('HOLD')
             global episode_counter
             episode_counter += 1
-            avg_rewards.append(sum(self.reward_history)/len(self.reward_history))
+            avg_rewards.append(sum(self.reward_history))
             while len(avg_rewards) > 100:
                 avg_rewards.pop(0)
             # Print episode number, average reward, and average loss
             print(f'----------------- EPISODE {episode_counter} -----------------')
             print(f'Rolling average reward: {np.mean(avg_rewards):.3f}')
             print(f'Average reward for this episode: {sum(self.reward_history)/len(self.reward_history):.3f}')
-            print('\n')
+            print(reason)
+            print('--------------------------------------------------------------')
             self.ML_reset()
             return
         
         if self.step_counter != 0:
             self.Agent.memory.store(self.state, self.action, reward, self.state_, done)
-            
-        self.action = self.Agent.do_step(self.state_)
+        
+        # Only get a new action if enough seconds passed
+        time_passed = ML_DT * self.time_passed_counter
+        if time_passed > ML_ACTION_DT or self.step_counter == 1:
+            self.time_passed_counter = 0
+            self.action = self.Agent.step(self.state_)
         
         # Compute heading change
         heading_change = self.action * MAX_HEADING_CHANGE
@@ -102,9 +120,10 @@ class IcratRL(Entity):
         stack(f'HDG {bs.traf.id[0]} {heading_change}')
         
         if self.step_counter % ML_STEPS == 0:
-            self.Agent.trainChooChoo()
+            self.Agent.train()
             
         self.step_counter += 1
+        self.time_passed_counter += 1
         
         return
     
@@ -121,48 +140,93 @@ class IcratRL(Entity):
         geolats = geofence.coordinates[::2]
         geolons = geofence.coordinates[1::2]
         
-        # Get the relative bearing of all points of the rectangle
-        abs_brg, _ = kwikqdrdist_matrix(ac_lat, ac_lon, geolats, geolons)
+        # Compute the absolute qdrs to all the points of the geofence
+        geoqdrs, _ = kwikqdrdist_matrix(ac_lat, ac_lon, geolats, geolons)
         
-        bearings = ((abs_brg - ac_hdg) + 180) % 360 - 180  
+        # Compute the relative bearings for all the geoqdrs
+        geoqdr_rel = ((geoqdrs - ac_hdg) + 180) % 360 - 180
         
-        a1 = max(bearings)
-        a2 = min(bearings)
+        # a1 is the smallest absolute qdr, a2 is the biggest
+        a1 = min(geoqdr_rel)
+        a2 = max(geoqdr_rel)
         
-        # Distance to geofence, just take the lat
-        dr = ac_lat
+        sina1 = np.sin(np.deg2rad(a1))
+        cosa1 = np.cos(np.deg2rad(a1))
+        sina2 = np.sin(np.deg2rad(a2))
+        cosa2 = np.cos(np.deg2rad(a2))
+        
+        
+        # Get the point index
+        a1idx = np.where(geoqdr_rel == a1)[0][0]
+        a2idx = np.where(geoqdr_rel == a2)[0][0]
+        
+        # Smallest distance to geofence, just take the lat
+        # First, get the nearest point to the aircraft in the geofence
+        geopoly = geom.Polygon(zip(geolats, geolons))
+        # Then create a point out of the aircraft position
+        ac_point = geom.Point(ac_lat, ac_lon)
+        # Find the nearest point to the aircraft in the geofence
+        p1, _ = nearest_points(geopoly, ac_point)
+        
+        # Now use kwikdist to find the distance
+        _, dr = kwikqdrdist(ac_lat, ac_lon, p1.x, p1.y)
+        
+        # Convert dr to metres
+        dr = dr * nm
+        
+        if SHOW_LINES:
+            if self.step_counter > 0:
+                areafilter.deleteArea('a1LINE')
+                areafilter.deleteArea('a2LINE')
+                areafilter.deleteArea('drLINE')
+                
+            
+            # We can actually draw these lines so we see how the aircraft functions
+            areafilter.defineArea('a1LINE', "LINE", [ac_lat, ac_lon, geolats[a1idx], geolons[a1idx]])
+            areafilter.defineArea('a2LINE', "LINE", [ac_lat, ac_lon, geolats[a2idx], geolons[a2idx]])
+            areafilter.defineArea('drLINE', "LINE", [ac_lat, ac_lon, p1.x, p1.y])
         
         # Distance to destination
         bd_abs, dd = kwikqdrdist(ac_lat, ac_lon, AC_DESTINATION_LATLON[0], AC_DESTINATION_LATLON[1])
-        dd = dd * 1852
+        dd = dd * nm
         bd = ((bd_abs - ac_hdg) + 180) % 360 - 180 
         
-        return [dr, dd, a1, a2, bd]
+        sinbd = np.sin(np.deg2rad(bd))
+        cosbd = np.cos(np.deg2rad(bd))
+        
+        return [dr/2500, (dd-2500)/5000, sina1, cosa1, sina2, cosa2, sinbd, cosbd]
         
     def get_reward(self, acidx, state, state_):
         ac_lat = bs.traf.lat[acidx]
         ac_lon = bs.traf.lon[acidx]
-        ac_hdg = bs.traf.hdg[acidx]
         done = False
+        reason = None
         reward = 0
         # If distance to destination is less than 100m we are done
-        if state[1] < 100 and state[1] != 0:
-            print('Reached destination.')
+        dist2dest = state_[1] * 5000 + 2500
+        if dist2dest < 300  and dist2dest != 0:
+            reason = 'Reached destination.'
             done = True
-            reward += 1
+            reward += 2
         
         # Check if we hit the geofence
         bbox = Geofence.geo_by_name['AIGEO'].bbox
         if bbox[0] < ac_lat < bbox[2] and bbox[1] < ac_lon < bbox[3]:
-            print('Hit geofence.')
+            reason = 'Hit geofence.'
             done = True
-            reward -= 2
+            reward -= 3
             
-        # Reward the aircraft as it gets closer to the destination
-        _, dist2dest = kwikqdrdist(ac_lat, ac_lon, AC_DESTINATION_LATLON[0], AC_DESTINATION_LATLON[1])
-        reward -= dist2dest
+        # Stop if simulation time is more than 1 minute
+        if bs.sim.simt > MAX_SIMT:
+            reason = 'Simulation time is more than MAX_SIMT.'
+            done = True
         
-        return reward, done
+        # Look at previous state and new state, and give a reward based on the change in state
+        diff_in_state = state[1] - state_[1]
+        #dist2dest = dist2dest / nm # Get it in nautical miles as it's a good order of magnitude
+        reward += diff_in_state
+        
+        return reward, done, reason
     
     def ML_reset(self):
         # This is called when we are done. First, call a simulation-wide reset
@@ -172,8 +236,8 @@ class IcratRL(Entity):
         self.step_counter = 0
         
         self.reward_history = []
-        self.state = [0,0,0,0,0] # dr, dd, aL, aR, bd
-        self.state_ = [0,0,0,0,0]
+        self.state = [0,0,0,0,0,0,0,0] # dr, dd, aL, aR, bd
+        self.state_ = [0,0,0,0,0,0,0,0]
         self.action = 0
             
         # Create the scenario again
@@ -183,21 +247,22 @@ class IcratRL(Entity):
 def create_scenario():
     ##### TUNING PARAMETERS #####
     # create a point where the center is at
+    # Get the point as a random number between -1 and 1
     origin_lat = 0
     origin_lon = 0
 
     # set the width and depth of a rectangle meters
     # To randomize?
     depth = 500 # meters
-    width = 4000 # meters
+    width = 2000 # meters
 
     # now set the origin of the aircraft to be a certain distance from the border of rectangle
     dist_origin_x = 0 # meters
-    dist_origin_y = 4000 # meters
+    dist_origin_y = 14000 # meters
 
     # distance from the border of top of rectangle
     dist_destination_x = 0 # meters
-    dist_destination_y = 4000 # meters
+    dist_destination_y = 14000 # meters
 
     ##### END TUNING PARAMETERS #####
 
@@ -217,8 +282,12 @@ def create_scenario():
     destination_y = point_df.geometry.y.values[0] + depth/2 + dist_destination_y
     destination_df = gpd.GeoDataFrame(geometry=[geom.Point(destination_x, destination_y)], crs="EPSG:3857")
 
+    # create random width offset 
+    width_left = np.random.uniform(low=0, high=width)
+    width_right = np.random.uniform(low=0, high=width)
+    
     # create a rectangle centered at point_df with depth and width
-    rectangle = geom.box(point_df.geometry.x.values[0] - width/2, point_df.geometry.y.values[0] - depth/2, point_df.geometry.x.values[0] + width/2, point_df.geometry.y.values[0] + depth/2)
+    rectangle = geom.box(point_df.geometry.x.values[0] - width_left, point_df.geometry.y.values[0] - depth/2, point_df.geometry.x.values[0] + width_right, point_df.geometry.y.values[0] + depth/2)
     rectangle_df = gpd.GeoDataFrame(geometry=[rectangle], crs="EPSG:3857")
 
     # convert everything to lat lon
@@ -230,9 +299,12 @@ def create_scenario():
     xy_values = rectangle_df.geometry.values[0].exterior.coords.xy
     lat_lon = [f'{lat}, {lon}' for lon, lat in zip(xy_values[0], xy_values[1])]
     stack('GEOFENCE,AIGEO,25000,0, ' + ','.join(lat_lon))
+    
+    # Get a random heading between -90 and 90 mapped to 0-360
+    hdg = 0 #np.random.randint(-90, 90)
 
     # create an aircraft
-    stack(f'CRE AI01 B744 {origin_df.geometry.y.values[0]} {origin_df.geometry.x.values[0]} 0 FL250 200')
+    stack(f'CRE AI01 B744 {origin_df.geometry.y.values[0]} {origin_df.geometry.x.values[0]} {hdg} FL250 200')
 
     global AC_DESTINATION_LATLON
     AC_DESTINATION_LATLON = [destination_df.geometry.y.values[0], destination_df.geometry.x.values[0]]
@@ -240,7 +312,9 @@ def create_scenario():
     stack(f'ADDWPT AI01 {destination_df.geometry.y.values[0]} {destination_df.geometry.x.values[0]}')
     stack('OP')
     stack('SCHEDULE 00:00:01 PAN 0,0')
-    stack('SCHEDULE 00:00:01 ZOOM 10')
-    stack('FF')
+    stack('SCHEDULE 00:00:01 ZOOM 2')
+    stack('SCHEDULE 00:00:01 AI01')
+    if FAST:
+        stack('FF')
     
     return

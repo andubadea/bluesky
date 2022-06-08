@@ -31,7 +31,7 @@ def init_plugin():
     # Configuration parameters
     config = {
         # The name of your plugin
-        'plugin_name':     'MEDRL',
+        'plugin_name':     'MEDRLold',
 
         # The type of this plugin. For now, only simulation plugins are possible.
         'plugin_type':     'sim'
@@ -47,8 +47,8 @@ POLICY_UPDATE_FREQUENCE = 2 # How often to update the policy
 BUFFER_SIZE = 10000000 # Number of stuff kept in memory
 BATCH_SIZE = 256 # Number of random smaples taken from the buffer 
 
-LR_A = 3e-4 # Learn rate of the actor
-LR_Q = 3e-4 # Learn rate of the critic
+LR_A = 3e-3 # Learn rate of the actor
+LR_Q = 3e-3 # Learn rate of the critic
 
 MEANS = [57000,57000,0,0,0,0,0,0]
 STDS = [31500,31500,100000,100000,1,1,1,1]
@@ -554,7 +554,7 @@ class MedRL(Entity):
         if bbox[0] < ac_lat < bbox[2] and bbox[1] < ac_lon < bbox[3]:
             reason = 'Hit geofence.'
             done = True
-            reward -= 1
+            reward -= 2
             
         # Stop if simulation time is more than 1 minute
         if bs.sim.simt > MAX_SIMT:
