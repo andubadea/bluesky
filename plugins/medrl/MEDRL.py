@@ -26,8 +26,8 @@ ML_DT = 1.0 #seconds
 ML_STEPS = 1 #Steps
 ML_ACTION_DT = 1 # seconds
 
-MAX_HEADING_CHANGE = 20 # degrees
-MAX_SIMT = 200 # seconds
+MAX_HEADING_CHANGE = 10 # degrees
+MAX_SIMT = 180 # seconds
 
 SHOW_LINES = False
 FAST = True
@@ -117,7 +117,7 @@ class MedRL(Entity):
         heading_change = self.action * MAX_HEADING_CHANGE
         
         # Execute action
-        stack(f'HDG {bs.traf.id[0]} {heading_change}')
+        stack(f'HDG {bs.traf.id[0]} {heading_change + bs.traf.trk[0]}')
         
         if self.step_counter % ML_STEPS == 0:
             self.Agent.train()
@@ -226,6 +226,9 @@ class MedRL(Entity):
         #dist2dest = dist2dest / nm # Get it in nautical miles as it's a good order of magnitude
         reward += diff_in_state
         
+        # Also negative reward for just existing
+        reward -= 0.005
+        
         return reward, done, reason
     
     def ML_reset(self):
@@ -253,16 +256,16 @@ def create_scenario():
 
     # set the width and depth of a rectangle meters
     # To randomize?
-    depth = 500 # meters
-    width = 2000 # meters
+    depth = 1000 # meters
+    width = 3000 # meters
 
     # now set the origin of the aircraft to be a certain distance from the border of rectangle
     dist_origin_x = 0 # meters
-    dist_origin_y = 14000 # meters
+    dist_origin_y = 10000 # meters
 
     # distance from the border of top of rectangle
     dist_destination_x = 0 # meters
-    dist_destination_y = 14000 # meters
+    dist_destination_y = 10000 # meters
 
     ##### END TUNING PARAMETERS #####
 

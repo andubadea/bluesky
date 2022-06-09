@@ -193,7 +193,7 @@ class nodeData:
         self.show_map      = True
         self.show_coast    = True
         self.show_traf     = True
-        self.show_pz       = False
+        self.show_pz       = True
         self.show_fir      = True
         self.show_lbl      = 2
         self.show_wpt      = 1
