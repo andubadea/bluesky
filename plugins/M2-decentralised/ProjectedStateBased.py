@@ -128,38 +128,13 @@ class ProjectedBased(ConflictDetection):
                 # get the lookahead distance
                 look_ahead_dist = ownship.selspd[idx] * dtlookahead[idx]
 
-                # add lon lat to shapely linestring
-                route_line = gpd.GeoSeries(LineString(zip(route.wplon, route.wplat)), crs='epsg:4326')
-                route_line = route_line.to_crs(epsg=32633)
-
-                # extend the route_line 40 meters in front and behind
-                # get last two points of front and back
-                end_extension =  LineString(route_line.geometry.values[0].coords[-2:])
-                end_sf = (end_extension.length + 400) / end_extension.length
-                end_extension = scale(end_extension, xfact=end_sf, yfact=end_sf, origin=end_extension.coords[0])
-                p_end = route_line.geometry.values[0].coords[-2]
-                end_extension = LineString([p_end, end_extension.coords[-1]])
-
-                start_extension  =  LineString(route_line.geometry.values[0].coords[:2])
-                start_sf = (start_extension.length + 400) / start_extension.length
-                start_extension = scale(start_extension, xfact=-start_sf, yfact=-start_sf, origin=start_extension.coords[0])
-                start_extension = reverse_geom(start_extension)
-
-                # now ensure that values are the same so merging becomes a linestring
-                p_start = route_line.geometry.values[0].coords[1]
-                start_extension = LineString([start_extension.coords[0], p_start])
-
-                # merge lines
-                route_merged = MultiLineString([start_extension.coords, route_line.geometry.values[0].coords[1:-1], end_extension.coords])
-                route_merged = linemerge(route_merged)
-                
-                route_line = gpd.GeoSeries(route_merged, crs='epsg:32633')
+                route_line = bs.traf.lineroutes[idx]
 
                 # find closest point to linestring
-                p1, _ = nearest_points(route_line.geometry.values[0], current_loc)
+                p1, _ = nearest_points(route_line, current_loc)
 
                 # now split the line to remove eveything before current position
-                back_line, front_line = split_line_with_point(route_line.geometry.values[0], p1)
+                back_line, front_line = split_line_with_point(route_line, p1)
 
                 # now interpolate along the line
                 if front_line.length < rpz[0]:
@@ -168,9 +143,9 @@ class ProjectedBased(ConflictDetection):
                         # get the last two points of route and extend 32 meters
                         # In reality, aircraft should be deleted at last waypoint so this
                         # is a safety so bluesky doesn't crash
-                        dummy_line = LineString(route_line.geometry.values[0].coords[-2:])
+                        dummy_line = LineString(route_line.coords[-2:])
                         sf = rpz[0] / dummy_line.length
-                        look_ahead_line = scale(dummy_line, xfact=sf, yfact=sf, origin=route_line.geometry.values[0].coords[-1])
+                        look_ahead_line = scale(dummy_line, xfact=sf, yfact=sf, origin=route_line.coords[-1])
 
                     else:
                         sf = rpz[0] / front_line.length
@@ -209,7 +184,7 @@ class ProjectedBased(ConflictDetection):
                         # get the first two points of route and extend 32 meters
                         # In reality, aircraft should be deleted at last waypoint so this
                         # is a safety so bluesky doesn't crash
-                        dummy_line = LineString(route_line.geometry.values[0].coords[:2])
+                        dummy_line = LineString(route_line.coords[:2])
                         sf = rpz[0] / dummy_line.length
                         look_back_line = scale(dummy_line, xfact=-sf, yfact=-sf, origin=p1)
                         # ensure that rounding error is removed

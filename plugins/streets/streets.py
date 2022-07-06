@@ -13,6 +13,13 @@ from collections import Counter
 import pandas as pd
 from scipy.sparse import csr_matrix
 
+from shapely.geometry import LineString, Point, MultiLineString, MultiPoint, GeometryCollection
+from shapely.ops import nearest_points, split, transform, linemerge
+import geopandas as gpd
+from shapely.affinity  import affine_transform, scale, translate
+from pyproj import Transformer
+
+
 
 import bluesky as bs
 from bluesky import core, stack, traf, scr, sim  #settings, navdb, tools
@@ -331,9 +338,17 @@ def handle_replan(edges_changes):
                     
                 edge_traffic.edgeap.update_route(idx)
 
+                utm_x = []
+                utm_y = []
                 for j, rte in enumerate(route):
                     lat = rte[1] # deg
                     lon = rte[0] # deg
+
+                    # convert to utm #TODO: check x y in correct order
+                    x,y = self.transformer_to_utm.transform(lat, lon)
+                    utm_x.append(x)
+                    utm_y.append(y)
+
                     alt = -999
                     spd = -999
                     
@@ -386,6 +401,36 @@ def handle_replan(edges_changes):
                 # # Add the turndist back
                 if not bs.traf.actwp.flyby[idx] and bs.traf.actwp.flyturn[idx]:
                     bs.traf.actwp.next_qdr[idx] = nextqdr_to_remember
+
+                # add route as linestring for projected based on UTM coordinates
+                original_route = LineString(list(zip(utm_x, utm_y)))
+
+                # extend the route_line 400 meters in front and behind
+                # get last two points of front and back
+                end_extension =  LineString(original_route.coords[-2:])
+                end_sf = (end_extension.length + 400) / end_extension.length
+                end_extension = scale(end_extension, xfact=end_sf, yfact=end_sf, origin=end_extension.coords[0])
+                p_end = original_route.coords[-2]
+                end_extension = LineString([p_end, end_extension.coords[-1]])
+
+                start_extension  =  LineString(original_route.coords[:2])
+                start_sf = (start_extension.length + 400) / start_extension.length
+                start_extension = scale(start_extension, xfact=-start_sf, yfact=-start_sf, origin=start_extension.coords[0])
+                start_extension = reverse_geom(start_extension)
+
+                # now ensure that values are the same so merging becomes a linestring
+                p_start = original_route.coords[1]
+                start_extension = LineString([start_extension.coords[0], p_start])
+
+                # merge lines
+                route_merged = MultiLineString([start_extension.coords, original_route.coords[1:-1], end_extension.coords])
+                route_merged = linemerge(route_merged)
+
+                #assert that the route_merged is a linestring
+                assert (isinstance(route_merged, LineString), f'route is not a LineString for {acid}. It is a {type(route_merged)}')
+                
+                # update the route
+                path_plans.lineroutes[idx] = route_merged
 
 
 
@@ -748,6 +793,7 @@ class EdgeTraffic(Entity):
 
             self.edgeap   = EdgesAp()
             self.actedge  = ActiveEdge()
+            self.edge_routes = np.array([], dtype=LineString)
 
         # make variables available in bs.traf
         bs.traf.edgeap = self.edgeap
@@ -1508,6 +1554,12 @@ class PathPlans(Entity):
         
         with self.settrafarrays():
             self.pathplanning = []
+            self.lineroutes = np.array([], dtype=LineString)
+
+        bs.traf.lineroutes = self.lineroutes
+
+        self.transformer_to_utm    = Transformer.from_crs("EPSG:4326", "EPSG:32633")
+        self.transformer_to_latlon = Transformer.from_crs("EPSG:32633", "EPSG:4326")
 
     def load(self, loitering_fpath):
         # load loitering aircraft 
@@ -1558,9 +1610,19 @@ class PathPlans(Entity):
         acrte = Route._routes.get(acid)
         #print(turns)
         
+        # get coordinates for route in utm
+        utm_x = []
+        utm_y = []
+
         for j, rte in enumerate(route):
             lat = rte[1] # deg
             lon = rte[0] # deg
+
+            # convert to utm #TODO: check x y in correct order
+            x,y = self.transformer_to_utm.transform(lat, lon)
+            utm_x.append(x)
+            utm_y.append(y)
+
             alt = -999
             spd = -999
             
@@ -1618,6 +1680,36 @@ class PathPlans(Entity):
         acrte.calcfp()
         edge_traffic.edgeap.edge_rou[ridx].direct(ridx,edge_traffic.edgeap.edge_rou[ridx].wpname[1])
 
+        # add route as linestring for projected based on UTM coordinates
+        original_route = LineString(list(zip(utm_x, utm_y)))
+
+        # extend the route_line 400 meters in front and behind
+        # get last two points of front and back
+        end_extension =  LineString(original_route.coords[-2:])
+        end_sf = (end_extension.length + 400) / end_extension.length
+        end_extension = scale(end_extension, xfact=end_sf, yfact=end_sf, origin=end_extension.coords[0])
+        p_end = original_route.coords[-2]
+        end_extension = LineString([p_end, end_extension.coords[-1]])
+
+        start_extension  =  LineString(original_route.coords[:2])
+        start_sf = (start_extension.length + 400) / start_extension.length
+        start_extension = scale(start_extension, xfact=-start_sf, yfact=-start_sf, origin=start_extension.coords[0])
+        start_extension = reverse_geom(start_extension)
+
+        # now ensure that values are the same so merging becomes a linestring
+        p_start = original_route.coords[1]
+        start_extension = LineString([start_extension.coords[0], p_start])
+
+        # merge lines
+        route_merged = MultiLineString([start_extension.coords, original_route.coords[1:-1], end_extension.coords])
+        route_merged = linemerge(route_merged)
+
+        #assert that the route_merged is a linestring
+        assert (isinstance(route_merged, LineString), f'route is not a LineString for {acid}. It is a {type(route_merged)}')
+
+        # finally assign to trafficarray
+        self.lineroutes[-n:] = route_merged
+
 # =============================================================================
 #         bs.traf.swlnav[ridx]    = True
 #         bs.traf.swvnav[ridx]    = True
@@ -1626,3 +1718,11 @@ class PathPlans(Entity):
     
     def load_flow_dill(self, fpath):
         self.graph=dill.load(open(f"{fpath}/Flow_control.dill", "rb"))
+
+def reverse_geom(geom) -> LineString:
+    def _reverse(x, y, z=None):
+        if z:
+            return x[::-1], y[::-1], z[::-1]
+        return x[::-1], y[::-1]
+
+    return transform(_reverse, geom)
