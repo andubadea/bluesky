@@ -64,7 +64,7 @@ def init_plugin():
 
 # defaults
 use_path_plan = True
-use_flow_control = True
+use_flow_control = False
 
 # initialise queue
 queue_dict = dict()
@@ -121,14 +121,14 @@ def reset():
     # when reseting bluesky turn off streets and turn on flow controls
     global streets_bool, use_flow_control
     streets_bool = False
-    use_flow_control = True
+    use_flow_control = False
 
     # default setting for streets is not constrained
     global heading_based_constrained
 
     # set hopping to true on the reset
     access_plugin_object('M2NAVIGATION').hopping = True
-    access_plugin_object('SPEEDBASEDV3').hopping = True
+    access_plugin_object('SPEEDBASEDV4').hopping = True
     bs.traf.cr.heading_based = False
     
     heading_based_constrained = False
@@ -584,7 +584,7 @@ def headingconstrained():
 
     # set M2 Navigation hopping to False
     access_plugin_object('M2NAVIGATION').hopping = False
-    access_plugin_object('SPEEDBASEDV3').hopping = False
+    access_plugin_object('SPEEDBASEDV4').hopping = False
 
 @stack.command
 def loadloiteringdill(fpath: str):

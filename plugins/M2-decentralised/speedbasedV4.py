@@ -34,7 +34,7 @@ def init_plugin():
 
     return config
 
-class SpeedBasedV3(ConflictResolution):
+class SpeedBasedV4(ConflictResolution):
     def __init__(self):
         super().__init__()
         self.layer_height = 30 * ft
@@ -73,7 +73,7 @@ class SpeedBasedV3(ConflictResolution):
             idx_pairs = self.pairs(conf, ownship, intruder, idx1)
             # We're doing this because we want to solve for ALL intruders, not only pairwise
             # Find solution for aircraft 'idx'
-            gs_new, alt_new, track_new = self.SpeedBasedV3(conf, ownship, intruder, idx1, idx_pairs)
+            gs_new, alt_new, track_new = self.SpeedBasedV4(conf, ownship, intruder, idx1, idx_pairs)
             
             # Write the new velocity of aircraft 'idx' to traffic data
             newgscapped[idx1] = gs_new
@@ -85,7 +85,7 @@ class SpeedBasedV3(ConflictResolution):
 
         return newtrack, newgscapped, newvs, newalt
     
-    def SpeedBasedV3(self, conf, ownship, intruder, idx1, idx_pairs):
+    def SpeedBasedV4(self, conf, ownship, intruder, idx1, idx_pairs):
         # The resolving function is structured as follows:
         # We first do some preliminary checks: 
         #       -whether we can ascend or descend 
@@ -101,7 +101,7 @@ class SpeedBasedV3(ConflictResolution):
         
         # ------------------- Pre-processing --------------------
         # Extract ownship data
-        v1 = np.array([ownship.gseast[idx1], ownship.gsnorth[idx1]])# [m/s]
+        #v1 = np.array([ownship.gseast[idx1], ownship.gsnorth[idx1]])# [m/s]
         # Also take distance to other aircraft
         dist2others = conf.dist_mat[idx1]
         # Get the lookahead time
@@ -138,7 +138,18 @@ class SpeedBasedV3(ConflictResolution):
             # Get the index of the intruder
             idx2 = intruder.id.index(conf.confpairs[idx_pair][1])
             # Get the velocity of the intruder
-            v2 = np.array([intruder.gseast[idx2], intruder.gsnorth[idx2]])
+            #v2 = np.array([intruder.gseast[idx2], intruder.gsnorth[idx2]])
+            
+            hdg_ownship = conf.conftrks[idx_pair][0]
+            hdg_intruder = conf.conftrks[idx_pair][1]
+            gs_ownship = ownship.gs[idx1]
+            gs_intruder = intruder.gs[idx2]
+            
+            v1 = np.array([gs_ownship * np.sin(np.radians(hdg_ownship)), gs_ownship * np.cos(np.radians(hdg_ownship))])
+            v2 = np.array([gs_intruder * np.sin(np.radians(hdg_intruder)), gs_intruder * np.cos(np.radians(hdg_intruder))])
+            
+            # Also get the fake speeds and headings and stuff
+            
             # Extract conflict bearing and distance information
             qdr = conf.qdr[idx_pair]
             dist= conf.dist[idx_pair]
