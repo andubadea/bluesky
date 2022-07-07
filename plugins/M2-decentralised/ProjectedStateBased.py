@@ -707,9 +707,4 @@ def split_line_with_point(line, splitter):
             return LineString(coords[:i+1] + [splitter.coords[0]]).simplify(0), LineString([splitter.coords[0]] + coords[i+1:]).simplify(0)
 
 def reverse_geom(geom) -> LineString:
-    def _reverse(x, y, z=None):
-        if z:
-            return x[::-1], y[::-1], z[::-1]
-        return x[::-1], y[::-1]
-
-    return transform(_reverse, geom)
+    return LineString(geom.coords[::-1])

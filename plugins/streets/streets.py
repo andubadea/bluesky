@@ -1705,10 +1705,10 @@ class PathPlans(Entity):
         route_merged = linemerge(route_merged)
 
         #assert that the route_merged is a linestring
-        assert (isinstance(route_merged, LineString), f'route is not a LineString for {acid}. It is a {type(route_merged)}')
+        assert isinstance(route_merged, LineString), f'route is not a LineString for {acid}. It is a {type(route_merged)}'
 
         # finally assign to trafficarray
-        self.lineroutes[-n:] = route_merged
+        self.lineroutes[-1] = route_merged
 
 # =============================================================================
 #         bs.traf.swlnav[ridx]    = True
@@ -1719,10 +1719,13 @@ class PathPlans(Entity):
     def load_flow_dill(self, fpath):
         self.graph=dill.load(open(f"{fpath}/Flow_control.dill", "rb"))
 
-def reverse_geom(geom) -> LineString:
-    def _reverse(x, y, z=None):
-        if z:
-            return x[::-1], y[::-1], z[::-1]
-        return x[::-1], y[::-1]
+# def reverse_geom(geom) -> LineString:
+#     def _reverse(x, y, z=None):
+#         if z:
+#             return x[::-1], y[::-1], z[::-1]
+#         return x[::-1], y[::-1]
 
-    return transform(_reverse, geom)
+#     return transform(_reverse, geom)
+
+def reverse_geom(geom) -> LineString:
+    return LineString(geom.coords[::-1])
