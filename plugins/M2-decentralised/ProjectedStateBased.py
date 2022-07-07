@@ -174,6 +174,9 @@ class ProjectedBased(ConflictDetection):
                     # now split line again to get line with a lookahead tine
                     # bs.stack.get_scenname()
                     look_ahead_line, _ = split_line_with_point(front_line, end_point)
+                
+                # add the current location to the front of the lookahead line
+                look_ahead_line = LineString([current_loc.coords[0], *look_ahead_line.coords])
 
 
                 # now also extend the line with back_line 32 meters back
@@ -207,6 +210,9 @@ class ProjectedBased(ConflictDetection):
 
                 # reverse the line again before merging with look_ahead_line
                 look_back_line = reverse_geom(look_back_line)
+
+                # end the look back line with current location
+                look_back_line = LineString([*look_back_line.coords, current_loc.coords[0]])
 
                 # merge lines
                 multi_line = MultiLineString([look_back_line, look_ahead_line])
