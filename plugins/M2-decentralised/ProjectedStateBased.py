@@ -12,6 +12,7 @@ import bluesky as bs
 from bluesky.tools import geo
 from bluesky.tools.aero import nm
 from bluesky.traffic.asas import ConflictDetection
+from bluesky.core.varexplorer import access_plugin_object
 from time import time
 
 def init_plugin():
@@ -43,6 +44,7 @@ class ProjectedBased(ConflictDetection):
         # create some transformers
         self.transformer_to_utm    = Transformer.from_crs("EPSG:4326", "EPSG:32633")
         self.transformer_to_latlon = Transformer.from_crs("EPSG:32633", "EPSG:4326")
+        self.path_plans = access_plugin_object('STREETS').path_plans
         return
         
     def clearconfdb(self):
@@ -128,7 +130,7 @@ class ProjectedBased(ConflictDetection):
                 # get the lookahead distance
                 look_ahead_dist = ownship.selspd[idx] * dtlookahead[idx]
 
-                route_line = bs.traf.lineroutes[idx]
+                route_line = self.path_plans.lineroutes[idx]
 
                 # find closest point to linestring
                 p1, _ = nearest_points(route_line, current_loc)
