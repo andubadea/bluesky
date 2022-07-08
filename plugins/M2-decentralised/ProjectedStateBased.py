@@ -37,7 +37,7 @@ class ProjectedBased(ConflictDetection):
         self.dist_mat = np.array([])
         self.qdr_mat = np.array([])
         self.rpz_actual = 32 #m
-        self.rpz_buffered = 40 #m
+        self.rpz_buffered = 38 #m
         self.hpz_actual = 7.62 #m
         self.dtlookahead_actual = 10 #s
 
@@ -449,7 +449,7 @@ class ProjectedBased(ConflictDetection):
             
                 # use statebased method if there are intersections
                 ntraf_intersecting = 2
-                rpz = np.zeros(ntraf_intersecting) + self.rpz_actual
+                rpz = np.zeros(ntraf_intersecting) + self.rpz_buffered
                 hpz = np.zeros(ntraf_intersecting) + self.hpz_actual
                 dtlookahead = np.zeros(ntraf_intersecting) + self.dtlookahead_actual
                 # Identity matrix of order ntraf: avoid ownship-ownship detected conflicts
@@ -569,7 +569,7 @@ class ProjectedBased(ConflictDetection):
         ''' Conflict detection between ownship (traf) and intruder (traf/adsb).'''
 
         # Calculate everything using the buffered RPZ
-        rpz = np.zeros(len(rpz)) + self.rpz_buffered
+        rpz = np.zeros(len(rpz)) + self.rpz_actual
         # Identity matrix of order ntraf: avoid ownship-ownship detected conflicts
         I = np.eye(ownship.ntraf)
 

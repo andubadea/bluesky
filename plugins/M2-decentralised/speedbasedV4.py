@@ -39,7 +39,7 @@ class SpeedBasedV4(ConflictResolution):
         super().__init__()
         self.layer_height = 30 * ft
         self.cruiselayerdiff = self.layer_height * 3
-        self.frnt_tol = 20 # Degrees
+        self.frnt_tol = 30 # Degrees
         self.rpz = 40
         
         self.heading_based = False
@@ -152,9 +152,13 @@ class SpeedBasedV4(ConflictResolution):
             
             # Extract conflict bearing and distance information
             qdr = conf.qdr[idx_pair]
-            dist= conf.dist[idx_pair]
+            dist= conf.dist_mat[idx1][idx2]
+            
+            if dist > conf.dist[idx_pair]:
+                print(idx1, idx2, dist, conf.dist[idx_pair])
+
             # Find the bearing of the intruder with respect to where we are heading
-            qdr_intruder = ((qdr - ownship.trk[idx1]) + 180) % 360 - 180  
+            qdr_intruder = ((qdr - hdg_ownship) + 180) % 360 - 180
                 
             # -------------- State related checks -----------
             # Determine if intruder is in front
@@ -218,7 +222,7 @@ class SpeedBasedV4(ConflictResolution):
                     # Also create a VO for this guy if he's not in the back
                     if not in_back:
                         #print('Add VO rogue.')
-                        VelocityObstacles.append(self.get_VO(conf, ownship, intruder, idx1, idx2))
+                        VelocityObstacles.append(self.get_VO(conf, ownship, intruder, idx1, idx2, idx_pair))
                     continue
                         
             # -------------- What to do if LOS ----------------
@@ -422,7 +426,7 @@ class SpeedBasedV4(ConflictResolution):
                 
             # Get Velocity Obstacle
             #print('Add VO.')
-            VelocityObstacles.append(self.get_VO(conf, ownship, intruder, idx1, idx2))
+            VelocityObstacles.append(self.get_VO(conf, ownship, intruder, idx1, idx2, idx_pair))
         
         #------------ FOR LOOP OVER ----------------
         #------------ Overall processing -----------
@@ -614,7 +618,7 @@ class SpeedBasedV4(ConflictResolution):
             priority_ok = self.check_prio(ownship, intruder, idx1, idx2)
             if (priority_ok and not in_front) or (in_back):
                 continue
-            VelocityObstacles.append(self.get_VO(conf, ownship, intruder, idx1, idx2))
+            VelocityObstacles.append(self.get_VO_real(conf, ownship, intruder, idx1, idx2))
         if los:
             return False
         # If there aren't any velocity obstacles, return true
@@ -630,11 +634,41 @@ class SpeedBasedV4(ConflictResolution):
         wpoint = Point(wpxv, wpyv)
         return not CombinedObstacles.contains(wpoint)
     
-    def get_VO(self, conf, ownship, intruder, idx1, idx2):
+    def get_VO(self, conf, ownship, intruder, idx1, idx2, idx_pair):
+        hdg_ownship = conf.conftrks[idx_pair][0]
+        hdg_intruder = conf.conftrks[idx_pair][1]
+        gs_ownship = ownship.gs[idx1]
+        gs_intruder = intruder.gs[idx2]
+    
+        v2 = np.array([gs_intruder * np.sin(np.radians(hdg_intruder)), gs_intruder * np.cos(np.radians(hdg_intruder))])
+        
+        t = conf.dtlookahead[idx1]
+        # Get QDR and DIST of conflict
+        qdr = conf.qdr[idx_pair]
+        dist = conf.dist[idx_pair]
+        # Get radians qdr
+        qdr_rad = np.radians(qdr)
+        # Get relative position
+        x_rel = np.array([np.sin(qdr_rad)*dist, np.cos(qdr_rad)*dist])
+        # Get the speed of the intruder
+        #v2 = np.array([intruder.gseast[idx2], intruder.gsnorth[idx2]])
+        # Get cutoff legs
+        left_leg_circle_point, right_leg_circle_point = self.cutoff_legs(x_rel, self.rpz, t)
+        # Extend cutoff legs
+        right_leg_extended = right_leg_circle_point * t
+        left_leg_extended = left_leg_circle_point * t
+        # Get the final VO
+        final_poly = Polygon([right_leg_extended, (0,0), left_leg_extended])
+        # Translate it by the velocity of the intruder
+        final_poly_translated = translate(final_poly, v2[0], v2[1])
+        # Return
+        return final_poly_translated
+    
+    def get_VO_real(self, conf, ownship, intruder, idx1, idx2):
         t = conf.dtlookahead[idx1]
         # Get QDR and DIST of conflict
         qdr = conf.qdr_mat[idx1, idx2]
-        dist = conf.dist_mat[idx1,idx2]
+        dist = conf.dist_mat[idx1, idx2]
         # Get radians qdr
         qdr_rad = np.radians(qdr)
         # Get relative position
