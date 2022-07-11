@@ -405,38 +405,11 @@ def handle_replan(edges_changes):
                 # add route as linestring for projected based on UTM coordinates
                 original_route = LineString(list(zip(utm_x, utm_y)))
 
-                # extend the route_line 400 meters in front and behind
-                # get last two points of front and back
-                end_extension =  LineString(original_route.coords[-2:])
-                end_sf = (end_extension.length + 400) / end_extension.length
-                end_extension = scale(end_extension, xfact=end_sf, yfact=end_sf, origin=end_extension.coords[0])
-                p_end = original_route.coords[-2]
-                end_extension = LineString([p_end, end_extension.coords[-1]])
-
-                start_extension  =  LineString(original_route.coords[:2])
-                start_sf = (start_extension.length + 400) / start_extension.length
-                start_extension = scale(start_extension, xfact=-start_sf, yfact=-start_sf, origin=start_extension.coords[0])
-                start_extension = reverse_geom(start_extension)
-
-                # now ensure that values are the same so merging becomes a linestring
-                p_start = original_route.coords[1]
-                start_extension = LineString([start_extension.coords[0], p_start])
-
-                # merge lines
-                if len(route) > 3:
-                    route_merged = MultiLineString([start_extension.coords, original_route.coords[1:-1], end_extension.coords])
-                    route_merged = linemerge(route_merged)
-                elif len(route) == 3:
-                    route_merged = MultiLineString([start_extension.coords, end_extension.coords])
-                    route_merged = linemerge(route_merged)
-                elif len(route) == 2:
-                    route_merged = LineString([start_extension.coords[0], end_extension.coords[-1]])
-
                 #assert that the route_merged is a linestring
-                assert (isinstance(route_merged, LineString), f'route is not a LineString for {acid}. It is a {type(route_merged)}')
+                assert original_route.is_simple, f'Route LineString self intersects for {acid}'
                 
                 # update the route
-                path_plans.lineroutes[idx] = route_merged
+                path_plans.lineroutes[idx] = original_route
 
 
 
@@ -1689,38 +1662,11 @@ class PathPlans(Entity):
         # add route as linestring for projected based on UTM coordinates
         original_route = LineString(list(zip(utm_x, utm_y)))
 
-        # extend the route_line 400 meters in front and behind
-        # get last two points of front and back
-        end_extension =  LineString(original_route.coords[-2:])
-        end_sf = (end_extension.length + 400) / end_extension.length
-        end_extension = scale(end_extension, xfact=end_sf, yfact=end_sf, origin=end_extension.coords[0])
-        p_end = original_route.coords[-2]
-        end_extension = LineString([p_end, end_extension.coords[-1]])
-
-        start_extension  =  LineString(original_route.coords[:2])
-        start_sf = (start_extension.length + 400) / start_extension.length
-        start_extension = scale(start_extension, xfact=-start_sf, yfact=-start_sf, origin=start_extension.coords[0])
-        start_extension = reverse_geom(start_extension)
-
-        # now ensure that values are the same so merging becomes a linestring
-        p_start = original_route.coords[1]
-        start_extension = LineString([start_extension.coords[0], p_start])
-
-        # merge lines
-        if len(route) > 3:
-            route_merged = MultiLineString([start_extension.coords, original_route.coords[1:-1], end_extension.coords])
-            route_merged = linemerge(route_merged)
-        elif len(route) == 3:
-            route_merged = MultiLineString([start_extension.coords, end_extension.coords])
-            route_merged = linemerge(route_merged)
-        elif len(route) == 2:
-            route_merged = LineString([start_extension.coords[0], end_extension.coords[-1]])
-
         #assert that the route_merged is a linestring
-        assert isinstance(route_merged, LineString), f'route is not a LineString for {acid}. It is a {type(route_merged)}'
-
+        assert original_route.is_simple, f'Route LineString self intersects for {acid}'
+        
         # finally assign to trafficarray
-        self.lineroutes[-1] = route_merged
+        self.lineroutes[-1] = original_route
 
 # =============================================================================
 #         bs.traf.swlnav[ridx]    = True
@@ -1730,14 +1676,3 @@ class PathPlans(Entity):
     
     def load_flow_dill(self, fpath):
         self.graph=dill.load(open(f"{fpath}/Flow_control.dill", "rb"))
-
-# def reverse_geom(geom) -> LineString:
-#     def _reverse(x, y, z=None):
-#         if z:
-#             return x[::-1], y[::-1], z[::-1]
-#         return x[::-1], y[::-1]
-
-#     return transform(_reverse, geom)
-
-def reverse_geom(geom) -> LineString:
-    return LineString(geom.coords[::-1])
