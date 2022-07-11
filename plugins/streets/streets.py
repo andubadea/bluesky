@@ -423,8 +423,14 @@ def handle_replan(edges_changes):
                 start_extension = LineString([start_extension.coords[0], p_start])
 
                 # merge lines
-                route_merged = MultiLineString([start_extension.coords, original_route.coords[1:-1], end_extension.coords])
-                route_merged = linemerge(route_merged)
+                if len(route) > 3:
+                    route_merged = MultiLineString([start_extension.coords, original_route.coords[1:-1], end_extension.coords])
+                    route_merged = linemerge(route_merged)
+                elif len(route) == 3:
+                    route_merged = MultiLineString([start_extension.coords, end_extension.coords])
+                    route_merged = linemerge(route_merged)
+                elif len(route) == 2:
+                    route_merged = LineString([start_extension.coords[0], end_extension.coords[-1]])
 
                 #assert that the route_merged is a linestring
                 assert (isinstance(route_merged, LineString), f'route is not a LineString for {acid}. It is a {type(route_merged)}')
@@ -1701,8 +1707,14 @@ class PathPlans(Entity):
         start_extension = LineString([start_extension.coords[0], p_start])
 
         # merge lines
-        route_merged = MultiLineString([start_extension.coords, original_route.coords[1:-1], end_extension.coords])
-        route_merged = linemerge(route_merged)
+        if len(route) > 3:
+            route_merged = MultiLineString([start_extension.coords, original_route.coords[1:-1], end_extension.coords])
+            route_merged = linemerge(route_merged)
+        elif len(route) == 3:
+            route_merged = MultiLineString([start_extension.coords, end_extension.coords])
+            route_merged = linemerge(route_merged)
+        elif len(route) == 2:
+            route_merged = LineString([start_extension.coords[0], end_extension.coords[-1]])
 
         #assert that the route_merged is a linestring
         assert isinstance(route_merged, LineString), f'route is not a LineString for {acid}. It is a {type(route_merged)}'
