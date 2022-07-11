@@ -670,7 +670,8 @@ def split_line_with_point(line, splitter):
 
     if distance_on_line == 0:
         return LineString([]), line.simplify(0)
-    
+    elif distance_on_line == line.length:
+        return line.simplify(0), LineString([])
 
     coords = list(line.coords)
     # split the line at the point and create two new lines
