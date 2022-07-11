@@ -123,12 +123,14 @@ class ProjectedBased(ConflictDetection):
                 
                 if not route.wplat:
                     continue
-
+                
                 # get the current location
                 current_loc = Point(self.transformer_to_utm.transform(ownship.lat[idx], ownship.lon[idx]))
                 
-                # get the lookahead distance
+                # get the lookahead distance (min 100 m)
                 look_ahead_dist = ownship.selspd[idx] * dtlookahead[idx]
+                look_ahead_dist = look_ahead_dist + self.rpz_actual
+                look_ahead_dist = 100 if look_ahead_dist < 100 else look_ahead_dist
 
                 route_line = self.path_plans.lineroutes[idx]
 
@@ -139,71 +141,51 @@ class ProjectedBased(ConflictDetection):
                 back_line, front_line = split_line_with_point(route_line, p1)
 
                 # now interpolate along the line
-                if front_line.length < rpz[0]:
+                if front_line.length < look_ahead_dist:
 
                     if front_line.length == 0:
-                        # get the last two points of route and extend 32 meters
-                        # In reality, aircraft should be deleted at last waypoint so this
-                        # is a safety so bluesky doesn't crash
                         dummy_line = LineString(route_line.coords[-2:])
-                        sf = rpz[0] / dummy_line.length
-                        look_ahead_line = scale(dummy_line, xfact=sf, yfact=sf, origin=route_line.coords[-1])
+                        sf = (self.rpz_actual + dummy_line.length) / dummy_line.length
+                        dummy_scaled = scale(dummy_line, xfact=sf, yfact=sf, origin=dummy_line.coords[0])    
+                        look_ahead_line = LineString([p1, dummy_scaled.coords[-1]])
 
                     else:
-                        sf = rpz[0] / front_line.length
-                        look_ahead_line = scale(front_line, xfact=sf, yfact=sf, origin=p1)
-                        try:
-                            l1 = LineString([p1, look_ahead_line.coords[1]])
-                            l2 = LineString(look_ahead_line.coords[1:])
-                        except ValueError:
-                            print('---------------------')
-                            print(bs.stack.get_scenname())
-                            print('---------------------')
-                            raise ValueError('Error in projecting lookahead line')
-
-                        look_ahead_line = MultiLineString([l1, l2])
-                        look_ahead_line = linemerge(multi_line)
-
+                        dummy_line = LineString(front_line.coords[-2:])
+                        sf = (self.rpz_actual + dummy_line.length) / dummy_line.length
+                        dummy_scaled = scale(dummy_line, xfact=sf, yfact=sf, origin=dummy_line.coords[0])    
+                        look_ahead_line = LineString([*front_line.coords[0:-1], dummy_scaled.coords[-1]])
+                
+      
                 else:
                     
                     # normal lookahead extension
-                    look_ahead_dist = look_ahead_dist + rpz[0]
-                    look_ahead_dist = 100 if look_ahead_dist < 100 else look_ahead_dist
                     end_point = front_line.interpolate(look_ahead_dist)
 
                     # now split line again to get line with a lookahead tine
-                    # bs.stack.get_scenname()
                     look_ahead_line, _ = split_line_with_point(front_line, end_point)
                 
                 # add the current location to the front of the lookahead line
                 look_ahead_line = LineString([current_loc.coords[0], *look_ahead_line.coords])
 
-
                 # now also extend the line with back_line 32 meters back
                 back_line = reverse_geom(back_line)
 
                 # if near the start of the line then just extend the line so it is 32 meters
-                if back_line.length < rpz[0]:
+                if back_line.length < self.rpz_actual:
 
                     if back_line.length == 0:
-                        # get the first two points of route and extend 32 meters
-                        # In reality, aircraft should be deleted at last waypoint so this
-                        # is a safety so bluesky doesn't crash
-                        dummy_line = LineString(route_line.coords[:2])
-                        sf = rpz[0] / dummy_line.length
-                        look_back_line = scale(dummy_line, xfact=-sf, yfact=-sf, origin=p1)
-                        # ensure that rounding error is removed
-                        look_back_line = LineString([p1, look_back_line.coords[1]])
-
-                    
+                        dummy_line = reverse_geom(LineString(route_line.coords[:2]))
                     else:
-                        sf = rpz[0] / back_line.length
-                        look_back_line = scale(back_line, xfact=sf, yfact=sf, origin=back_line.coords[0])
-                        look_back_line = LineString([back_line.coords[0], look_back_line.coords[-1]])
+                        dummy_line = LineString(back_line.coords[-2:])
+                    
+                    sf = (self.rpz_actual + dummy_line.length) / dummy_line.length
+                    scaled_dummy = scale(dummy_line, xfact=sf, yfact=sf, origin=dummy_line.coords[0])
+                    # ensure that rounding error is removed
+                    look_back_line = LineString([route_line.coords[0], scaled_dummy.coords[-1]])
                     
                 else:
                     # interpolate with route geometry if larger than 32 meters
-                    start_point = back_line.interpolate(rpz[0])
+                    start_point = back_line.interpolate(self.rpz_actual)
                 
                     # now split line again to get line that extends 32 meters back from aircraft
                     look_back_line, _ = split_line_with_point(back_line, start_point)
@@ -215,6 +197,7 @@ class ProjectedBased(ConflictDetection):
                 look_back_line = LineString([*look_back_line.coords, current_loc.coords[0]])
 
                 # merge lines
+                # ensure that lines are connected to the actual position of the aircraft
                 multi_line = MultiLineString([look_back_line, look_ahead_line])
                 merged_line = linemerge(multi_line)
 

@@ -403,7 +403,7 @@ def handle_replan(edges_changes):
                     bs.traf.actwp.next_qdr[idx] = nextqdr_to_remember
 
                 # add route as linestring for projected based on UTM coordinates
-                original_route = LineString(list(zip(utm_x, utm_y)))
+                original_route = LineString(list(zip(utm_x, utm_y))).simplify(0.0001)
 
                 #assert that the route_merged is a linestring
                 assert original_route.is_simple, f'Route LineString self intersects for {acid}'
@@ -1660,7 +1660,7 @@ class PathPlans(Entity):
         edge_traffic.edgeap.edge_rou[ridx].direct(ridx,edge_traffic.edgeap.edge_rou[ridx].wpname[1])
 
         # add route as linestring for projected based on UTM coordinates
-        original_route = LineString(list(zip(utm_x, utm_y)))
+        original_route = LineString(list(zip(utm_x, utm_y))).simplify(0.0001)
 
         #assert that the route_merged is a linestring
         assert original_route.is_simple, f'Route LineString self intersects for {acid}'
