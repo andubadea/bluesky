@@ -153,8 +153,7 @@ class ProjectedBased(ConflictDetection):
                         dummy_line = LineString(front_line.coords[-2:])
                         sf = (self.rpz_actual + dummy_line.length) / dummy_line.length
                         dummy_scaled = scale(dummy_line, xfact=sf, yfact=sf, origin=dummy_line.coords[0])    
-                        look_ahead_line = LineString([*front_line.coords[0:-1], dummy_scaled.coords[-1]])
-                
+                        look_ahead_line = LineString([*front_line.coords, dummy_scaled.coords[-1]])
       
                 else:
                     
@@ -175,13 +174,17 @@ class ProjectedBased(ConflictDetection):
 
                     if back_line.length == 0:
                         dummy_line = reverse_geom(LineString(route_line.coords[:2]))
+                    
+                        sf = (self.rpz_actual + dummy_line.length) / dummy_line.length
+                        scaled_dummy = scale(dummy_line, xfact=sf, yfact=sf, origin=dummy_line.coords[0])
+                        # ensure that rounding error is removed
+                        look_back_line = LineString([route_line.coords[0], scaled_dummy.coords[-1]])
                     else:
                         dummy_line = LineString(back_line.coords[-2:])
-                    
-                    sf = (self.rpz_actual + dummy_line.length) / dummy_line.length
-                    scaled_dummy = scale(dummy_line, xfact=sf, yfact=sf, origin=dummy_line.coords[0])
-                    # ensure that rounding error is removed
-                    look_back_line = LineString([route_line.coords[0], scaled_dummy.coords[-1]])
+                        sf = (self.rpz_actual + dummy_line.length) / dummy_line.length
+                        scaled_dummy = scale(dummy_line, xfact=sf, yfact=sf, origin=dummy_line.coords[0])
+                        # ensure that rounding error is removed
+                        look_back_line = LineString([*back_line.coords, scaled_dummy.coords[-1]])
                     
                 else:
                     # interpolate with route geometry if larger than 32 meters
