@@ -155,7 +155,7 @@ class SpeedBasedV4(ConflictResolution):
             dist= conf.dist_mat[idx1][idx2]
             
             if dist > conf.dist[idx_pair]:
-                print(idx1, idx2, dist, conf.dist[idx_pair])
+                dist = conf.dist[idx_pair]
 
             # Find the bearing of the intruder with respect to where we are heading
             qdr_intruder = ((qdr - hdg_ownship) + 180) % 360 - 180
