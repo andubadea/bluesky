@@ -406,7 +406,7 @@ def handle_replan(edges_changes):
                 original_route = LineString(list(zip(utm_x, utm_y))).simplify(0.0001)
 
                 #assert that the route_merged is a linestring
-                assert original_route.is_simple, f'Route LineString self intersects for {acid}'
+                path_plans.lineintersects = not original_route.is_simple
                 
                 # update the route
                 path_plans.lineroutes[idx] = original_route
@@ -1534,8 +1534,10 @@ class PathPlans(Entity):
         with self.settrafarrays():
             self.pathplanning = []
             self.lineroutes = np.array([], dtype=LineString)
+            self.lineintersects = np.array([], dtype=bool)
 
         bs.traf.lineroutes = self.lineroutes
+        bs.traf.lineintersects = self.lineintersects
 
         self.transformer_to_utm    = Transformer.from_crs("EPSG:4326", "EPSG:32633")
         self.transformer_to_latlon = Transformer.from_crs("EPSG:32633", "EPSG:4326")
@@ -1663,7 +1665,7 @@ class PathPlans(Entity):
         original_route = LineString(list(zip(utm_x, utm_y))).simplify(0.0001)
 
         #assert that the route_merged is a linestring
-        assert original_route.is_simple, f'Route LineString self intersects for {acid}'
+        self.lineintersects[-1] = not original_route.is_simple
         
         # finally assign to trafficarray
         self.lineroutes[-1] = original_route
