@@ -22,7 +22,7 @@ def init_plugin():
     # Configuration parameters
     config = {
         # The name of your plugin
-        'plugin_name':     'PROJECTEDSTATEBASEDV2',
+        'plugin_name':     'PROJECTEDBASEDV2',
 
         # The type of this plugin. For now, only simulation plugins are possible.
         'plugin_type':     'sim'
@@ -127,19 +127,17 @@ class ProjectedBasedV2(ConflictDetection):
                 # get the current location
                 current_loc = Point(self.transformer_to_utm.transform(ownship.lat[idx], ownship.lon[idx]))
                 
-                # get the lookahead distance (min 100 m)
+                # get the lookahead distance (min 64 m)
                 look_ahead_dist = ownship.gs[idx] * dtlookahead[idx]
-                look_ahead_dist = look_ahead_dist + self.rpz_actual
-                look_ahead_dist = 100 if look_ahead_dist < 100 else look_ahead_dist
+                look_ahead_dist = 64 if look_ahead_dist < 64 else look_ahead_dist
 
                 route_line = self.path_plans.lineroutes[idx]
 
                 # check if route is self intersecting
-                if not self.path_plans.lineintersects[idx]:
+                if self.path_plans.lineintersects[idx]:
                     merged_line, p1 = self.build_projected_line_from_route_line(route_line, current_loc, look_ahead_dist)
 
                 else:
-                    
                     merged_line, p1 = self.build_projected_line_from_wpts(idx, route, route_line, current_loc, look_ahead_dist)
 
                 # fill the geo_dict
@@ -503,7 +501,7 @@ class ProjectedBasedV2(ConflictDetection):
         iactwp = route.iactwp
 
         # get coordinates for route in utm
-        utm_coords = [self.transformer_to_utm.transform(x,y) for x,y in zip(route.wplat, route.wplon)]
+        utm_coords =  self.path_plans.route_coords[idx]
 
         # get all of the waypoints infront of iactwp including iactwp
         front_line = LineString([*current_loc.coords[:], *utm_coords[iactwp:]]).simplify(0.0001)

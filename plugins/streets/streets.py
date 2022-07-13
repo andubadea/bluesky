@@ -402,6 +402,9 @@ def handle_replan(edges_changes):
                 if not bs.traf.actwp.flyby[idx] and bs.traf.actwp.flyturn[idx]:
                     bs.traf.actwp.next_qdr[idx] = nextqdr_to_remember
 
+                # add utm route points to path_plans
+                path_plans.route_coords[idx] = list(zip(utm_x, utm_y))
+
                 # add route as linestring for projected based on UTM coordinates
                 original_route = LineString(list(zip(utm_x, utm_y))).simplify(0.0001)
 
@@ -1534,6 +1537,7 @@ class PathPlans(Entity):
         with self.settrafarrays():
             self.pathplanning = []
             self.lineroutes = np.array([], dtype=LineString)
+            self.route_coords = np.array([], dtype=object)
             self.lineintersects = np.array([], dtype=bool)
 
         bs.traf.lineroutes = self.lineroutes
@@ -1660,6 +1664,9 @@ class PathPlans(Entity):
         # Calculate flight plan
         acrte.calcfp()
         edge_traffic.edgeap.edge_rou[ridx].direct(ridx,edge_traffic.edgeap.edge_rou[ridx].wpname[1])
+
+        # get route in a traff array
+        self.route_coords[-1] = list(zip(utm_x, utm_y))
 
         # add route as linestring for projected based on UTM coordinates
         original_route = LineString(list(zip(utm_x, utm_y))).simplify(0.0001)
