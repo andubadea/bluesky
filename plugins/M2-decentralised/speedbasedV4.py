@@ -477,7 +477,7 @@ class SpeedBasedV4(ConflictResolution):
             self.stuck[idx1] = True
             #print('STUCK')
             
-        if ownship.gs[idx1] != 0:
+        if ownship.gs[idx1] != 0 and VelocityObstacles:
             # Combine all velocity obstacles into one big polygon
             CombinedObstacles = cascaded_union(VelocityObstacles)
             
@@ -523,7 +523,7 @@ class SpeedBasedV4(ConflictResolution):
                     solutions = []
                     if type(intersection) == MultiPoint:
                         for vel_point in intersection:
-                            velocity = list(vel_point.coords)
+                            velocity = list(*vel_point.coords)
                             # Check whether to put velocity "negative" or "positive". 
                             # Drones can fly backwards.
                             if np.degrees(self.angle(velocity, v1)) < 1:
@@ -532,7 +532,7 @@ class SpeedBasedV4(ConflictResolution):
                                 solutions.append(-self.norm(velocity))
                     else:
                         # It's a single point
-                        velocity = list(intersection.coords)
+                        velocity = list(*intersection.coords)
                         # Check whether to put velocity "negative" or "positive". 
                         # Drones can fly backwards.
                         if np.degrees(self.angle(velocity, v1)) < 1:
