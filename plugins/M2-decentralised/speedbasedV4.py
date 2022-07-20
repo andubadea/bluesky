@@ -6,7 +6,7 @@ import numpy as np
 from bluesky import core
 from bluesky import stack
 from bluesky.traffic.asas import ConflictResolution
-from shapely.geometry import Point, LineString
+from shapely.geometry import Point, LineString, MultiPoint
 from shapely.geometry.polygon import Polygon
 from shapely.ops import cascaded_union, nearest_points
 from shapely.affinity import translate
@@ -515,14 +515,15 @@ class SpeedBasedV4(ConflictResolution):
                 # Create velocity line
                 line = LineString([v_line_min, v_line_max])
                 # Get the intersection with the velocity obstacles
-                intersection = CombinedObstacles.intersection(line)
+                intersection = CombinedObstacles.boundary.intersection(line)
                 
                 #---------------- RESOLUTION SPEEDS ---------------
                 # Apply the VO resolution speed
                 if intersection:
                     solutions = []
-                    if type(intersection) == LineString:
-                        for velocity in list(intersection.coords):
+                    if type(intersection) == MultiPoint:
+                        for vel_point in intersection:
+                            velocity = list(vel_point.coords)
                             # Check whether to put velocity "negative" or "positive". 
                             # Drones can fly backwards.
                             if np.degrees(self.angle(velocity, v1)) < 1:
@@ -530,14 +531,14 @@ class SpeedBasedV4(ConflictResolution):
                             else:
                                 solutions.append(-self.norm(velocity))
                     else:
-                        for line in intersection:
-                            for velocity in list(line.coords):
-                                # Check whether to put velocity "negative" or "positive". 
-                                # Drones can fly backwards.
-                                if np.degrees(self.angle(velocity, v1)) < 1:
-                                    solutions.append(self.norm(velocity))
-                                else:
-                                    solutions.append(-self.norm(velocity))
+                        # It's a single point
+                        velocity = list(intersection.coords)
+                        # Check whether to put velocity "negative" or "positive". 
+                        # Drones can fly backwards.
+                        if np.degrees(self.angle(velocity, v1)) < 1:
+                            solutions.append(self.norm(velocity))
+                        else:
+                            solutions.append(-self.norm(velocity))
                                 
                     pos_speeds = [spd for spd in solutions if spd >= 0]
                     neg_speeds = [spd for spd in solutions if spd < 0]
