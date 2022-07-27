@@ -94,33 +94,40 @@ class ProjectedBased(ConflictDetection):
         projected_confpairs = projected_based[0]        
 
         # run statebased
-        statebased_confpairs, lospairs, inconf, tcpamax, qdr, \
-            dist, dcpa, tcpa, tLOS, qdr_mat, dist_mat = \
+        statebased_confpairs, lospairs, statebased_inconf, statebased_tcpamax, statebased_qdr, \
+            statebased_dist, statebased_dcpa, statebased_tcpa, statebased_tLOS, qdr_mat, dist_mat = \
                 self.detect_statebased(ownship, intruder, rpz, hpz, dtlookahead)
 
-        # get indices from statebased that are in projected_basd
-        confpairs_indices = [statebased_confpairs.index(pair) for pair in statebased_confpairs
-                                                                        if pair in projected_confpairs]
+        if statebased_confpairs:
+            # get indices from statebased that are in projected_basd
+            confpairs_indices = [statebased_confpairs.index(pair) for pair in statebased_confpairs
+                                                                            if pair in projected_confpairs]
 
-        # now only keep the confpairs that are in statebased
-        confpairs = [statebased_confpairs[i] for i in confpairs_indices]
-        tcpamax = [tcpamax[i] for i in confpairs_indices]
-        qdr = [qdr[i] for i in confpairs_indices]
-        dist = [dist[i] for i in confpairs_indices]
-        dcpa = [dcpa[i] for i in confpairs_indices]
-        tcpa = [tcpa[i] for i in confpairs_indices]
-        tLOS = [tLOS[i] for i in confpairs_indices]
+            # now only keep the confpairs that are in statebased
+            confpairs = [statebased_confpairs[i] for i in confpairs_indices]
+            qdr = np.array([statebased_qdr[i] for i in confpairs_indices])
+            dist = np.array([statebased_dist[i] for i in confpairs_indices])
+            dcpa = np.array([statebased_dcpa[i] for i in confpairs_indices])
+            tcpa = np.array([statebased_tcpa[i] for i in confpairs_indices])
+            tLOS = np.array([statebased_tLOS[i] for i in confpairs_indices])
 
-        # go through confpairs
-        conflict_ac = [bs.traf.id(acid) for acid in {acids[0] for acids in confpairs}]
+            # go through confpairs
+            conflict_ac = [bs.traf.id2idx(acid) for acid in {acids[0] for acids in confpairs}]
 
-        inconf = np.array([False]*bs.traf.ntraf)
+            inconf = np.full(bs.traf.ntraf, False, dtype=np.bool)
+            tcpamax = np.full(bs.traf.ntraf, 0)
 
-        for idx in conflict_ac:
-            inconf[idx] = True
+            for idx in conflict_ac:
+                inconf[idx] = True
+                tcpamax[idx] = statebased_tcpamax[idx]
+            
+            return confpairs, lospairs, inconf, tcpamax, \
+                qdr, dist, dcpa, tcpa, tLOS, qdr_mat, dist_mat
+        
+        else:
 
-        return confpairs, lospairs, inconf, tcpamax, \
-            qdr, dist, dcpa, tcpa, tLOS, qdr_mat, dist_mat
+            return statebased_confpairs, lospairs, statebased_inconf, statebased_tcpamax, statebased_qdr, \
+            statebased_dist, statebased_dcpa, statebased_tcpa, statebased_tLOS, qdr_mat, dist_mat 
         
     def detect_projectedbased(self, ownship, intruder, rpz, hpz, dtlookahead):
         ''' Conflict detection between ownship (traf) and intruder (traf/adsb).'''
@@ -162,7 +169,7 @@ class ProjectedBased(ConflictDetection):
                 
                 # get the lookahead distance (min 64 m)
                 look_ahead_dist = ownship.gs[idx] * dtlookahead[idx]
-                look_ahead_dist = 64 if look_ahead_dist < 64 else look_ahead_dist
+                look_ahead_dist = 100 if look_ahead_dist < 100 else look_ahead_dist
 
                 route_line = self.path_plans.lineroutes[idx]
 
