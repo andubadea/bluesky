@@ -64,7 +64,7 @@ def init_plugin():
 
 # defaults
 use_path_plan = True
-use_flow_control = False
+use_flow_control = True
 
 # initialise queue
 queue_dict = dict()
@@ -121,7 +121,7 @@ def reset():
     # when reseting bluesky turn off streets and turn on flow controls
     global streets_bool, use_flow_control
     streets_bool = False
-    use_flow_control = False
+    use_flow_control = True
 
     # default setting for streets is not constrained
     global heading_based_constrained
@@ -345,7 +345,7 @@ def handle_replan(edges_changes):
                     lon = rte[0] # deg
 
                     # convert to utm #TODO: check x y in correct order
-                    x,y = self.transformer_to_utm.transform(lat, lon)
+                    x,y = path_plans.transformer_to_utm.transform(lat, lon)
                     utm_x.append(x)
                     utm_y.append(y)
 
@@ -409,7 +409,7 @@ def handle_replan(edges_changes):
                 original_route = LineString(list(zip(utm_x, utm_y))).simplify(0.0001)
 
                 #assert that the route_merged is a linestring
-                path_plans.lineintersects = not original_route.is_simple
+                path_plans.lineintersects[idx] = not original_route.is_simple
                 
                 # update the route
                 path_plans.lineroutes[idx] = original_route
