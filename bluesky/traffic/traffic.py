@@ -124,7 +124,7 @@ losheader = \
     'LAYERTYPE2 [-],' + \
     'EDGEID1 [-],' + \
     'EDGEID2 [-]\n'
-    
+
 regheader = \
     '#######################################################\n' + \
     'REGULAR LOG\n' + \
@@ -133,6 +133,17 @@ regheader = \
     'Parameters [Units]:\n' + \
     'Simulation time [s], ' + \
     'ACIDs [-], ALTs [ft], LATs [deg], LONs [deg], EDGEID [-]\n'
+    
+flowheader = \
+    '#######################################################\n' + \
+    'FLOW LOG\n' + \
+    'Statistics recorded regularly at a certain simtime interval.\n' + \
+    '#######################################################\n\n' + \
+    'Parameters [Units]:\n' + \
+    'Simulation time [s], ' + \
+    'ACIDs [-], ALTs [ft], LATs [deg], LONs [deg], EDGEID [-], AIRSPACETYPE [-], \
+    BOOL_REPLAN, BOOL_ATTEMPT_REPLAN, BOOL_UPDATED_GRAPH_NO_REPLAN, BOOL_HIGH_TRAF_NO_REPLAN, \
+    BOOL_LAST_POINT_NO_REPLAN\n'
     
 geoheader = \
     '#######################################################\n' + \
@@ -179,7 +190,8 @@ class Traffic(Entity):
         # Loggers and other vars
         self.flst = datalog.crelog('FLSTLOG', None, flstheader)
         self.conflog = datalog.crelog('CONFLOG', None, confheader)
-        self.reglog = datalog.crelog('REGLOG', None, regheader)
+        # self.reglog = datalog.crelog('REGLOG', None, regheader)
+        self.flowlog = datalog.crelog('FLOWLOG', None, flowheader)
         self.geolog = datalog.crelog('GEOLOG', None, geoheader)
         self.loslog = datalog.crelog('LOSLOG', None, losheader)
         self.geo_intrusions = dict()
@@ -687,14 +699,14 @@ class Traffic(Entity):
         
         self.prevlospairs = set(self.cd.lospairs)
         
-    @timed_function(name='reglog', dt=30)
-    def thereglog(self):
-        self.reglog.log(*self.id)
-        self.reglog.log(*self.alt/ft)
-        self.reglog.log(*self.lat)
-        self.reglog.log(*self.lon)
-        self.reglog.log(*self.actedge.wpedgeid)
-        return
+    # @timed_function(name='reglog', dt=30)
+    # def thereglog(self):
+    #     self.reglog.log(*self.id)
+    #     self.reglog.log(*self.alt/ft)
+    #     self.reglog.log(*self.lat)
+    #     self.reglog.log(*self.lon)
+    #     self.reglog.log(*self.actedge.wpedgeid)
+    #     return
 
     @timed_function(name='asas', dt=bs.settings.asas_dt, manual=True)
     def update_asas(self):
@@ -1131,7 +1143,7 @@ class Traffic(Entity):
     def STARTM2LOG(self):
         self.flst.start()
         self.conflog.start()
-        self.reglog.start()
+        self.flowlog.start()
         self.geolog.start()
         self.loslog.start()
         return
