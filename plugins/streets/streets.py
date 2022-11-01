@@ -258,7 +258,12 @@ def do_flowcontrol():
                     edge_traffic.edge_dict[edge]['speed_limit'] = 30
 
         if edges_changes!=[]:
-            handle_replan(edges_changes)
+            log_replan_changed_routes, \
+            log_replan_same_route, \
+            log_no_replan_but_changes, \
+            log_no_replan_high_traffic, \
+            log_no_replan_last_point, \
+            log_no_replan_open_airspace = handle_replan(edges_changes)
 
         bs.traf.flowlog.log(*bs.traf.id)
         bs.traf.flowlog.log(*bs.traf.alt/ft)
@@ -266,6 +271,7 @@ def do_flowcontrol():
         bs.traf.flowlog.log(*bs.traf.lon)
         bs.traf.flowlog.log(*bs.traf.actedge.wpedgeid)
         bs.traf.flowlog.log(*bs.traf.actedge.edge_airspace_type)
+
         bs.traf.flowlog.log(*log_replan_changed_routes)
         bs.traf.flowlog.log(*log_replan_same_route)
         bs.traf.flowlog.log(*log_no_replan_but_changes)
@@ -324,6 +330,14 @@ def delete_loitering_flowcontrol(lifted_loitering_edges):
             handle_replan(edges_changes)         
             
 def handle_replan(edges_changes):
+
+    log_replan_changed_routes = np.zeros(bs.traf.ntraf)
+    log_replan_same_route = np.zeros(bs.traf.ntraf)
+    log_no_replan_but_changes = np.zeros(bs.traf.ntraf)
+    log_no_replan_high_traffic = np.zeros(bs.traf.ntraf)
+    log_no_replan_last_point = np.zeros(bs.traf.ntraf)
+    log_no_replan_open_airspace = np.zeros(bs.traf.ntraf)
+
     for idx,path in enumerate(path_plans.pathplanning):
         #print("index")
         #print(idx)
@@ -348,10 +362,45 @@ def handle_replan(edges_changes):
         
         else:
             #print(next_node_osmnx_id,prev_node_osmnx_id,lat,lon)
-            route,turns,edges,next_turn,groups,in_constrained,turn_speeds=path.replan(edges_changes,prev_node_osmnx_id,next_node_osmnx_id,lat,lon)
-            if len(route)>0:
+            route,turns,edges,next_turn,groups,in_constrained,turn_speeds,replantype=path.replan(edges_changes,prev_node_osmnx_id,next_node_osmnx_id,lat,lon)
+            if len(route)>0:                    
 
                 acrte = Route._routes.get(acid)
+
+                # get old lats, lons of route
+                oldlats = {acrte.wplat}
+                oldlons = {acrte.wplon}
+
+                # If replantype is 0 this emeans that overall graph was updated but this aircraft
+                # was not affected
+                if replantype == 0:
+                    log_no_replan_but_changes[idx] = 1
+                
+                # if replantype is 1 this means that the aircraft replanned
+                # still unsure if it is the same route or previous route.
+                elif replantype == 1:
+                    newlats = {coord[1] for coord in route}
+                    newlons = {coord[0] for coord in route}
+
+                    # now check if it is same route
+                    if newlats.issubset(oldlats) and newlons.issubset(oldlons):
+                        log_replan_same_route[idx] = 1
+                    else:
+                        log_replan_changed_routes[idx] = 1
+
+                # if replantype is 2 it means it did not replan because of high traffic
+                # and aircraft has low or medium priority
+                elif replantype == 2:
+                    log_no_replan_high_traffic[idx] = 1
+                
+                # if replantype is 3 it means it did not replan because it is near the last point of route
+                elif replantype == 3:
+                    log_no_replan_last_point[idx] = 1
+
+                # if replantype is 4 it means that aircraft has route completely in open airspace
+                elif replantype == 4:
+                    log_no_replan_open_airspace[idx] = 1
+
                 # If the next waypoint is a turn waypoint, then remember the turnrad
                 nextqdr_to_remember = bs.traf.actwp.next_qdr[idx]
                     
@@ -432,6 +481,9 @@ def handle_replan(edges_changes):
                 
                 # update the route
                 path_plans.lineroutes[idx] = original_route
+
+    return  log_replan_changed_routes, log_replan_same_route, log_no_replan_but_changes, \
+            log_no_replan_high_traffic, log_no_replan_last_point, log_no_replan_open_airspace
 
 
 

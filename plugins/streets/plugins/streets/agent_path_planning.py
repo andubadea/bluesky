@@ -2269,9 +2269,18 @@ class PathPlanning:
     ##groups is the list of the group in which each waypoint belongs to
     ##in_constrained is the list of booleans indicating for every waypoint if it is in constarined airspace
     ##turn_speed is teh list if speed to be used if the waypoint is a turning waypoint        
+    ##turn_speed is teh list if speed to be used if the waypoint is a turning waypoint        
     def replan(self,changes_list,prev_node_osmnx_id,next_node_index,lat,lon):
+        replan_type=4
+        # 0=Updated graph, no replaning
+        #1=Replanned (new or old route)
+        #2=Did not replan beacuse of high traffic and low/medium priority
+        #3=Did not replan because last point
+        #4=Did not replan beacause route in open airspace
+        
+        
         if self.path_only_open:
-            return [],[],[],[],[],[],[] 
+            return [],[],[],[],[],[],[],replan_type
         
         
         if self.in_same_cell:
@@ -2284,17 +2293,19 @@ class PathPlanning:
             self.in_constrained=[False,False]
             self.turn_speed=[0,5]
             
-            return self.route,self.turns,self.edges_list,self.next_turn_point,self.groups,self.in_constrained,self.turn_speed
+            return self.route,self.turns,self.edges_list,self.next_turn_point,self.groups,self.in_constrained,self.turn_speed,replan_type
 
 
-        ##If the aircraft is currently at teh edge that the goal is , it should not replan
+        ##If the aircraft is currently at the edge that the goal is , it should not replan
         if next_node_index==self.goal_index_next:
-            return [],[],[],[],[],[],[] 
+            replan_type=3
+            return [],[],[],[],[],[],[] , replan_type
 
         prev_node_osmnx_id_init=prev_node_osmnx_id
         next_node_index_init=next_node_index
         lat_init=lat
         lon_init=lon
+        replan_type=0
 
         replan_from_next_node=False
         if next_node_index<4481 and  prev_node_osmnx_id<4481 and next_node_index!=self.goal_index and next_node_index!=self.goal_index_next:
@@ -2339,8 +2350,8 @@ class PathPlanning:
         
         self.start_index=next_node_index
         self.start_index_previous=prev_node_osmnx_id
-        if prev_node_osmnx_id>4480 and prev_node_osmnx_id!=5000:
-            prev_node_osmnx_id=5000
+        if prev_node_osmnx_id>4480 and prev_node_osmnx_id!=6000:
+            prev_node_osmnx_id=6000
             self.start_index=self.start_index_previous
             next_node_index=self.start_index_previous
             self.start_index_previous=prev_node_osmnx_id
@@ -2351,7 +2362,7 @@ class PathPlanning:
         p=transformer.transform(lat,lon)
         self.graph.start_point=Point(tuple((p[0],p[1])))
 
-        if self.start_index_previous==5000:
+        if self.start_index_previous==6000:
             self.graph.start_ind=self.start_index
         else:
             self.graph.start_ind=-1
@@ -2404,6 +2415,8 @@ class PathPlanning:
 
         if change_list==[]:
             replan_bool=False
+            replan_type=0
+            
               
         if prev_node_osmnx_id<4481 and replan_bool and next_node_index<4481:
 
@@ -2411,6 +2424,7 @@ class PathPlanning:
                 #TODO check if teh second condition is not needed
             if (self.flow_graph.edges_current_speed[prev_node_osmnx_id][next_node_index]<1 and self.flow_graph.edges_current_speed[prev_node_osmnx_id][next_node_index]!=0 and self.priority<3):# or self.edge_gdf[prev_node_osmnx_id][next_node_index].speed==0:
                 replan_bool=False
+                replan_type=2
             
         if not replan_bool and change_list!=[]:
             self.update_changed_vertices(self.path,self.graph,self.flow_graph.edges_current_speed,self.flow_graph.edges_graph,self.flow_graph.edges_previous_speed,True,change_list)
@@ -2421,7 +2435,7 @@ class PathPlanning:
             start_id=None
             result = np.where(self.os_keys2_indices ==self.start_index)
             rr=np.where(result[1] ==0)
-            if self.start_index_previous==5000:
+            if self.start_index_previous==6000:
                 start_id=self.os_keys2_indices[result[0][rr]][0][1]
             else:
                 for ii in self.os_keys2_indices[result[0][rr]][0][1:]:
@@ -2448,6 +2462,7 @@ class PathPlanning:
             route,turns,indices_nodes,turn_coord,groups,in_constrained,turn_speed,init_groups=self.get_path(self.path,self.graph,self.flow_graph.edges_current_speed,self.flow_graph.edges_graph,self.flow_graph.edges_previous_speed,True,change_list)
             
             self.path.origin_node_index=start_id
+            replan_type=1
              
             if route != None :
                 edges_list=[]
@@ -2457,7 +2472,7 @@ class PathPlanning:
                 os_id2=indices_nodes[0]
 
                 
-                if 2000 not in init_groups and self.start_index_previous==5000:
+                if 2000 not in init_groups and self.start_index_previous==6000:
                     edges_list.append((os_id1,os_id2))
 
                     nodes_index=0
@@ -2495,7 +2510,7 @@ class PathPlanning:
     
                         if init_groups[nodes_index]==2000 and init_groups[nodes_index+1]==2000:
                             nodes_index=nodes_index+1
-                            os_id1=5000
+                            os_id1=6000
                             os_id2=indices_nodes[nodes_index]
     
                         else:
@@ -2677,7 +2692,7 @@ class PathPlanning:
                 self.groups=np.array(groups,dtype=np.uint16)
                 self.in_constrained=np.array(in_constrained,dtype=np.bool8)
                 self.turn_speed=np.array(turn_speed,dtype=np.float64)
-                return self.route,self.turns,self.edges_list,self.next_turn_point,self.groups,self.in_constrained,self.turn_speed
+                return self.route,self.turns,self.edges_list,self.next_turn_point,self.groups,self.in_constrained,self.turn_speed,replan_type
             else:
                 if replan_from_next_node:
                     replan_from_next_node=False
@@ -2702,7 +2717,7 @@ class PathPlanning:
                     p=transformer.transform(lat,lon)
                     self.graph.start_point=Point(tuple((p[0],p[1])))
             
-                    if self.start_index_previous==5000:
+                    if self.start_index_previous==6000:
                         self.graph.start_ind=self.start_index
                     else:
                         self.graph.start_ind=-1
@@ -2718,6 +2733,7 @@ class PathPlanning:
                             #TODO check if teh second condition is not needed
                         if (self.flow_graph.edges_current_speed[prev_node_osmnx_id][next_node_index]<1 and self.flow_graph.edges_current_speed[prev_node_osmnx_id][next_node_index]!=0 and self.priority<3):# or self.edge_gdf[prev_node_osmnx_id][next_node_index].speed==0:
                             replan_bool=False
+                            replan_type=2
                         
                     if not replan_bool and change_list!=[]:
                         self.update_changed_vertices(self.path,self.graph,self.flow_graph.edges_current_speed,self.flow_graph.edges_graph,self.flow_graph.edges_previous_speed,True,change_list)
@@ -2728,7 +2744,7 @@ class PathPlanning:
                         start_id=None
                         result = np.where(self.os_keys2_indices ==self.start_index)
                         rr=np.where(result[1] ==0)
-                        if self.start_index_previous==5000:
+                        if self.start_index_previous==6000:
                             start_id=self.os_keys2_indices[result[0][rr]][0][1]
                         else:
                             for ii in self.os_keys2_indices[result[0][rr]][0][1:]:
@@ -2755,6 +2771,7 @@ class PathPlanning:
                         route,turns,indices_nodes,turn_coord,groups,in_constrained,turn_speed,init_groups=self.get_path(self.path,self.graph,self.flow_graph.edges_current_speed,self.flow_graph.edges_graph,self.flow_graph.edges_previous_speed,True,change_list)
                         
                         self.path.origin_node_index=start_id
+                        replan_type=1
                          
                         if route != None :
                             edges_list=[]
@@ -2764,7 +2781,7 @@ class PathPlanning:
                             os_id2=indices_nodes[0]
             
                             
-                            if 2000 not in init_groups and self.start_index_previous==5000:
+                            if 2000 not in init_groups and self.start_index_previous==6000:
                                 edges_list.append((os_id1,os_id2))
             
                                 nodes_index=0
@@ -2802,7 +2819,7 @@ class PathPlanning:
                 
                                     if init_groups[nodes_index]==2000 and init_groups[nodes_index+1]==2000:
                                         nodes_index=nodes_index+1
-                                        os_id1=5000
+                                        os_id1=6000
                                         os_id2=indices_nodes[nodes_index]
                 
                                     else:
@@ -2847,9 +2864,9 @@ class PathPlanning:
                             self.groups=np.array(groups,dtype=np.uint16)
                             self.in_constrained=np.array(in_constrained,dtype=np.bool8)
                             self.turn_speed=np.array(turn_speed,dtype=np.float64)
-                            return self.route,self.turns,self.edges_list,self.next_turn_point,self.groups,self.in_constrained,self.turn_speed                    
+                            return self.route,self.turns,self.edges_list,self.next_turn_point,self.groups,self.in_constrained,self.turn_speed     ,replan_type               
 
-        return [],[],[],[],[],[],[]
+        return [],[],[],[],[],[],[],replan_type
       
     ##Function handling the replanning process, called when aircraft is spawned
     ##Returns: route,turns,edges_list,next_turn_point,groups,in_constrained,turn_speed
