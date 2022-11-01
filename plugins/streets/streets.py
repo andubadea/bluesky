@@ -144,6 +144,12 @@ def do_flowcontrol():
     # TODO: update the speed limit value of edges in (edge_traffic.edge_dict[wpedgeid]['speed_limit'])
     # probably need streeys_bool here as well
     if use_path_plan and use_flow_control:
+        log_replan_changed_routes = np.zeros(bs.traf.ntraf)
+        log_replan_same_route = np.zeros(bs.traf.ntraf)
+        log_no_replan_but_changes = np.zeros(bs.traf.ntraf)
+        log_no_replan_high_traffic = np.zeros(bs.traf.ntraf)
+        log_no_replan_last_point = np.zeros(bs.traf.ntraf)
+        log_no_replan_open_airspace = np.zeros(bs.traf.ntraf)
         #print("flow control")
 
         # go through any deleted loitering geofences
@@ -253,6 +259,19 @@ def do_flowcontrol():
 
         if edges_changes!=[]:
             handle_replan(edges_changes)
+
+        bs.traf.flowlog.log(*bs.traf.id)
+        bs.traf.flowlog.log(*bs.traf.alt/ft)
+        bs.traf.flowlog.log(*bs.traf.lat)
+        bs.traf.flowlog.log(*bs.traf.lon)
+        bs.traf.flowlog.log(*bs.traf.actedge.wpedgeid)
+        bs.traf.flowlog.log(*bs.traf.actedge.edge_airspace_type)
+        bs.traf.flowlog.log(*log_replan_changed_routes)
+        bs.traf.flowlog.log(*log_replan_same_route)
+        bs.traf.flowlog.log(*log_no_replan_but_changes)
+        bs.traf.flowlog.log(*log_no_replan_high_traffic)
+        bs.traf.flowlog.log(*log_no_replan_last_point)
+        bs.traf.flowlog.log(*log_no_replan_open_airspace)
 
 
 ## Call function when new loitering geofence is applied
