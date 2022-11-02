@@ -5,6 +5,7 @@ bluesky/resources/grib
 bluesky/resources/netcdf
 bluesky/resources/performance/BADA/*
 !bluesky/resources/performance/BADA/README.md
+plugins/scenario_maker/Vienna/pickles
 
 # Sphinx documentation
 docs/_build/
