@@ -4,7 +4,7 @@
 00:00:00>RESO SPEEDBASEDV3
 00:00:00>CDMETHOD M2STATEBASED
 00:00:00>STREETSENABLE
-00:00:00>airspaceinfo graph_data/grid_sectors
+00:00:00>airspaceinfo graph_data/grid_sectors_small
 00:00:00>loadloiteringdill Flight_intention_high_40_7.dill
 00:00:00>CASMACHTHR 0
 00:00:00>LOADGEOJSON open_geofence id height
