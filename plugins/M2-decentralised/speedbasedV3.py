@@ -1,3 +1,5 @@
+# SpeedBasedV3 should be used as the resolution method when using M2StateBassed CD
+
 from bluesky.traffic.asas import ConflictResolution
 import bluesky as bs
 import numpy as np
