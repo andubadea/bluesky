@@ -411,7 +411,7 @@ class Autopilot(Entity, replaceable=True):
         bs.traf.actwp.turntonextwp = bs.traf.swlnav*np.logical_or(bs.traf.actwp.turntonextwp,useturnspd)
 
         # Which CAS/Mach do we have to keep? VNAV, last turn or next turn?
-        oncurrentleg = (abs(degto180(bs.traf.trk - qdr)) < 2.0) # [deg]
+        oncurrentleg = np.logical_or((abs(degto180(bs.traf.trk - qdr)) < 2.0), np.logical_not(bs.traf.swlnav)) # [deg]
         inoldturn    = (bs.traf.actwp.oldturnspd > 0.) * np.logical_not(oncurrentleg)
 
         # Avoid using old turning speeds when turning of this leg to the next leg
