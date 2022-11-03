@@ -31,6 +31,8 @@ class TrafficSpawner(Entity):
         #default alt and speed
         self.alt = 100 * ft
         self.spd = 20 * kts
+        # When to stop simulating
+        self.stop_time = 600
         return
     
     @command
@@ -45,10 +47,15 @@ class TrafficSpawner(Entity):
         return
     
     @command
-    def trafficnumber(self, target_ntraf = 100):
+    def trafficnumber(self, target_ntraf = 50):
         self.target_ntraf = target_ntraf
         bs.scr.echo(f'The target traffic number was set to {target_ntraf}.')
         return
+    
+    @command
+    def stopsimt(self, time):
+        # This will be the time at which we stop and quit.
+        self.stop_time = time
     
     def load_origins_destinations(self):
         with open(f'{self.path}/orig_dest_dict.pickle', 'rb') as f:
@@ -77,7 +84,7 @@ class TrafficSpawner(Entity):
             achdg, _ = kwikqdrdist(lats[0], lons[0], lats[1], lons[1])
             
             # Let's create the aircraft
-            bs.traf.cre(acid, actype, lats[0], lons[0], achdg, self.alt, 5)
+            bs.traf.cre(acid, actype, lats[0], lons[0], achdg, 0, 5)
             
             # Get more info
             acrte = Route._routes.get(acid)
@@ -117,6 +124,11 @@ class TrafficSpawner(Entity):
             acids_to_delete = np.array(bs.traf.id)[delete_array]
             for acid in acids_to_delete:
                 stack.stack(f'DEL {acid}')
+                
+        if bs.sim.simt > self.stop_time:
+            stack.stack(f'HOLD')
+            stack.stack(f'QUIT')
+            
             
     @command
     def DELETEALL(self):
