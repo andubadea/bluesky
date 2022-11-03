@@ -1,4 +1,4 @@
-# SpeedBasedV3 should be used as the resolution method when using M2StateBassed CD
+# SpeedBasedM2 should be used as the resolution method when using M2StateBassed CD
 
 from bluesky.traffic.asas import ConflictResolution
 import bluesky as bs
@@ -26,7 +26,7 @@ def init_plugin():
     # Configuration parameters
     config = {
         # The name of your plugin
-        'plugin_name':     'SPEEDBASEDV3',
+        'plugin_name':     'SPEEDBASEDM2',
 
         # The type of this plugin. For now, only simulation plugins are possible.
         'plugin_type':     'sim'
@@ -34,7 +34,7 @@ def init_plugin():
 
     return config
 
-class SpeedBasedV3(ConflictResolution):
+class SpeedBasedM2(ConflictResolution):
     def __init__(self):
         super().__init__()
         self.layer_height = 30 * ft
@@ -73,7 +73,7 @@ class SpeedBasedV3(ConflictResolution):
             idx_pairs = self.pairs(conf, ownship, intruder, idx1)
             # We're doing this because we want to solve for ALL intruders, not only pairwise
             # Find solution for aircraft 'idx'
-            gs_new, alt_new, track_new = self.SpeedBasedV3(conf, ownship, intruder, idx1, idx_pairs)
+            gs_new, alt_new, track_new = self.SpeedBasedM2(conf, ownship, intruder, idx1, idx_pairs)
             
             # Write the new velocity of aircraft 'idx' to traffic data
             newgscapped[idx1] = gs_new
@@ -85,7 +85,7 @@ class SpeedBasedV3(ConflictResolution):
 
         return newtrack, newgscapped, newvs, newalt
     
-    def SpeedBasedV3(self, conf, ownship, intruder, idx1, idx_pairs):
+    def SpeedBasedM2(self, conf, ownship, intruder, idx1, idx_pairs):
         # The resolving function is structured as follows:
         # We first do some preliminary checks: 
         #       -whether we can ascend or descend 

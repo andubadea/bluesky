@@ -128,7 +128,7 @@ def reset():
 
     # set hopping to true on the reset
     access_plugin_object('M2NAVIGATION').hopping = True
-    access_plugin_object('SPEEDBASEDV3').hopping = True
+    access_plugin_object('SPEEDBASEDM2').hopping = True
     bs.traf.cr.heading_based = False
     
     heading_based_constrained = False
@@ -637,7 +637,7 @@ def headingconstrained():
 
     # set M2 Navigation hopping to False
     access_plugin_object('M2NAVIGATION').hopping = False
-    access_plugin_object('SPEEDBASEDV3').hopping = False
+    access_plugin_object('SPEEDBASEDM2').hopping = False
 
 @stack.command
 def loadloiteringdill(fpath: str):
