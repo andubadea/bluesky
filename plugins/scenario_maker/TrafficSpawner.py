@@ -33,7 +33,15 @@ class TrafficSpawner(Entity):
         self.spd = 20 * kts
         # When to stop simulating
         self.stop_time = 600
+        # Start the logs
+        bs.traf.conflog.start()
+        bs.traf.loslog.start()
+        # Turn ASAS on
+        stack.stack('ASAS ON')
         return
+    
+    def reset(self):
+        self.__init__()
     
     @command
     def loadcity(self, city = None):
@@ -127,11 +135,11 @@ class TrafficSpawner(Entity):
                 
         if bs.sim.simt > self.stop_time:
             stack.stack(f'HOLD')
+            stack.stack(f'DELETEALL')
             stack.stack(f'QUIT')
             
-            
     @command
-    def DELETEALL(self):
+    def deleteall(self):
         '''Deletes all aircraft.'''
         while self.ntraf>0:
             self.delete(0)
