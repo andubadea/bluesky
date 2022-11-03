@@ -5,6 +5,7 @@ import networkx as nx
 from shapely.ops import linemerge
 from multiprocessing import Pool as ThreadPool
 import traceback
+import os
 
 #Steal kiwkqdrdist function from Bluesky
 def kwikqdrdist(lata, lona, latb, lonb):
@@ -45,16 +46,18 @@ with open(f'{path}/osm2id.pickle', 'rb') as f:
 # Load the spawning points for that city, convert em to simple IDs
 spawn_nodes_osm = np.genfromtxt(f'{path}/spawn_points.txt', dtype = np.int64)
 orig_nodes = [osm2id[x] for x in spawn_nodes_osm]
+orig_nodes_new = []
 
 # Compile the list of destination nodes
 dest_nodes = [x for x in G.nodes if x not in orig_nodes]
-
+dest_nodes_new = []
+            
 # Make the input array by combining all origin nodes with destination nodes
 input_arr = []
 for origin in orig_nodes:
     for destination in dest_nodes:
         input_arr.append([origin, destination])
-
+        
 # Function that creates the route pickle
 def make_route_pickle(inp):
     '''Creates a route pickle. 
@@ -92,6 +95,7 @@ def make_route_pickle(inp):
                         first = False
                         continue
                     point_edges.append([u,v])
+            i += 1
         
         # Also prepare the turns
         latlons = list(zip(line.xy[1], line.xy[0]))
@@ -106,6 +110,7 @@ def make_route_pickle(inp):
             d1=kwikqdrdist(lat_prev,lon_prev,lat_cur,lon_cur)
             d2=kwikqdrdist(lat_cur,lon_cur,lat_next,lon_next)
             angle=abs(d2[0]-d1[0])
+
             if angle>180:
                 angle=360-angle
                 
@@ -114,7 +119,12 @@ def make_route_pickle(inp):
                 turns.append(True)
             else:
                 turns.append(False)
-        
+                
+            i+= 1
+                
+        #Last waypoint is always a turn one.        
+        turns.append(True)
+        # Pack everything up
         route_pickle = list(zip(line.xy[1], line.xy[0], point_edges, turns))
 
     else:
@@ -123,7 +133,6 @@ def make_route_pickle(inp):
         
     with open(f'{path}/pickles/{orig_node}-{dest_node}.pkl' , 'wb') as f:
         pickle.dump(route_pickle, f)
-        
     return route_pickle
 
 def main():
@@ -135,7 +144,24 @@ def main():
         traceback.print_exc()
     pool.close()
     
-if __name__ == '__main__':
-    main()
+# if __name__ == '__main__':
+#     main()
 
+orig_dest_dict = dict()
+files_that_exist = os.listdir(f'{path}/pickles')
+for filename in files_that_exist:
+    # If pkl not in file, skip
+    if 'pkl' not in filename:
+        continue
+    # First is origin, second is destination
+    split_filename = filename.replace('.pkl', '').split('-')
+    orig = int(split_filename[0])
+    dest = int(split_filename[1])
+    if orig not in orig_dest_dict:
+        orig_dest_dict[orig] = []
+        
+    orig_dest_dict[orig].append(dest)
 
+# Save orig_nodes and dest_nodes to a file
+with open(f'{path}/orig_dest_dict.pickle', 'wb') as f:
+    pickle.dump(orig_dest_dict, f)
