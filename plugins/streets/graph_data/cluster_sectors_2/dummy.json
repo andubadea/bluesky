@@ -1,0 +1,2841 @@
+{
+    "nodes": {
+        "osmid": [
+            5000,
+            4481,
+            4482,
+            4483,
+            4484,
+            4485,
+            4486,
+            4487,
+            4488,
+            4489,
+            4490,
+            4491,
+            4492,
+            4493,
+            4494,
+            4495,
+            4496,
+            4497,
+            4498,
+            4499,
+            4500,
+            4501,
+            4502,
+            4503,
+            4504,
+            4505,
+            4506,
+            4507,
+            4508,
+            4509,
+            4510,
+            4511,
+            4512,
+            4513,
+            4514,
+            4515,
+            4516,
+            4517,
+            4518,
+            4519,
+            4520,
+            4521,
+            4522,
+            4523,
+            4524,
+            4525,
+            4526,
+            4527,
+            4528,
+            4529,
+            4530,
+            4531,
+            4532,
+            4533,
+            4534,
+            4535,
+            4536,
+            4537,
+            4538,
+            4539,
+            4540,
+            4541,
+            4542,
+            4543,
+            4544,
+            4545,
+            4546,
+            4547,
+            4548,
+            4549,
+            4550,
+            4551,
+            4552,
+            4553,
+            4554,
+            4555,
+            4556,
+            4557,
+            4558,
+            4559,
+            4560,
+            4561,
+            4562,
+            4563,
+            4564,
+            4565,
+            4566,
+            4567,
+            4568,
+            4569,
+            4570,
+            4571,
+            4572,
+            4573,
+            4574,
+            4575,
+            4576,
+            4577,
+            4578,
+            4579,
+            4580,
+            4581,
+            4582,
+            4583,
+            4584,
+            4585,
+            4586,
+            4587,
+            4588,
+            4589,
+            4590,
+            4591,
+            4592,
+            4593,
+            4594,
+            4595,
+            4596,
+            4597,
+            4598,
+            4599,
+            4600,
+            4601,
+            4602,
+            4603,
+            4604,
+            4605,
+            4606,
+            4607,
+            4608,
+            4609,
+            4610,
+            4611,
+            4612,
+            4613,
+            4614,
+            4615,
+            4616,
+            4617,
+            4618,
+            4619,
+            4620,
+            4621,
+            4622,
+            4623,
+            4624,
+            4625,
+            4626,
+            4627,
+            4628,
+            4629,
+            4630,
+            4631,
+            4632,
+            4633,
+            4634,
+            4635,
+            4636,
+            4637,
+            4638,
+            4639,
+            4640,
+            4641,
+            4642,
+            4643,
+            4644,
+            4645,
+            4646,
+            4647,
+            4648,
+            4649,
+            4650,
+            4651,
+            4652,
+            4653,
+            4654,
+            4655,
+            4656,
+            4657,
+            4658,
+            4659,
+            4660,
+            4661,
+            4662,
+            4663,
+            4664,
+            4665,
+            4666,
+            4667,
+            4668,
+            4669,
+            4670,
+            4671,
+            4672,
+            4673,
+            4674,
+            4675,
+            4676,
+            4677,
+            4678,
+            4679,
+            4680,
+            4681,
+            4682,
+            4683,
+            4684,
+            4685,
+            4686,
+            4687,
+            4688,
+            4689,
+            4690,
+            4691,
+            4692,
+            4693,
+            4694,
+            4695,
+            4696,
+            4697,
+            4698,
+            4699,
+            4700,
+            4701,
+            4702,
+            4703,
+            4704,
+            4705,
+            4706
+        ]
+    },
+    "edges": {
+        "4501-2940": {
+            "stroke_group": "1576",
+            "flow_group": 0,
+            "height_allocation": "open",
+            "speed_limit": 30
+        },
+        "4501-2868": {
+            "stroke_group": "1576",
+            "flow_group": 0,
+            "height_allocation": "open",
+            "speed_limit": 30
+        },
+        "4501-2872": {
+            "stroke_group": "1576",
+            "flow_group": 0,
+            "height_allocation": "open",
+            "speed_limit": 30
+        },
+        "4510-2835": {
+            "stroke_group": "1576",
+            "flow_group": 0,
+            "height_allocation": "open",
+            "speed_limit": 30
+        },
+        "4510-2837": {
+            "stroke_group": "1576",
+            "flow_group": 0,
+            "height_allocation": "open",
+            "speed_limit": 30
+        },
+        "4513-2853": {
+            "stroke_group": "1576",
+            "flow_group": 0,
+            "height_allocation": "open",
+            "speed_limit": 30
+        },
+        "4519-2877": {
+            "stroke_group": "1576",
+            "flow_group": 0,
+            "height_allocation": "open",
+            "speed_limit": 30
+        },
+        "4527-4192": {
+            "stroke_group": "1576",
+            "flow_group": 0,
+            "height_allocation": "open",
+            "speed_limit": 30
+        },
+        "4535-2056": {
+            "stroke_group": "1576",
+            "flow_group": 0,
+            "height_allocation": "open",
+            "speed_limit": 30
+        },
+        "4536-3852": {
+            "stroke_group": "1576",
+            "flow_group": 0,
+            "height_allocation": "open",
+            "speed_limit": 30
+        },
+        "4536-3851": {
+            "stroke_group": "1576",
+            "flow_group": 0,
+            "height_allocation": "open",
+            "speed_limit": 30
+        },
+        "4541-3846": {
+            "stroke_group": "1576",
+            "flow_group": 0,
+            "height_allocation": "open",
+            "speed_limit": 30
+        },
+        "4545-3841": {
+            "stroke_group": "1576",
+            "flow_group": 0,
+            "height_allocation": "open",
+            "speed_limit": 30
+        },
+        "4545-3843": {
+            "stroke_group": "1576",
+            "flow_group": 0,
+            "height_allocation": "open",
+            "speed_limit": 30
+        },
+        "4551-1904": {
+            "stroke_group": "1576",
+            "flow_group": 0,
+            "height_allocation": "open",
+            "speed_limit": 30
+        },
+        "4551-2083": {
+            "stroke_group": "1576",
+            "flow_group": 0,
+            "height_allocation": "open",
+            "speed_limit": 30
+        },
+        "4551-1687": {
+            "stroke_group": "1576",
+            "flow_group": 0,
+            "height_allocation": "open",
+            "speed_limit": 30
+        },
+        "4551-1684": {
+            "stroke_group": "1576",
+            "flow_group": 0,
+            "height_allocation": "open",
+            "speed_limit": 30
+        },
+        "4551-1681": {
+            "stroke_group": "1576",
+            "flow_group": 0,
+            "height_allocation": "open",
+            "speed_limit": 30
+        },
+        "4551-1679": {
+            "stroke_group": "1576",
+            "flow_group": 0,
+            "height_allocation": "open",
+            "speed_limit": 30
+        },
+        "4553-3638": {
+            "stroke_group": "1576",
+            "flow_group": 0,
+            "height_allocation": "open",
+            "speed_limit": 30
+        },
+        "4564-3636": {
+            "stroke_group": "1576",
+            "flow_group": 0,
+            "height_allocation": "open",
+            "speed_limit": 30
+        },
+        "4575-444": {
+            "stroke_group": "1576",
+            "flow_group": 0,
+            "height_allocation": "open",
+            "speed_limit": 30
+        },
+        "4575-440": {
+            "stroke_group": "1576",
+            "flow_group": 0,
+            "height_allocation": "open",
+            "speed_limit": 30
+        },
+        "4581-3311": {
+            "stroke_group": "1576",
+            "flow_group": 0,
+            "height_allocation": "open",
+            "speed_limit": 30
+        },
+        "4587-3303": {
+            "stroke_group": "1576",
+            "flow_group": 0,
+            "height_allocation": "open",
+            "speed_limit": 30
+        },
+        "4590-3300": {
+            "stroke_group": "1576",
+            "flow_group": 0,
+            "height_allocation": "open",
+            "speed_limit": 30
+        },
+        "4592-1691": {
+            "stroke_group": "1576",
+            "flow_group": 0,
+            "height_allocation": "open",
+            "speed_limit": 30
+        },
+        "4615-4471": {
+            "stroke_group": "1576",
+            "flow_group": 0,
+            "height_allocation": "open",
+            "speed_limit": 30
+        },
+        "4626-424": {
+            "stroke_group": "1576",
+            "flow_group": 0,
+            "height_allocation": "open",
+            "speed_limit": 30
+        },
+        "4626-1657": {
+            "stroke_group": "1576",
+            "flow_group": 0,
+            "height_allocation": "open",
+            "speed_limit": 30
+        },
+        "4637-419": {
+            "stroke_group": "1576",
+            "flow_group": 0,
+            "height_allocation": "open",
+            "speed_limit": 30
+        },
+        "4641-1527": {
+            "stroke_group": "1576",
+            "flow_group": 0,
+            "height_allocation": "open",
+            "speed_limit": 30
+        },
+        "4655-401": {
+            "stroke_group": "1576",
+            "flow_group": 0,
+            "height_allocation": "open",
+            "speed_limit": 30
+        },
+        "4669-1507": {
+            "stroke_group": "1576",
+            "flow_group": 0,
+            "height_allocation": "open",
+            "speed_limit": 30
+        },
+        "4669-1502": {
+            "stroke_group": "1576",
+            "flow_group": 0,
+            "height_allocation": "open",
+            "speed_limit": 30
+        },
+        "4676-1497": {
+            "stroke_group": "1576",
+            "flow_group": 0,
+            "height_allocation": "open",
+            "speed_limit": 30
+        },
+        "4678-1498": {
+            "stroke_group": "1576",
+            "flow_group": 0,
+            "height_allocation": "open",
+            "speed_limit": 30
+        },
+        "4678-1500": {
+            "stroke_group": "1576",
+            "flow_group": 0,
+            "height_allocation": "open",
+            "speed_limit": 30
+        },
+        "4684-1508": {
+            "stroke_group": "1576",
+            "flow_group": 0,
+            "height_allocation": "open",
+            "speed_limit": 30
+        },
+        "4685-1609": {
+            "stroke_group": "1576",
+            "flow_group": 0,
+            "height_allocation": "open",
+            "speed_limit": 30
+        },
+        "4687-689": {
+            "stroke_group": "1576",
+            "flow_group": 0,
+            "height_allocation": "open",
+            "speed_limit": 30
+        },
+        "4689-694": {
+            "stroke_group": "1576",
+            "flow_group": 0,
+            "height_allocation": "open",
+            "speed_limit": 30
+        },
+        "4689-696": {
+            "stroke_group": "1576",
+            "flow_group": 0,
+            "height_allocation": "open",
+            "speed_limit": 30
+        },
+        "4689-1494": {
+            "stroke_group": "1576",
+            "flow_group": 0,
+            "height_allocation": "open",
+            "speed_limit": 30
+        },
+        "4689-1496": {
+            "stroke_group": "1576",
+            "flow_group": 0,
+            "height_allocation": "open",
+            "speed_limit": 30
+        },
+        "4692-694": {
+            "stroke_group": "1576",
+            "flow_group": 0,
+            "height_allocation": "open",
+            "speed_limit": 30
+        },
+        "4700-2748": {
+            "stroke_group": "1576",
+            "flow_group": 0,
+            "height_allocation": "open",
+            "speed_limit": 30
+        },
+        "4700-2750": {
+            "stroke_group": "1576",
+            "flow_group": 0,
+            "height_allocation": "open",
+            "speed_limit": 30
+        },
+        "4700-2752": {
+            "stroke_group": "1576",
+            "flow_group": 0,
+            "height_allocation": "open",
+            "speed_limit": 30
+        },
+        "4700-2710": {
+            "stroke_group": "1576",
+            "flow_group": 0,
+            "height_allocation": "open",
+            "speed_limit": 30
+        },
+        "4700-2717": {
+            "stroke_group": "1576",
+            "flow_group": 0,
+            "height_allocation": "open",
+            "speed_limit": 30
+        },
+        "4700-2721": {
+            "stroke_group": "1576",
+            "flow_group": 0,
+            "height_allocation": "open",
+            "speed_limit": 30
+        },
+        "4700-2905": {
+            "stroke_group": "1576",
+            "flow_group": 0,
+            "height_allocation": "open",
+            "speed_limit": 30
+        },
+        "4700-2908": {
+            "stroke_group": "1576",
+            "flow_group": 0,
+            "height_allocation": "open",
+            "speed_limit": 30
+        },
+        "4700-2911": {
+            "stroke_group": "1576",
+            "flow_group": 0,
+            "height_allocation": "open",
+            "speed_limit": 30
+        },
+        "4701-1675": {
+            "stroke_group": "1576",
+            "flow_group": 0,
+            "height_allocation": "open",
+            "speed_limit": 30
+        },
+        "4701-1673": {
+            "stroke_group": "1576",
+            "flow_group": 0,
+            "height_allocation": "open",
+            "speed_limit": 30
+        },
+        "4701-1672": {
+            "stroke_group": "1576",
+            "flow_group": 0,
+            "height_allocation": "open",
+            "speed_limit": 30
+        },
+        "4702-2062": {
+            "stroke_group": "1576",
+            "flow_group": 0,
+            "height_allocation": "open",
+            "speed_limit": 30
+        },
+        "4703-2026": {
+            "stroke_group": "1576",
+            "flow_group": 0,
+            "height_allocation": "open",
+            "speed_limit": 30
+        },
+        "4704-3734": {
+            "stroke_group": "1576",
+            "flow_group": 0,
+            "height_allocation": "open",
+            "speed_limit": 30
+        },
+        "4704-3849": {
+            "stroke_group": "1576",
+            "flow_group": 0,
+            "height_allocation": "open",
+            "speed_limit": 30
+        },
+        "4704-3850": {
+            "stroke_group": "1576",
+            "flow_group": 0,
+            "height_allocation": "open",
+            "speed_limit": 30
+        },
+        "4704-3762": {
+            "stroke_group": "1576",
+            "flow_group": 0,
+            "height_allocation": "open",
+            "speed_limit": 30
+        },
+        "4704-3641": {
+            "stroke_group": "1576",
+            "flow_group": 0,
+            "height_allocation": "open",
+            "speed_limit": 30
+        },
+        "2937-4499": {
+            "stroke_group": "1577",
+            "flow_group": 0,
+            "height_allocation": "open",
+            "speed_limit": 30
+        },
+        "2937-4501": {
+            "stroke_group": "1577",
+            "flow_group": 0,
+            "height_allocation": "open",
+            "speed_limit": 30
+        },
+        "2870-4501": {
+            "stroke_group": "1577",
+            "flow_group": 0,
+            "height_allocation": "open",
+            "speed_limit": 30
+        },
+        "2867-4502": {
+            "stroke_group": "1577",
+            "flow_group": 0,
+            "height_allocation": "open",
+            "speed_limit": 30
+        },
+        "2850-4510": {
+            "stroke_group": "1577",
+            "flow_group": 0,
+            "height_allocation": "open",
+            "speed_limit": 30
+        },
+        "2844-4510": {
+            "stroke_group": "1577",
+            "flow_group": 0,
+            "height_allocation": "open",
+            "speed_limit": 30
+        },
+        "2841-4510": {
+            "stroke_group": "1577",
+            "flow_group": 0,
+            "height_allocation": "open",
+            "speed_limit": 30
+        },
+        "2841-4511": {
+            "stroke_group": "1577",
+            "flow_group": 0,
+            "height_allocation": "open",
+            "speed_limit": 30
+        },
+        "2847-4513": {
+            "stroke_group": "1577",
+            "flow_group": 0,
+            "height_allocation": "open",
+            "speed_limit": 30
+        },
+        "2862-4513": {
+            "stroke_group": "1577",
+            "flow_group": 0,
+            "height_allocation": "open",
+            "speed_limit": 30
+        },
+        "2741-4513": {
+            "stroke_group": "1577",
+            "flow_group": 0,
+            "height_allocation": "open",
+            "speed_limit": 30
+        },
+        "2892-4519": {
+            "stroke_group": "1577",
+            "flow_group": 0,
+            "height_allocation": "open",
+            "speed_limit": 30
+        },
+        "2879-4519": {
+            "stroke_group": "1577",
+            "flow_group": 0,
+            "height_allocation": "open",
+            "speed_limit": 30
+        },
+        "2882-4525": {
+            "stroke_group": "1577",
+            "flow_group": 0,
+            "height_allocation": "open",
+            "speed_limit": 30
+        },
+        "2885-4527": {
+            "stroke_group": "1577",
+            "flow_group": 0,
+            "height_allocation": "open",
+            "speed_limit": 30
+        },
+        "2805-4527": {
+            "stroke_group": "1577",
+            "flow_group": 0,
+            "height_allocation": "open",
+            "speed_limit": 30
+        },
+        "2802-4527": {
+            "stroke_group": "1577",
+            "flow_group": 0,
+            "height_allocation": "open",
+            "speed_limit": 30
+        },
+        "3022-4527": {
+            "stroke_group": "1577",
+            "flow_group": 0,
+            "height_allocation": "open",
+            "speed_limit": 30
+        },
+        "2069-4534": {
+            "stroke_group": "1577",
+            "flow_group": 0,
+            "height_allocation": "open",
+            "speed_limit": 30
+        },
+        "2038-4535": {
+            "stroke_group": "1577",
+            "flow_group": 0,
+            "height_allocation": "open",
+            "speed_limit": 30
+        },
+        "2069-4535": {
+            "stroke_group": "1577",
+            "flow_group": 0,
+            "height_allocation": "open",
+            "speed_limit": 30
+        },
+        "3837-4543": {
+            "stroke_group": "1577",
+            "flow_group": 0,
+            "height_allocation": "open",
+            "speed_limit": 30
+        },
+        "2075-4551": {
+            "stroke_group": "1577",
+            "flow_group": 0,
+            "height_allocation": "open",
+            "speed_limit": 30
+        },
+        "1901-4551": {
+            "stroke_group": "1577",
+            "flow_group": 0,
+            "height_allocation": "open",
+            "speed_limit": 30
+        },
+        "2049-4551": {
+            "stroke_group": "1577",
+            "flow_group": 0,
+            "height_allocation": "open",
+            "speed_limit": 30
+        },
+        "1693-4551": {
+            "stroke_group": "1577",
+            "flow_group": 0,
+            "height_allocation": "open",
+            "speed_limit": 30
+        },
+        "474-4551": {
+            "stroke_group": "1577",
+            "flow_group": 0,
+            "height_allocation": "open",
+            "speed_limit": 30
+        },
+        "474-4556": {
+            "stroke_group": "1577",
+            "flow_group": 0,
+            "height_allocation": "open",
+            "speed_limit": 30
+        },
+        "467-4556": {
+            "stroke_group": "1577",
+            "flow_group": 0,
+            "height_allocation": "open",
+            "speed_limit": 30
+        },
+        "457-4562": {
+            "stroke_group": "1577",
+            "flow_group": 0,
+            "height_allocation": "open",
+            "speed_limit": 30
+        },
+        "4344-4564": {
+            "stroke_group": "1577",
+            "flow_group": 0,
+            "height_allocation": "open",
+            "speed_limit": 30
+        },
+        "4347-4564": {
+            "stroke_group": "1577",
+            "flow_group": 0,
+            "height_allocation": "open",
+            "speed_limit": 30
+        },
+        "4456-4564": {
+            "stroke_group": "1577",
+            "flow_group": 0,
+            "height_allocation": "open",
+            "speed_limit": 30
+        },
+        "449-4575": {
+            "stroke_group": "1577",
+            "flow_group": 0,
+            "height_allocation": "open",
+            "speed_limit": 30
+        },
+        "4342-4577": {
+            "stroke_group": "1577",
+            "flow_group": 0,
+            "height_allocation": "open",
+            "speed_limit": 30
+        },
+        "4342-4578": {
+            "stroke_group": "1577",
+            "flow_group": 0,
+            "height_allocation": "open",
+            "speed_limit": 30
+        },
+        "4339-4579": {
+            "stroke_group": "1577",
+            "flow_group": 0,
+            "height_allocation": "open",
+            "speed_limit": 30
+        },
+        "3307-4581": {
+            "stroke_group": "1577",
+            "flow_group": 0,
+            "height_allocation": "open",
+            "speed_limit": 30
+        },
+        "4339-4581": {
+            "stroke_group": "1577",
+            "flow_group": 0,
+            "height_allocation": "open",
+            "speed_limit": 30
+        },
+        "3298-4590": {
+            "stroke_group": "1577",
+            "flow_group": 0,
+            "height_allocation": "open",
+            "speed_limit": 30
+        },
+        "3299-4590": {
+            "stroke_group": "1577",
+            "flow_group": 0,
+            "height_allocation": "open",
+            "speed_limit": 30
+        },
+        "3301-4590": {
+            "stroke_group": "1577",
+            "flow_group": 0,
+            "height_allocation": "open",
+            "speed_limit": 30
+        },
+        "438-4592": {
+            "stroke_group": "1577",
+            "flow_group": 0,
+            "height_allocation": "open",
+            "speed_limit": 30
+        },
+        "1728-4592": {
+            "stroke_group": "1577",
+            "flow_group": 0,
+            "height_allocation": "open",
+            "speed_limit": 30
+        },
+        "1663-4624": {
+            "stroke_group": "1577",
+            "flow_group": 0,
+            "height_allocation": "open",
+            "speed_limit": 30
+        },
+        "4388-4635": {
+            "stroke_group": "1577",
+            "flow_group": 0,
+            "height_allocation": "open",
+            "speed_limit": 30
+        },
+        "4390-4635": {
+            "stroke_group": "1577",
+            "flow_group": 0,
+            "height_allocation": "open",
+            "speed_limit": 30
+        },
+        "4388-4638": {
+            "stroke_group": "1577",
+            "flow_group": 0,
+            "height_allocation": "open",
+            "speed_limit": 30
+        },
+        "1520-4641": {
+            "stroke_group": "1577",
+            "flow_group": 0,
+            "height_allocation": "open",
+            "speed_limit": 30
+        },
+        "416-4647": {
+            "stroke_group": "1577",
+            "flow_group": 0,
+            "height_allocation": "open",
+            "speed_limit": 30
+        },
+        "1514-4653": {
+            "stroke_group": "1577",
+            "flow_group": 0,
+            "height_allocation": "open",
+            "speed_limit": 30
+        },
+        "410-4655": {
+            "stroke_group": "1577",
+            "flow_group": 0,
+            "height_allocation": "open",
+            "speed_limit": 30
+        },
+        "392-4658": {
+            "stroke_group": "1577",
+            "flow_group": 0,
+            "height_allocation": "open",
+            "speed_limit": 30
+        },
+        "1499-4669": {
+            "stroke_group": "1577",
+            "flow_group": 0,
+            "height_allocation": "open",
+            "speed_limit": 30
+        },
+        "382-4680": {
+            "stroke_group": "1577",
+            "flow_group": 0,
+            "height_allocation": "open",
+            "speed_limit": 30
+        },
+        "1603-4681": {
+            "stroke_group": "1577",
+            "flow_group": 0,
+            "height_allocation": "open",
+            "speed_limit": 30
+        },
+        "382-4681": {
+            "stroke_group": "1577",
+            "flow_group": 0,
+            "height_allocation": "open",
+            "speed_limit": 30
+        },
+        "1503-4684": {
+            "stroke_group": "1577",
+            "flow_group": 0,
+            "height_allocation": "open",
+            "speed_limit": 30
+        },
+        "1544-4685": {
+            "stroke_group": "1577",
+            "flow_group": 0,
+            "height_allocation": "open",
+            "speed_limit": 30
+        },
+        "1610-4685": {
+            "stroke_group": "1577",
+            "flow_group": 0,
+            "height_allocation": "open",
+            "speed_limit": 30
+        },
+        "1604-4685": {
+            "stroke_group": "1577",
+            "flow_group": 0,
+            "height_allocation": "open",
+            "speed_limit": 30
+        },
+        "1597-4685": {
+            "stroke_group": "1577",
+            "flow_group": 0,
+            "height_allocation": "open",
+            "speed_limit": 30
+        },
+        "687-4687": {
+            "stroke_group": "1577",
+            "flow_group": 0,
+            "height_allocation": "open",
+            "speed_limit": 30
+        },
+        "690-4687": {
+            "stroke_group": "1577",
+            "flow_group": 0,
+            "height_allocation": "open",
+            "speed_limit": 30
+        },
+        "692-4692": {
+            "stroke_group": "1577",
+            "flow_group": 0,
+            "height_allocation": "open",
+            "speed_limit": 30
+        },
+        "693-4692": {
+            "stroke_group": "1577",
+            "flow_group": 0,
+            "height_allocation": "open",
+            "speed_limit": 30
+        },
+        "691-4695": {
+            "stroke_group": "1577",
+            "flow_group": 0,
+            "height_allocation": "open",
+            "speed_limit": 30
+        },
+        "692-4695": {
+            "stroke_group": "1577",
+            "flow_group": 0,
+            "height_allocation": "open",
+            "speed_limit": 30
+        },
+        "2699-4700": {
+            "stroke_group": "1577",
+            "flow_group": 0,
+            "height_allocation": "open",
+            "speed_limit": 30
+        },
+        "2700-4700": {
+            "stroke_group": "1577",
+            "flow_group": 0,
+            "height_allocation": "open",
+            "speed_limit": 30
+        },
+        "2725-4700": {
+            "stroke_group": "1577",
+            "flow_group": 0,
+            "height_allocation": "open",
+            "speed_limit": 30
+        },
+        "2890-4700": {
+            "stroke_group": "1577",
+            "flow_group": 0,
+            "height_allocation": "open",
+            "speed_limit": 30
+        },
+        "2896-4700": {
+            "stroke_group": "1577",
+            "flow_group": 0,
+            "height_allocation": "open",
+            "speed_limit": 30
+        },
+        "1677-4701": {
+            "stroke_group": "1577",
+            "flow_group": 0,
+            "height_allocation": "open",
+            "speed_limit": 30
+        },
+        "791-4701": {
+            "stroke_group": "1577",
+            "flow_group": 0,
+            "height_allocation": "open",
+            "speed_limit": 30
+        },
+        "2018-4702": {
+            "stroke_group": "1577",
+            "flow_group": 0,
+            "height_allocation": "open",
+            "speed_limit": 30
+        },
+        "2014-4702": {
+            "stroke_group": "1577",
+            "flow_group": 0,
+            "height_allocation": "open",
+            "speed_limit": 30
+        },
+        "3733-4704": {
+            "stroke_group": "1577",
+            "flow_group": 0,
+            "height_allocation": "open",
+            "speed_limit": 30
+        },
+        "3726-4704": {
+            "stroke_group": "1577",
+            "flow_group": 0,
+            "height_allocation": "open",
+            "speed_limit": 30
+        },
+        "5000-4481": {
+            "stroke_group": "1578",
+            "flow_group": 0,
+            "height_allocation": "open",
+            "speed_limit": 30
+        },
+        "5000-4482": {
+            "stroke_group": "1578",
+            "flow_group": 0,
+            "height_allocation": "open",
+            "speed_limit": 30
+        },
+        "5000-4483": {
+            "stroke_group": "1578",
+            "flow_group": 0,
+            "height_allocation": "open",
+            "speed_limit": 30
+        },
+        "5000-4484": {
+            "stroke_group": "1578",
+            "flow_group": 0,
+            "height_allocation": "open",
+            "speed_limit": 30
+        },
+        "5000-4485": {
+            "stroke_group": "1578",
+            "flow_group": 0,
+            "height_allocation": "open",
+            "speed_limit": 30
+        },
+        "5000-4486": {
+            "stroke_group": "1578",
+            "flow_group": 0,
+            "height_allocation": "open",
+            "speed_limit": 30
+        },
+        "5000-4487": {
+            "stroke_group": "1578",
+            "flow_group": 0,
+            "height_allocation": "open",
+            "speed_limit": 30
+        },
+        "5000-4488": {
+            "stroke_group": "1578",
+            "flow_group": 0,
+            "height_allocation": "open",
+            "speed_limit": 30
+        },
+        "5000-4489": {
+            "stroke_group": "1578",
+            "flow_group": 0,
+            "height_allocation": "open",
+            "speed_limit": 30
+        },
+        "5000-4490": {
+            "stroke_group": "1578",
+            "flow_group": 0,
+            "height_allocation": "open",
+            "speed_limit": 30
+        },
+        "5000-4491": {
+            "stroke_group": "1578",
+            "flow_group": 0,
+            "height_allocation": "open",
+            "speed_limit": 30
+        },
+        "5000-4492": {
+            "stroke_group": "1578",
+            "flow_group": 0,
+            "height_allocation": "open",
+            "speed_limit": 30
+        },
+        "5000-4493": {
+            "stroke_group": "1578",
+            "flow_group": 0,
+            "height_allocation": "open",
+            "speed_limit": 30
+        },
+        "5000-4494": {
+            "stroke_group": "1578",
+            "flow_group": 0,
+            "height_allocation": "open",
+            "speed_limit": 30
+        },
+        "5000-4495": {
+            "stroke_group": "1578",
+            "flow_group": 0,
+            "height_allocation": "open",
+            "speed_limit": 30
+        },
+        "5000-4496": {
+            "stroke_group": "1578",
+            "flow_group": 0,
+            "height_allocation": "open",
+            "speed_limit": 30
+        },
+        "5000-4497": {
+            "stroke_group": "1578",
+            "flow_group": 0,
+            "height_allocation": "open",
+            "speed_limit": 30
+        },
+        "5000-4498": {
+            "stroke_group": "1578",
+            "flow_group": 0,
+            "height_allocation": "open",
+            "speed_limit": 30
+        },
+        "5000-4499": {
+            "stroke_group": "1578",
+            "flow_group": 0,
+            "height_allocation": "open",
+            "speed_limit": 30
+        },
+        "5000-4500": {
+            "stroke_group": "1578",
+            "flow_group": 0,
+            "height_allocation": "open",
+            "speed_limit": 30
+        },
+        "5000-4501": {
+            "stroke_group": "1578",
+            "flow_group": 0,
+            "height_allocation": "open",
+            "speed_limit": 30
+        },
+        "5000-4502": {
+            "stroke_group": "1578",
+            "flow_group": 0,
+            "height_allocation": "open",
+            "speed_limit": 30
+        },
+        "5000-4503": {
+            "stroke_group": "1578",
+            "flow_group": 0,
+            "height_allocation": "open",
+            "speed_limit": 30
+        },
+        "5000-4504": {
+            "stroke_group": "1578",
+            "flow_group": 0,
+            "height_allocation": "open",
+            "speed_limit": 30
+        },
+        "5000-4505": {
+            "stroke_group": "1578",
+            "flow_group": 0,
+            "height_allocation": "open",
+            "speed_limit": 30
+        },
+        "5000-4506": {
+            "stroke_group": "1578",
+            "flow_group": 0,
+            "height_allocation": "open",
+            "speed_limit": 30
+        },
+        "5000-4507": {
+            "stroke_group": "1578",
+            "flow_group": 0,
+            "height_allocation": "open",
+            "speed_limit": 30
+        },
+        "5000-4508": {
+            "stroke_group": "1578",
+            "flow_group": 0,
+            "height_allocation": "open",
+            "speed_limit": 30
+        },
+        "5000-4509": {
+            "stroke_group": "1578",
+            "flow_group": 0,
+            "height_allocation": "open",
+            "speed_limit": 30
+        },
+        "5000-4510": {
+            "stroke_group": "1578",
+            "flow_group": 0,
+            "height_allocation": "open",
+            "speed_limit": 30
+        },
+        "5000-4511": {
+            "stroke_group": "1578",
+            "flow_group": 0,
+            "height_allocation": "open",
+            "speed_limit": 30
+        },
+        "5000-4512": {
+            "stroke_group": "1578",
+            "flow_group": 0,
+            "height_allocation": "open",
+            "speed_limit": 30
+        },
+        "5000-4513": {
+            "stroke_group": "1578",
+            "flow_group": 0,
+            "height_allocation": "open",
+            "speed_limit": 30
+        },
+        "5000-4514": {
+            "stroke_group": "1578",
+            "flow_group": 0,
+            "height_allocation": "open",
+            "speed_limit": 30
+        },
+        "5000-4515": {
+            "stroke_group": "1578",
+            "flow_group": 0,
+            "height_allocation": "open",
+            "speed_limit": 30
+        },
+        "5000-4516": {
+            "stroke_group": "1578",
+            "flow_group": 0,
+            "height_allocation": "open",
+            "speed_limit": 30
+        },
+        "5000-4517": {
+            "stroke_group": "1578",
+            "flow_group": 0,
+            "height_allocation": "open",
+            "speed_limit": 30
+        },
+        "5000-4518": {
+            "stroke_group": "1578",
+            "flow_group": 0,
+            "height_allocation": "open",
+            "speed_limit": 30
+        },
+        "5000-4519": {
+            "stroke_group": "1578",
+            "flow_group": 0,
+            "height_allocation": "open",
+            "speed_limit": 30
+        },
+        "5000-4520": {
+            "stroke_group": "1578",
+            "flow_group": 0,
+            "height_allocation": "open",
+            "speed_limit": 30
+        },
+        "5000-4521": {
+            "stroke_group": "1578",
+            "flow_group": 0,
+            "height_allocation": "open",
+            "speed_limit": 30
+        },
+        "5000-4522": {
+            "stroke_group": "1578",
+            "flow_group": 0,
+            "height_allocation": "open",
+            "speed_limit": 30
+        },
+        "5000-4523": {
+            "stroke_group": "1578",
+            "flow_group": 0,
+            "height_allocation": "open",
+            "speed_limit": 30
+        },
+        "5000-4524": {
+            "stroke_group": "1578",
+            "flow_group": 0,
+            "height_allocation": "open",
+            "speed_limit": 30
+        },
+        "5000-4525": {
+            "stroke_group": "1578",
+            "flow_group": 0,
+            "height_allocation": "open",
+            "speed_limit": 30
+        },
+        "5000-4526": {
+            "stroke_group": "1578",
+            "flow_group": 0,
+            "height_allocation": "open",
+            "speed_limit": 30
+        },
+        "5000-4527": {
+            "stroke_group": "1578",
+            "flow_group": 0,
+            "height_allocation": "open",
+            "speed_limit": 30
+        },
+        "5000-4528": {
+            "stroke_group": "1578",
+            "flow_group": 0,
+            "height_allocation": "open",
+            "speed_limit": 30
+        },
+        "5000-4529": {
+            "stroke_group": "1578",
+            "flow_group": 0,
+            "height_allocation": "open",
+            "speed_limit": 30
+        },
+        "5000-4530": {
+            "stroke_group": "1578",
+            "flow_group": 0,
+            "height_allocation": "open",
+            "speed_limit": 30
+        },
+        "5000-4531": {
+            "stroke_group": "1578",
+            "flow_group": 0,
+            "height_allocation": "open",
+            "speed_limit": 30
+        },
+        "5000-4532": {
+            "stroke_group": "1578",
+            "flow_group": 0,
+            "height_allocation": "open",
+            "speed_limit": 30
+        },
+        "5000-4533": {
+            "stroke_group": "1578",
+            "flow_group": 0,
+            "height_allocation": "open",
+            "speed_limit": 30
+        },
+        "5000-4534": {
+            "stroke_group": "1578",
+            "flow_group": 0,
+            "height_allocation": "open",
+            "speed_limit": 30
+        },
+        "5000-4535": {
+            "stroke_group": "1578",
+            "flow_group": 0,
+            "height_allocation": "open",
+            "speed_limit": 30
+        },
+        "5000-4536": {
+            "stroke_group": "1578",
+            "flow_group": 0,
+            "height_allocation": "open",
+            "speed_limit": 30
+        },
+        "5000-4537": {
+            "stroke_group": "1578",
+            "flow_group": 0,
+            "height_allocation": "open",
+            "speed_limit": 30
+        },
+        "5000-4538": {
+            "stroke_group": "1578",
+            "flow_group": 0,
+            "height_allocation": "open",
+            "speed_limit": 30
+        },
+        "5000-4539": {
+            "stroke_group": "1578",
+            "flow_group": 0,
+            "height_allocation": "open",
+            "speed_limit": 30
+        },
+        "5000-4540": {
+            "stroke_group": "1578",
+            "flow_group": 0,
+            "height_allocation": "open",
+            "speed_limit": 30
+        },
+        "5000-4541": {
+            "stroke_group": "1578",
+            "flow_group": 0,
+            "height_allocation": "open",
+            "speed_limit": 30
+        },
+        "5000-4542": {
+            "stroke_group": "1578",
+            "flow_group": 0,
+            "height_allocation": "open",
+            "speed_limit": 30
+        },
+        "5000-4543": {
+            "stroke_group": "1578",
+            "flow_group": 0,
+            "height_allocation": "open",
+            "speed_limit": 30
+        },
+        "5000-4544": {
+            "stroke_group": "1578",
+            "flow_group": 0,
+            "height_allocation": "open",
+            "speed_limit": 30
+        },
+        "5000-4545": {
+            "stroke_group": "1578",
+            "flow_group": 0,
+            "height_allocation": "open",
+            "speed_limit": 30
+        },
+        "5000-4546": {
+            "stroke_group": "1578",
+            "flow_group": 0,
+            "height_allocation": "open",
+            "speed_limit": 30
+        },
+        "5000-4547": {
+            "stroke_group": "1578",
+            "flow_group": 0,
+            "height_allocation": "open",
+            "speed_limit": 30
+        },
+        "5000-4548": {
+            "stroke_group": "1578",
+            "flow_group": 0,
+            "height_allocation": "open",
+            "speed_limit": 30
+        },
+        "5000-4549": {
+            "stroke_group": "1578",
+            "flow_group": 0,
+            "height_allocation": "open",
+            "speed_limit": 30
+        },
+        "5000-4550": {
+            "stroke_group": "1578",
+            "flow_group": 0,
+            "height_allocation": "open",
+            "speed_limit": 30
+        },
+        "5000-4551": {
+            "stroke_group": "1578",
+            "flow_group": 0,
+            "height_allocation": "open",
+            "speed_limit": 30
+        },
+        "5000-4552": {
+            "stroke_group": "1578",
+            "flow_group": 0,
+            "height_allocation": "open",
+            "speed_limit": 30
+        },
+        "5000-4553": {
+            "stroke_group": "1578",
+            "flow_group": 0,
+            "height_allocation": "open",
+            "speed_limit": 30
+        },
+        "5000-4554": {
+            "stroke_group": "1578",
+            "flow_group": 0,
+            "height_allocation": "open",
+            "speed_limit": 30
+        },
+        "5000-4555": {
+            "stroke_group": "1578",
+            "flow_group": 0,
+            "height_allocation": "open",
+            "speed_limit": 30
+        },
+        "5000-4556": {
+            "stroke_group": "1578",
+            "flow_group": 0,
+            "height_allocation": "open",
+            "speed_limit": 30
+        },
+        "5000-4557": {
+            "stroke_group": "1578",
+            "flow_group": 0,
+            "height_allocation": "open",
+            "speed_limit": 30
+        },
+        "5000-4558": {
+            "stroke_group": "1578",
+            "flow_group": 0,
+            "height_allocation": "open",
+            "speed_limit": 30
+        },
+        "5000-4559": {
+            "stroke_group": "1578",
+            "flow_group": 0,
+            "height_allocation": "open",
+            "speed_limit": 30
+        },
+        "5000-4560": {
+            "stroke_group": "1578",
+            "flow_group": 0,
+            "height_allocation": "open",
+            "speed_limit": 30
+        },
+        "5000-4561": {
+            "stroke_group": "1578",
+            "flow_group": 0,
+            "height_allocation": "open",
+            "speed_limit": 30
+        },
+        "5000-4562": {
+            "stroke_group": "1578",
+            "flow_group": 0,
+            "height_allocation": "open",
+            "speed_limit": 30
+        },
+        "5000-4563": {
+            "stroke_group": "1578",
+            "flow_group": 0,
+            "height_allocation": "open",
+            "speed_limit": 30
+        },
+        "5000-4564": {
+            "stroke_group": "1578",
+            "flow_group": 0,
+            "height_allocation": "open",
+            "speed_limit": 30
+        },
+        "5000-4565": {
+            "stroke_group": "1578",
+            "flow_group": 0,
+            "height_allocation": "open",
+            "speed_limit": 30
+        },
+        "5000-4566": {
+            "stroke_group": "1578",
+            "flow_group": 0,
+            "height_allocation": "open",
+            "speed_limit": 30
+        },
+        "5000-4567": {
+            "stroke_group": "1578",
+            "flow_group": 0,
+            "height_allocation": "open",
+            "speed_limit": 30
+        },
+        "5000-4568": {
+            "stroke_group": "1578",
+            "flow_group": 0,
+            "height_allocation": "open",
+            "speed_limit": 30
+        },
+        "5000-4569": {
+            "stroke_group": "1578",
+            "flow_group": 0,
+            "height_allocation": "open",
+            "speed_limit": 30
+        },
+        "5000-4570": {
+            "stroke_group": "1578",
+            "flow_group": 0,
+            "height_allocation": "open",
+            "speed_limit": 30
+        },
+        "5000-4571": {
+            "stroke_group": "1578",
+            "flow_group": 0,
+            "height_allocation": "open",
+            "speed_limit": 30
+        },
+        "5000-4572": {
+            "stroke_group": "1578",
+            "flow_group": 0,
+            "height_allocation": "open",
+            "speed_limit": 30
+        },
+        "5000-4573": {
+            "stroke_group": "1578",
+            "flow_group": 0,
+            "height_allocation": "open",
+            "speed_limit": 30
+        },
+        "5000-4574": {
+            "stroke_group": "1578",
+            "flow_group": 0,
+            "height_allocation": "open",
+            "speed_limit": 30
+        },
+        "5000-4575": {
+            "stroke_group": "1578",
+            "flow_group": 0,
+            "height_allocation": "open",
+            "speed_limit": 30
+        },
+        "5000-4576": {
+            "stroke_group": "1578",
+            "flow_group": 0,
+            "height_allocation": "open",
+            "speed_limit": 30
+        },
+        "5000-4577": {
+            "stroke_group": "1578",
+            "flow_group": 0,
+            "height_allocation": "open",
+            "speed_limit": 30
+        },
+        "5000-4578": {
+            "stroke_group": "1578",
+            "flow_group": 0,
+            "height_allocation": "open",
+            "speed_limit": 30
+        },
+        "5000-4579": {
+            "stroke_group": "1578",
+            "flow_group": 0,
+            "height_allocation": "open",
+            "speed_limit": 30
+        },
+        "5000-4580": {
+            "stroke_group": "1578",
+            "flow_group": 0,
+            "height_allocation": "open",
+            "speed_limit": 30
+        },
+        "5000-4581": {
+            "stroke_group": "1578",
+            "flow_group": 0,
+            "height_allocation": "open",
+            "speed_limit": 30
+        },
+        "5000-4582": {
+            "stroke_group": "1578",
+            "flow_group": 0,
+            "height_allocation": "open",
+            "speed_limit": 30
+        },
+        "5000-4583": {
+            "stroke_group": "1578",
+            "flow_group": 0,
+            "height_allocation": "open",
+            "speed_limit": 30
+        },
+        "5000-4584": {
+            "stroke_group": "1578",
+            "flow_group": 0,
+            "height_allocation": "open",
+            "speed_limit": 30
+        },
+        "5000-4585": {
+            "stroke_group": "1578",
+            "flow_group": 0,
+            "height_allocation": "open",
+            "speed_limit": 30
+        },
+        "5000-4586": {
+            "stroke_group": "1578",
+            "flow_group": 0,
+            "height_allocation": "open",
+            "speed_limit": 30
+        },
+        "5000-4587": {
+            "stroke_group": "1578",
+            "flow_group": 0,
+            "height_allocation": "open",
+            "speed_limit": 30
+        },
+        "5000-4588": {
+            "stroke_group": "1578",
+            "flow_group": 0,
+            "height_allocation": "open",
+            "speed_limit": 30
+        },
+        "5000-4589": {
+            "stroke_group": "1578",
+            "flow_group": 0,
+            "height_allocation": "open",
+            "speed_limit": 30
+        },
+        "5000-4590": {
+            "stroke_group": "1578",
+            "flow_group": 0,
+            "height_allocation": "open",
+            "speed_limit": 30
+        },
+        "5000-4591": {
+            "stroke_group": "1578",
+            "flow_group": 0,
+            "height_allocation": "open",
+            "speed_limit": 30
+        },
+        "5000-4592": {
+            "stroke_group": "1578",
+            "flow_group": 0,
+            "height_allocation": "open",
+            "speed_limit": 30
+        },
+        "5000-4593": {
+            "stroke_group": "1578",
+            "flow_group": 0,
+            "height_allocation": "open",
+            "speed_limit": 30
+        },
+        "5000-4594": {
+            "stroke_group": "1578",
+            "flow_group": 0,
+            "height_allocation": "open",
+            "speed_limit": 30
+        },
+        "5000-4595": {
+            "stroke_group": "1578",
+            "flow_group": 0,
+            "height_allocation": "open",
+            "speed_limit": 30
+        },
+        "5000-4596": {
+            "stroke_group": "1578",
+            "flow_group": 0,
+            "height_allocation": "open",
+            "speed_limit": 30
+        },
+        "5000-4597": {
+            "stroke_group": "1578",
+            "flow_group": 0,
+            "height_allocation": "open",
+            "speed_limit": 30
+        },
+        "5000-4598": {
+            "stroke_group": "1578",
+            "flow_group": 0,
+            "height_allocation": "open",
+            "speed_limit": 30
+        },
+        "5000-4599": {
+            "stroke_group": "1578",
+            "flow_group": 0,
+            "height_allocation": "open",
+            "speed_limit": 30
+        },
+        "5000-4600": {
+            "stroke_group": "1578",
+            "flow_group": 0,
+            "height_allocation": "open",
+            "speed_limit": 30
+        },
+        "5000-4601": {
+            "stroke_group": "1578",
+            "flow_group": 0,
+            "height_allocation": "open",
+            "speed_limit": 30
+        },
+        "5000-4602": {
+            "stroke_group": "1578",
+            "flow_group": 0,
+            "height_allocation": "open",
+            "speed_limit": 30
+        },
+        "5000-4603": {
+            "stroke_group": "1578",
+            "flow_group": 0,
+            "height_allocation": "open",
+            "speed_limit": 30
+        },
+        "5000-4604": {
+            "stroke_group": "1578",
+            "flow_group": 0,
+            "height_allocation": "open",
+            "speed_limit": 30
+        },
+        "5000-4605": {
+            "stroke_group": "1578",
+            "flow_group": 0,
+            "height_allocation": "open",
+            "speed_limit": 30
+        },
+        "5000-4606": {
+            "stroke_group": "1578",
+            "flow_group": 0,
+            "height_allocation": "open",
+            "speed_limit": 30
+        },
+        "5000-4607": {
+            "stroke_group": "1578",
+            "flow_group": 0,
+            "height_allocation": "open",
+            "speed_limit": 30
+        },
+        "5000-4608": {
+            "stroke_group": "1578",
+            "flow_group": 0,
+            "height_allocation": "open",
+            "speed_limit": 30
+        },
+        "5000-4609": {
+            "stroke_group": "1578",
+            "flow_group": 0,
+            "height_allocation": "open",
+            "speed_limit": 30
+        },
+        "5000-4610": {
+            "stroke_group": "1578",
+            "flow_group": 0,
+            "height_allocation": "open",
+            "speed_limit": 30
+        },
+        "5000-4611": {
+            "stroke_group": "1578",
+            "flow_group": 0,
+            "height_allocation": "open",
+            "speed_limit": 30
+        },
+        "5000-4612": {
+            "stroke_group": "1578",
+            "flow_group": 0,
+            "height_allocation": "open",
+            "speed_limit": 30
+        },
+        "5000-4613": {
+            "stroke_group": "1578",
+            "flow_group": 0,
+            "height_allocation": "open",
+            "speed_limit": 30
+        },
+        "5000-4614": {
+            "stroke_group": "1578",
+            "flow_group": 0,
+            "height_allocation": "open",
+            "speed_limit": 30
+        },
+        "5000-4615": {
+            "stroke_group": "1578",
+            "flow_group": 0,
+            "height_allocation": "open",
+            "speed_limit": 30
+        },
+        "5000-4616": {
+            "stroke_group": "1578",
+            "flow_group": 0,
+            "height_allocation": "open",
+            "speed_limit": 30
+        },
+        "5000-4617": {
+            "stroke_group": "1578",
+            "flow_group": 0,
+            "height_allocation": "open",
+            "speed_limit": 30
+        },
+        "5000-4618": {
+            "stroke_group": "1578",
+            "flow_group": 0,
+            "height_allocation": "open",
+            "speed_limit": 30
+        },
+        "5000-4619": {
+            "stroke_group": "1578",
+            "flow_group": 0,
+            "height_allocation": "open",
+            "speed_limit": 30
+        },
+        "5000-4620": {
+            "stroke_group": "1578",
+            "flow_group": 0,
+            "height_allocation": "open",
+            "speed_limit": 30
+        },
+        "5000-4621": {
+            "stroke_group": "1578",
+            "flow_group": 0,
+            "height_allocation": "open",
+            "speed_limit": 30
+        },
+        "5000-4622": {
+            "stroke_group": "1578",
+            "flow_group": 0,
+            "height_allocation": "open",
+            "speed_limit": 30
+        },
+        "5000-4623": {
+            "stroke_group": "1578",
+            "flow_group": 0,
+            "height_allocation": "open",
+            "speed_limit": 30
+        },
+        "5000-4624": {
+            "stroke_group": "1578",
+            "flow_group": 0,
+            "height_allocation": "open",
+            "speed_limit": 30
+        },
+        "5000-4625": {
+            "stroke_group": "1578",
+            "flow_group": 0,
+            "height_allocation": "open",
+            "speed_limit": 30
+        },
+        "5000-4626": {
+            "stroke_group": "1578",
+            "flow_group": 0,
+            "height_allocation": "open",
+            "speed_limit": 30
+        },
+        "5000-4627": {
+            "stroke_group": "1578",
+            "flow_group": 0,
+            "height_allocation": "open",
+            "speed_limit": 30
+        },
+        "5000-4628": {
+            "stroke_group": "1578",
+            "flow_group": 0,
+            "height_allocation": "open",
+            "speed_limit": 30
+        },
+        "5000-4629": {
+            "stroke_group": "1578",
+            "flow_group": 0,
+            "height_allocation": "open",
+            "speed_limit": 30
+        },
+        "5000-4630": {
+            "stroke_group": "1578",
+            "flow_group": 0,
+            "height_allocation": "open",
+            "speed_limit": 30
+        },
+        "5000-4631": {
+            "stroke_group": "1578",
+            "flow_group": 0,
+            "height_allocation": "open",
+            "speed_limit": 30
+        },
+        "5000-4632": {
+            "stroke_group": "1578",
+            "flow_group": 0,
+            "height_allocation": "open",
+            "speed_limit": 30
+        },
+        "5000-4633": {
+            "stroke_group": "1578",
+            "flow_group": 0,
+            "height_allocation": "open",
+            "speed_limit": 30
+        },
+        "5000-4634": {
+            "stroke_group": "1578",
+            "flow_group": 0,
+            "height_allocation": "open",
+            "speed_limit": 30
+        },
+        "5000-4635": {
+            "stroke_group": "1578",
+            "flow_group": 0,
+            "height_allocation": "open",
+            "speed_limit": 30
+        },
+        "5000-4636": {
+            "stroke_group": "1578",
+            "flow_group": 0,
+            "height_allocation": "open",
+            "speed_limit": 30
+        },
+        "5000-4637": {
+            "stroke_group": "1578",
+            "flow_group": 0,
+            "height_allocation": "open",
+            "speed_limit": 30
+        },
+        "5000-4638": {
+            "stroke_group": "1578",
+            "flow_group": 0,
+            "height_allocation": "open",
+            "speed_limit": 30
+        },
+        "5000-4639": {
+            "stroke_group": "1578",
+            "flow_group": 0,
+            "height_allocation": "open",
+            "speed_limit": 30
+        },
+        "5000-4640": {
+            "stroke_group": "1578",
+            "flow_group": 0,
+            "height_allocation": "open",
+            "speed_limit": 30
+        },
+        "5000-4641": {
+            "stroke_group": "1578",
+            "flow_group": 0,
+            "height_allocation": "open",
+            "speed_limit": 30
+        },
+        "5000-4642": {
+            "stroke_group": "1578",
+            "flow_group": 0,
+            "height_allocation": "open",
+            "speed_limit": 30
+        },
+        "5000-4643": {
+            "stroke_group": "1578",
+            "flow_group": 0,
+            "height_allocation": "open",
+            "speed_limit": 30
+        },
+        "5000-4644": {
+            "stroke_group": "1578",
+            "flow_group": 0,
+            "height_allocation": "open",
+            "speed_limit": 30
+        },
+        "5000-4645": {
+            "stroke_group": "1578",
+            "flow_group": 0,
+            "height_allocation": "open",
+            "speed_limit": 30
+        },
+        "5000-4646": {
+            "stroke_group": "1578",
+            "flow_group": 0,
+            "height_allocation": "open",
+            "speed_limit": 30
+        },
+        "5000-4647": {
+            "stroke_group": "1578",
+            "flow_group": 0,
+            "height_allocation": "open",
+            "speed_limit": 30
+        },
+        "5000-4648": {
+            "stroke_group": "1578",
+            "flow_group": 0,
+            "height_allocation": "open",
+            "speed_limit": 30
+        },
+        "5000-4649": {
+            "stroke_group": "1578",
+            "flow_group": 0,
+            "height_allocation": "open",
+            "speed_limit": 30
+        },
+        "5000-4650": {
+            "stroke_group": "1578",
+            "flow_group": 0,
+            "height_allocation": "open",
+            "speed_limit": 30
+        },
+        "5000-4651": {
+            "stroke_group": "1578",
+            "flow_group": 0,
+            "height_allocation": "open",
+            "speed_limit": 30
+        },
+        "5000-4652": {
+            "stroke_group": "1578",
+            "flow_group": 0,
+            "height_allocation": "open",
+            "speed_limit": 30
+        },
+        "5000-4653": {
+            "stroke_group": "1578",
+            "flow_group": 0,
+            "height_allocation": "open",
+            "speed_limit": 30
+        },
+        "5000-4654": {
+            "stroke_group": "1578",
+            "flow_group": 0,
+            "height_allocation": "open",
+            "speed_limit": 30
+        },
+        "5000-4655": {
+            "stroke_group": "1578",
+            "flow_group": 0,
+            "height_allocation": "open",
+            "speed_limit": 30
+        },
+        "5000-4656": {
+            "stroke_group": "1578",
+            "flow_group": 0,
+            "height_allocation": "open",
+            "speed_limit": 30
+        },
+        "5000-4657": {
+            "stroke_group": "1578",
+            "flow_group": 0,
+            "height_allocation": "open",
+            "speed_limit": 30
+        },
+        "5000-4658": {
+            "stroke_group": "1578",
+            "flow_group": 0,
+            "height_allocation": "open",
+            "speed_limit": 30
+        },
+        "5000-4659": {
+            "stroke_group": "1578",
+            "flow_group": 0,
+            "height_allocation": "open",
+            "speed_limit": 30
+        },
+        "5000-4660": {
+            "stroke_group": "1578",
+            "flow_group": 0,
+            "height_allocation": "open",
+            "speed_limit": 30
+        },
+        "5000-4661": {
+            "stroke_group": "1578",
+            "flow_group": 0,
+            "height_allocation": "open",
+            "speed_limit": 30
+        },
+        "5000-4662": {
+            "stroke_group": "1578",
+            "flow_group": 0,
+            "height_allocation": "open",
+            "speed_limit": 30
+        },
+        "5000-4663": {
+            "stroke_group": "1578",
+            "flow_group": 0,
+            "height_allocation": "open",
+            "speed_limit": 30
+        },
+        "5000-4664": {
+            "stroke_group": "1578",
+            "flow_group": 0,
+            "height_allocation": "open",
+            "speed_limit": 30
+        },
+        "5000-4665": {
+            "stroke_group": "1578",
+            "flow_group": 0,
+            "height_allocation": "open",
+            "speed_limit": 30
+        },
+        "5000-4666": {
+            "stroke_group": "1578",
+            "flow_group": 0,
+            "height_allocation": "open",
+            "speed_limit": 30
+        },
+        "5000-4667": {
+            "stroke_group": "1578",
+            "flow_group": 0,
+            "height_allocation": "open",
+            "speed_limit": 30
+        },
+        "5000-4668": {
+            "stroke_group": "1578",
+            "flow_group": 0,
+            "height_allocation": "open",
+            "speed_limit": 30
+        },
+        "5000-4669": {
+            "stroke_group": "1578",
+            "flow_group": 0,
+            "height_allocation": "open",
+            "speed_limit": 30
+        },
+        "5000-4670": {
+            "stroke_group": "1578",
+            "flow_group": 0,
+            "height_allocation": "open",
+            "speed_limit": 30
+        },
+        "5000-4671": {
+            "stroke_group": "1578",
+            "flow_group": 0,
+            "height_allocation": "open",
+            "speed_limit": 30
+        },
+        "5000-4672": {
+            "stroke_group": "1578",
+            "flow_group": 0,
+            "height_allocation": "open",
+            "speed_limit": 30
+        },
+        "5000-4673": {
+            "stroke_group": "1578",
+            "flow_group": 0,
+            "height_allocation": "open",
+            "speed_limit": 30
+        },
+        "5000-4674": {
+            "stroke_group": "1578",
+            "flow_group": 0,
+            "height_allocation": "open",
+            "speed_limit": 30
+        },
+        "5000-4675": {
+            "stroke_group": "1578",
+            "flow_group": 0,
+            "height_allocation": "open",
+            "speed_limit": 30
+        },
+        "5000-4676": {
+            "stroke_group": "1578",
+            "flow_group": 0,
+            "height_allocation": "open",
+            "speed_limit": 30
+        },
+        "5000-4677": {
+            "stroke_group": "1578",
+            "flow_group": 0,
+            "height_allocation": "open",
+            "speed_limit": 30
+        },
+        "5000-4678": {
+            "stroke_group": "1578",
+            "flow_group": 0,
+            "height_allocation": "open",
+            "speed_limit": 30
+        },
+        "5000-4679": {
+            "stroke_group": "1578",
+            "flow_group": 0,
+            "height_allocation": "open",
+            "speed_limit": 30
+        },
+        "5000-4680": {
+            "stroke_group": "1578",
+            "flow_group": 0,
+            "height_allocation": "open",
+            "speed_limit": 30
+        },
+        "5000-4681": {
+            "stroke_group": "1578",
+            "flow_group": 0,
+            "height_allocation": "open",
+            "speed_limit": 30
+        },
+        "5000-4682": {
+            "stroke_group": "1578",
+            "flow_group": 0,
+            "height_allocation": "open",
+            "speed_limit": 30
+        },
+        "5000-4683": {
+            "stroke_group": "1578",
+            "flow_group": 0,
+            "height_allocation": "open",
+            "speed_limit": 30
+        },
+        "5000-4684": {
+            "stroke_group": "1578",
+            "flow_group": 0,
+            "height_allocation": "open",
+            "speed_limit": 30
+        },
+        "5000-4685": {
+            "stroke_group": "1578",
+            "flow_group": 0,
+            "height_allocation": "open",
+            "speed_limit": 30
+        },
+        "5000-4686": {
+            "stroke_group": "1578",
+            "flow_group": 0,
+            "height_allocation": "open",
+            "speed_limit": 30
+        },
+        "5000-4687": {
+            "stroke_group": "1578",
+            "flow_group": 0,
+            "height_allocation": "open",
+            "speed_limit": 30
+        },
+        "5000-4688": {
+            "stroke_group": "1578",
+            "flow_group": 0,
+            "height_allocation": "open",
+            "speed_limit": 30
+        },
+        "5000-4689": {
+            "stroke_group": "1578",
+            "flow_group": 0,
+            "height_allocation": "open",
+            "speed_limit": 30
+        },
+        "5000-4690": {
+            "stroke_group": "1578",
+            "flow_group": 0,
+            "height_allocation": "open",
+            "speed_limit": 30
+        },
+        "5000-4691": {
+            "stroke_group": "1578",
+            "flow_group": 0,
+            "height_allocation": "open",
+            "speed_limit": 30
+        },
+        "5000-4692": {
+            "stroke_group": "1578",
+            "flow_group": 0,
+            "height_allocation": "open",
+            "speed_limit": 30
+        },
+        "5000-4693": {
+            "stroke_group": "1578",
+            "flow_group": 0,
+            "height_allocation": "open",
+            "speed_limit": 30
+        },
+        "5000-4694": {
+            "stroke_group": "1578",
+            "flow_group": 0,
+            "height_allocation": "open",
+            "speed_limit": 30
+        },
+        "5000-4695": {
+            "stroke_group": "1578",
+            "flow_group": 0,
+            "height_allocation": "open",
+            "speed_limit": 30
+        },
+        "5000-4696": {
+            "stroke_group": "1578",
+            "flow_group": 0,
+            "height_allocation": "open",
+            "speed_limit": 30
+        },
+        "5000-4697": {
+            "stroke_group": "1578",
+            "flow_group": 0,
+            "height_allocation": "open",
+            "speed_limit": 30
+        },
+        "5000-4698": {
+            "stroke_group": "1578",
+            "flow_group": 0,
+            "height_allocation": "open",
+            "speed_limit": 30
+        },
+        "5000-4699": {
+            "stroke_group": "1578",
+            "flow_group": 0,
+            "height_allocation": "open",
+            "speed_limit": 30
+        },
+        "5000-4700": {
+            "stroke_group": "1578",
+            "flow_group": 0,
+            "height_allocation": "open",
+            "speed_limit": 30
+        },
+        "5000-4701": {
+            "stroke_group": "1578",
+            "flow_group": 0,
+            "height_allocation": "open",
+            "speed_limit": 30
+        },
+        "5000-4702": {
+            "stroke_group": "1578",
+            "flow_group": 0,
+            "height_allocation": "open",
+            "speed_limit": 30
+        },
+        "5000-4703": {
+            "stroke_group": "1578",
+            "flow_group": 0,
+            "height_allocation": "open",
+            "speed_limit": 30
+        },
+        "5000-4704": {
+            "stroke_group": "1578",
+            "flow_group": 0,
+            "height_allocation": "open",
+            "speed_limit": 30
+        },
+        "5000-4705": {
+            "stroke_group": "1578",
+            "flow_group": 0,
+            "height_allocation": "open",
+            "speed_limit": 30
+        },
+        "5000-4706": {
+            "stroke_group": "1578",
+            "flow_group": 0,
+            "height_allocation": "open",
+            "speed_limit": 30
+        }
+    },
+    "strokes": {
+        "1576": [
+            "4501-2940",
+            "4501-2868",
+            "4501-2872",
+            "4510-2835",
+            "4510-2837",
+            "4513-2853",
+            "4519-2877",
+            "4527-4192",
+            "4535-2056",
+            "4536-3852",
+            "4536-3851",
+            "4541-3846",
+            "4545-3841",
+            "4545-3843",
+            "4551-1904",
+            "4551-2083",
+            "4551-1687",
+            "4551-1684",
+            "4551-1681",
+            "4551-1679",
+            "4553-3638",
+            "4564-3636",
+            "4575-444",
+            "4575-440",
+            "4581-3311",
+            "4587-3303",
+            "4590-3300",
+            "4592-1691",
+            "4615-4471",
+            "4626-424",
+            "4626-1657",
+            "4637-419",
+            "4641-1527",
+            "4655-401",
+            "4669-1507",
+            "4669-1502",
+            "4676-1497",
+            "4678-1498",
+            "4678-1500",
+            "4684-1508",
+            "4685-1609",
+            "4687-689",
+            "4689-694",
+            "4689-696",
+            "4689-1494",
+            "4689-1496",
+            "4692-694",
+            "4700-2748",
+            "4700-2750",
+            "4700-2752",
+            "4700-2710",
+            "4700-2717",
+            "4700-2721",
+            "4700-2905",
+            "4700-2908",
+            "4700-2911",
+            "4701-1675",
+            "4701-1673",
+            "4701-1672",
+            "4702-2062",
+            "4703-2026",
+            "4704-3734",
+            "4704-3849",
+            "4704-3850",
+            "4704-3762",
+            "4704-3641"
+        ],
+        "1577": [
+            "2937-4499",
+            "2937-4501",
+            "2870-4501",
+            "2867-4502",
+            "2850-4510",
+            "2844-4510",
+            "2841-4510",
+            "2841-4511",
+            "2847-4513",
+            "2862-4513",
+            "2741-4513",
+            "2892-4519",
+            "2879-4519",
+            "2882-4525",
+            "2885-4527",
+            "2805-4527",
+            "2802-4527",
+            "3022-4527",
+            "2885-4527",
+            "2069-4534",
+            "2038-4535",
+            "2069-4535",
+            "3837-4543",
+            "2075-4551",
+            "1901-4551",
+            "2049-4551",
+            "1693-4551",
+            "474-4551",
+            "474-4556",
+            "467-4556",
+            "457-4562",
+            "4344-4564",
+            "4347-4564",
+            "4456-4564",
+            "449-4575",
+            "4342-4577",
+            "4342-4578",
+            "4339-4579",
+            "3307-4581",
+            "4339-4581",
+            "3298-4590",
+            "3299-4590",
+            "3301-4590",
+            "438-4592",
+            "1728-4592",
+            "1663-4624",
+            "4388-4635",
+            "4390-4635",
+            "4388-4638",
+            "1520-4641",
+            "416-4647",
+            "1514-4653",
+            "410-4655",
+            "392-4658",
+            "1499-4669",
+            "382-4680",
+            "1603-4681",
+            "382-4681",
+            "1503-4684",
+            "1544-4685",
+            "1610-4685",
+            "1604-4685",
+            "1597-4685",
+            "687-4687",
+            "690-4687",
+            "692-4692",
+            "693-4692",
+            "691-4695",
+            "692-4695",
+            "2699-4700",
+            "2700-4700",
+            "2725-4700",
+            "2890-4700",
+            "2896-4700",
+            "1677-4701",
+            "791-4701",
+            "2018-4702",
+            "2014-4702",
+            "3733-4704",
+            "3726-4704"
+        ],
+        "1578": [
+            "5000-4481",
+            "5000-4482",
+            "5000-4483",
+            "5000-4484",
+            "5000-4485",
+            "5000-4486",
+            "5000-4487",
+            "5000-4488",
+            "5000-4489",
+            "5000-4490",
+            "5000-4491",
+            "5000-4492",
+            "5000-4493",
+            "5000-4494",
+            "5000-4495",
+            "5000-4496",
+            "5000-4497",
+            "5000-4498",
+            "5000-4499",
+            "5000-4500",
+            "5000-4501",
+            "5000-4502",
+            "5000-4503",
+            "5000-4504",
+            "5000-4505",
+            "5000-4506",
+            "5000-4507",
+            "5000-4508",
+            "5000-4509",
+            "5000-4510",
+            "5000-4511",
+            "5000-4512",
+            "5000-4513",
+            "5000-4514",
+            "5000-4515",
+            "5000-4516",
+            "5000-4517",
+            "5000-4518",
+            "5000-4519",
+            "5000-4520",
+            "5000-4521",
+            "5000-4522",
+            "5000-4523",
+            "5000-4524",
+            "5000-4525",
+            "5000-4526",
+            "5000-4527",
+            "5000-4528",
+            "5000-4529",
+            "5000-4530",
+            "5000-4531",
+            "5000-4532",
+            "5000-4533",
+            "5000-4534",
+            "5000-4535",
+            "5000-4536",
+            "5000-4537",
+            "5000-4538",
+            "5000-4539",
+            "5000-4540",
+            "5000-4541",
+            "5000-4542",
+            "5000-4543",
+            "5000-4544",
+            "5000-4545",
+            "5000-4546",
+            "5000-4547",
+            "5000-4548",
+            "5000-4549",
+            "5000-4550",
+            "5000-4551",
+            "5000-4552",
+            "5000-4553",
+            "5000-4554",
+            "5000-4555",
+            "5000-4556",
+            "5000-4557",
+            "5000-4558",
+            "5000-4559",
+            "5000-4560",
+            "5000-4561",
+            "5000-4562",
+            "5000-4563",
+            "5000-4564",
+            "5000-4565",
+            "5000-4566",
+            "5000-4567",
+            "5000-4568",
+            "5000-4569",
+            "5000-4570",
+            "5000-4571",
+            "5000-4572",
+            "5000-4573",
+            "5000-4574",
+            "5000-4575",
+            "5000-4576",
+            "5000-4577",
+            "5000-4578",
+            "5000-4579",
+            "5000-4580",
+            "5000-4581",
+            "5000-4582",
+            "5000-4583",
+            "5000-4584",
+            "5000-4585",
+            "5000-4586",
+            "5000-4587",
+            "5000-4588",
+            "5000-4589",
+            "5000-4590",
+            "5000-4591",
+            "5000-4592",
+            "5000-4593",
+            "5000-4594",
+            "5000-4595",
+            "5000-4596",
+            "5000-4597",
+            "5000-4598",
+            "5000-4599",
+            "5000-4600",
+            "5000-4601",
+            "5000-4602",
+            "5000-4603",
+            "5000-4604",
+            "5000-4605",
+            "5000-4606",
+            "5000-4607",
+            "5000-4608",
+            "5000-4609",
+            "5000-4610",
+            "5000-4611",
+            "5000-4612",
+            "5000-4613",
+            "5000-4614",
+            "5000-4615",
+            "5000-4616",
+            "5000-4617",
+            "5000-4618",
+            "5000-4619",
+            "5000-4620",
+            "5000-4621",
+            "5000-4622",
+            "5000-4623",
+            "5000-4624",
+            "5000-4625",
+            "5000-4626",
+            "5000-4627",
+            "5000-4628",
+            "5000-4629",
+            "5000-4630",
+            "5000-4631",
+            "5000-4632",
+            "5000-4633",
+            "5000-4634",
+            "5000-4635",
+            "5000-4636",
+            "5000-4637",
+            "5000-4638",
+            "5000-4639",
+            "5000-4640",
+            "5000-4641",
+            "5000-4642",
+            "5000-4643",
+            "5000-4644",
+            "5000-4645",
+            "5000-4646",
+            "5000-4647",
+            "5000-4648",
+            "5000-4649",
+            "5000-4650",
+            "5000-4651",
+            "5000-4652",
+            "5000-4653",
+            "5000-4654",
+            "5000-4655",
+            "5000-4656",
+            "5000-4657",
+            "5000-4658",
+            "5000-4659",
+            "5000-4660",
+            "5000-4661",
+            "5000-4662",
+            "5000-4663",
+            "5000-4664",
+            "5000-4665",
+            "5000-4666",
+            "5000-4667",
+            "5000-4668",
+            "5000-4669",
+            "5000-4670",
+            "5000-4671",
+            "5000-4672",
+            "5000-4673",
+            "5000-4674",
+            "5000-4675",
+            "5000-4676",
+            "5000-4677",
+            "5000-4678",
+            "5000-4679",
+            "5000-4680",
+            "5000-4681",
+            "5000-4682",
+            "5000-4683",
+            "5000-4684",
+            "5000-4685",
+            "5000-4686",
+            "5000-4687",
+            "5000-4688",
+            "5000-4689",
+            "5000-4690",
+            "5000-4691",
+            "5000-4692",
+            "5000-4693",
+            "5000-4694",
+            "5000-4695",
+            "5000-4696",
+            "5000-4697",
+            "5000-4698",
+            "5000-4699",
+            "5000-4700",
+            "5000-4701",
+            "5000-4702",
+            "5000-4703",
+            "5000-4704",
+            "5000-4705",
+            "5000-4706"
+        ]
+    }
+}
