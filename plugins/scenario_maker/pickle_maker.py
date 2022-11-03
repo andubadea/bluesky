@@ -6,14 +6,10 @@ from shapely.ops import linemerge
 from multiprocessing import Pool as ThreadPool
 import traceback
 
-def kwikdist(lata, lona, latb, lonb):
-    """
-    Quick and dirty dist [nm]
-    In:
-        lat/lon, lat/lon [deg]
-    Out:
-        dist [nm]
-    """
+#Steal kiwkqdrdist function from Bluesky
+def kwikqdrdist(lata, lona, latb, lonb):
+    """Gives quick and dirty qdr[deg] and dist [nm]
+       from lat/lon. (note: does not work well close to poles)"""
 
     re      = 6371000.  # radius earth [m]
     dlat    = np.radians(latb - lata)
@@ -23,7 +19,9 @@ def kwikdist(lata, lona, latb, lonb):
     dangle  = np.sqrt(dlat * dlat + dlon * dlon * cavelat * cavelat)
     dist    = re * dangle
 
-    return dist
+    qdr     = np.degrees(np.arctan2(dlon * cavelat, dlat)) % 360
+
+    return qdr, dist
 
 # City we are using
 city = 'Vienna'
@@ -51,23 +49,35 @@ orig_nodes = [osm2id[x] for x in spawn_nodes_osm]
 # Compile the list of destination nodes
 dest_nodes = [x for x in G.nodes if x not in orig_nodes]
 
-# Make the input array
+# Make the input array by combining all origin nodes with destination nodes
 input_arr = []
 for origin in orig_nodes:
     for destination in dest_nodes:
         input_arr.append([origin, destination])
-    
+
+# Function that creates the route pickle
 def make_route_pickle(inp):
+    '''Creates a route pickle. 
+    This consists in a list that has the following elements:
+    Lattitude
+    Longitude
+    Edge
+    Turn WPT Bool'''
+    # Parse input
     orig_node, dest_node = inp
-    # Compute distance between these two
-    dist = kwikdist(G.nodes[orig_node]['y'], G.nodes[orig_node]['x'], 
+    
+    # Compute distance between the two waypoints
+    _, dist = kwikqdrdist(G.nodes[orig_node]['y'], G.nodes[orig_node]['x'], 
                     G.nodes[dest_node]['y'], G.nodes[dest_node]['x'])
     
     if dist > min_dist:
         # Create the path for these two nodes
         route = nx.shortest_path(G, orig_node, dest_node)
+        # Extract the path geometry
         geoms = [edges.loc[(u, v, 0), 'geometry'] for u, v in zip(route[:-1], route[1:])]
         line = linemerge(geoms)
+        
+        # Prepare the edges is a very dumb way.
         point_edges = []
         i = 0
         for geom, u, v in zip(geoms, route[:-1], route[1:]):
@@ -83,10 +93,32 @@ def make_route_pickle(inp):
                         continue
                     point_edges.append([u,v])
         
-        route_pickle = list(zip(line.xy[1], line.xy[0], point_edges))
+        # Also prepare the turns
+        latlons = list(zip(line.xy[1], line.xy[0]))
+        turns = [True] # Always make first wpt a turn
+        i = 1
+        for lat_cur, lon_cur in latlons[1:-1]:
+            # Get the needed stuff
+            lat_prev, lon_prev = latlons[i-1]
+            lat_next, lon_next = latlons[i+1]
+            
+            # Get the angle
+            d1=kwikqdrdist(lat_prev,lon_prev,lat_cur,lon_cur)
+            d2=kwikqdrdist(lat_cur,lon_cur,lat_next,lon_next)
+            angle=abs(d2[0]-d1[0])
+            if angle>180:
+                angle=360-angle
+                
+            # This is a turn if angle is greater than 25
+            if angle > 25:
+                turns.append(True)
+            else:
+                turns.append(False)
         
-        # We also need to create the list of edges
+        route_pickle = list(zip(line.xy[1], line.xy[0], point_edges, turns))
+
     else:
+        # Return to not create a pickle if path is too short.
         return
         
     with open(f'{path}/pickles/{orig_node}-{dest_node}.pkl' , 'wb') as f:
@@ -95,7 +127,7 @@ def make_route_pickle(inp):
     return route_pickle
 
 def main():
-    pool = ThreadPool(16)
+    pool = ThreadPool(8)
     try:
         _ = pool.map(make_route_pickle, input_arr)
     except:

@@ -413,6 +413,9 @@ class Route(Replaceable):
 
         # Calculate flight plan
         acrte.calcfp()
+        
+        # Direct to first waypoint
+        acrte.direct(acidx, acrte.wpname[0])
 
         # Check for success by checking inserted location in flight plan >= 0
         if wpidx < 0:

@@ -433,6 +433,10 @@ class Autopilot(Entity, replaceable=True):
                                   bs.traf.actwp.oldturnspd,bs.traf.selspd)
 
         self.inturn = np.logical_or(useturnspd,inoldturn)
+        
+        # Yet another override when not following leg correctly
+        slow_speed = np.minimum(10, bs.traf.selspd)
+        bs.traf.selspd = np.where(np.logical_and(np.logical_not(oncurrentleg),np.logical_not(self.inturn)) , slow_speed, bs.traf.selspd)
 
         # Below crossover altitude: CAS=const, above crossover altitude: Mach = const
         self.tas = vcasormach2tas(bs.traf.selspd, bs.traf.alt)
