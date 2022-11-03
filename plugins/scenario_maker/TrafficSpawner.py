@@ -5,6 +5,7 @@ from bluesky import stack
 from bluesky.tools.geo import kwikqdrdist
 from bluesky.tools.aero import kts, ft
 from bluesky.traffic import Route
+from bluesky.tools.misc import degto180
 import numpy as np
 import os
 import pickle
@@ -22,7 +23,7 @@ def init_plugin():
 class TrafficSpawner(Entity):
     def __init__(self):
         super().__init__()
-        self.target_ntraf = 1
+        self.target_ntraf = 50
         # Load default city
         self.loadcity('Vienna')
         # Traffic ID increment
@@ -54,7 +55,7 @@ class TrafficSpawner(Entity):
             self.orig_dest_dict = pickle.load(f)
         return
     
-    @timed_function(dt = 10)
+    @timed_function(dt = 1)
     def spawn_traffic(self):
         '''Function to spawn traffic to maintain a traffic level equal to ntraf.'''
         while bs.traf.ntraf < self.target_ntraf:
@@ -68,8 +69,6 @@ class TrafficSpawner(Entity):
                 
             # This pickle route has LAT, LON, EDGE, TURN. Unpack em
             lats, lons, edges, turns = list(zip(*pickled_route))
-            
-            print(turns)
             
             # Obtain required data for aircraft
             acid = f'D{self.traf_id}'
@@ -102,6 +101,22 @@ class TrafficSpawner(Entity):
             # Turn lnav on for this aircraft
             stack.stack(f'LNAV {acid} ON')
             stack.stack(f'VNAV {acid} ON')
+    
+    @timed_function(dt = 0.5)
+    def delete_aircraft(self):
+        # Delete aircraft that have LNAV off and have gone past the last waypoint.
+        lnav_on = bs.traf.swlnav
+        still_going_to_dest = np.logical_and(abs(degto180(bs.traf.trk - bs.traf.ap.qdr2wp)) < 10.0, 
+                                       bs.traf.ap.dist2wp > 5)
+        delete_array = np.logical_and.reduce((np.logical_not(lnav_on), 
+                                         bs.traf.actwp.swlastwp,
+                                         np.logical_not(still_going_to_dest)))
+        
+        if np.any(delete_array):
+            # Get the ACIDs of the aircraft to delete
+            acids_to_delete = np.array(bs.traf.id)[delete_array]
+            for acid in acids_to_delete:
+                stack.stack(f'DEL {acid}')
             
     @command
     def DELETEALL(self):
