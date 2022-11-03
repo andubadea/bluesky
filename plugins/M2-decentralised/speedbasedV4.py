@@ -1,4 +1,4 @@
-# For adapted for ProjectedBased
+# SpeedBasedV4 should be used as the resolution method when using ProjectedBased as CD
 
 from bluesky.traffic.asas import ConflictResolution
 import bluesky as bs
