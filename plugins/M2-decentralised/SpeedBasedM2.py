@@ -1,4 +1,4 @@
-# SpeedBasedM2 should be used as the resolution method when using M2StateBassed CD
+# SpeedBasedM2 should be used as the resolution method when using M2StateBased CD
 
 from bluesky.traffic.asas import ConflictResolution
 import bluesky as bs
