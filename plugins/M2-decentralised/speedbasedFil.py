@@ -1,4 +1,4 @@
-# SpeedBasedV5 should be used as the resolution method when using ProjectedBased as a filter
+# SpeedBasedFil should be used as the resolution method when using ProjectedBasedFilter as the CD
 
 from bluesky.traffic.asas import ConflictResolution
 import bluesky as bs
