@@ -368,8 +368,8 @@ def handle_replan(edges_changes):
                 acrte = Route._routes.get(acid)
 
                 # get old lats, lons of route
-                oldlats = {acrte.wplat}
-                oldlons = {acrte.wplon}
+                oldlats = set(acrte.wplat)
+                oldlons = set(acrte.wplon)
 
                 # If replantype is 0 this emeans that overall graph was updated but this aircraft
                 # was not affected
