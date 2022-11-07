@@ -128,7 +128,7 @@ def reset():
 
     # set hopping to true on the reset
     access_plugin_object('M2NAVIGATION').hopping = True
-    access_plugin_object('SPEEDBASEDM2').hopping = True
+    bs.traf.cr.hopping = True
     bs.traf.cr.heading_based = False
     
     heading_based_constrained = False
