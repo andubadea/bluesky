@@ -39,7 +39,7 @@ class SpeedBasedProj(ConflictResolution):
         super().__init__()
         self.layer_height = 30 * ft
         self.cruiselayerdiff = self.layer_height * 3
-        self.frnt_tol = 30 # Degrees
+        self.frnt_tol = 20 # Degrees
         self.rpz = 40
         
         self.heading_based = False
@@ -477,7 +477,7 @@ class SpeedBasedProj(ConflictResolution):
             self.stuck[idx1] = True
             #print('STUCK')
             
-        if ownship.gs[idx1] != 0 and VelocityObstacles:
+        if ownship.gs[idx1] !=0:
             # Combine all velocity obstacles into one big polygon
             CombinedObstacles = cascaded_union(VelocityObstacles)
             
@@ -515,15 +515,14 @@ class SpeedBasedProj(ConflictResolution):
                 # Create velocity line
                 line = LineString([v_line_min, v_line_max])
                 # Get the intersection with the velocity obstacles
-                intersection = CombinedObstacles.boundary.intersection(line)
+                intersection = CombinedObstacles.intersection(line)
                 
                 #---------------- RESOLUTION SPEEDS ---------------
                 # Apply the VO resolution speed
                 if intersection:
                     solutions = []
-                    if type(intersection) == MultiPoint:
-                        for vel_point in intersection:
-                            velocity = list(*vel_point.coords)
+                    if type(intersection) == LineString:
+                        for velocity in list(intersection.coords):
                             # Check whether to put velocity "negative" or "positive". 
                             # Drones can fly backwards.
                             if np.degrees(self.angle(velocity, v1)) < 1:
@@ -531,14 +530,14 @@ class SpeedBasedProj(ConflictResolution):
                             else:
                                 solutions.append(-self.norm(velocity))
                     else:
-                        # It's a single point
-                        velocity = list(*intersection.coords)
-                        # Check whether to put velocity "negative" or "positive". 
-                        # Drones can fly backwards.
-                        if np.degrees(self.angle(velocity, v1)) < 1:
-                            solutions.append(self.norm(velocity))
-                        else:
-                            solutions.append(-self.norm(velocity))
+                        for line in intersection:
+                            for velocity in list(line.coords):
+                                # Check whether to put velocity "negative" or "positive". 
+                                # Drones can fly backwards.
+                                if np.degrees(self.angle(velocity, v1)) < 1:
+                                    solutions.append(self.norm(velocity))
+                                else:
+                                    solutions.append(-self.norm(velocity))
                                 
                     pos_speeds = [spd for spd in solutions if spd >= 0]
                     neg_speeds = [spd for spd in solutions if spd < 0]
@@ -568,7 +567,7 @@ class SpeedBasedProj(ConflictResolution):
             else:
                 #Speeding up
                 gs_new = gs_new + 0.01
-        else:
+        elif ownship.gs[idx1] == 0:
             if landing:
                 # We are landing, maintain gs_new = 0
                 gs_new = 0
@@ -583,7 +582,7 @@ class SpeedBasedProj(ConflictResolution):
         else:
             alt_new = ownship.ap.alt[idx1]
             self.altactivearr[idx1] = False
-            
+        
         return gs_new, alt_new, track_new
             
 

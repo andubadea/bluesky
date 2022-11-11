@@ -366,7 +366,7 @@ class ProjectedBased(ConflictDetection):
                     # ignore if intersection is behind both intruder and ownship
                     continue
                 
-                # plot_things(p_own, p_int, own_line, int_line, s_own, s_int, p_inter, lpr_own, lpr_int, pr_own, pr_int)
+                plot_things(p_own, p_int, own_line, int_line, s_own, s_int, p_inter, lpr_own, lpr_int, pr_own, pr_int)
 
                 # check if intersecting pair is in a conflict
                 ownshiplats = np.array([ownshiplat, intruderlat])
