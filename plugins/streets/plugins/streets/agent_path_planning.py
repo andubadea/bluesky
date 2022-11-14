@@ -2350,8 +2350,8 @@ class PathPlanning:
         
         self.start_index=next_node_index
         self.start_index_previous=prev_node_osmnx_id
-        if prev_node_osmnx_id>4480 and prev_node_osmnx_id!=6000:
-            prev_node_osmnx_id=6000
+        if prev_node_osmnx_id>4480 and prev_node_osmnx_id!=5000:
+            prev_node_osmnx_id=5000
             self.start_index=self.start_index_previous
             next_node_index=self.start_index_previous
             self.start_index_previous=prev_node_osmnx_id
@@ -2362,7 +2362,7 @@ class PathPlanning:
         p=transformer.transform(lat,lon)
         self.graph.start_point=Point(tuple((p[0],p[1])))
 
-        if self.start_index_previous==6000:
+        if self.start_index_previous==5000:
             self.graph.start_ind=self.start_index
         else:
             self.graph.start_ind=-1
@@ -2435,7 +2435,7 @@ class PathPlanning:
             start_id=None
             result = np.where(self.os_keys2_indices ==self.start_index)
             rr=np.where(result[1] ==0)
-            if self.start_index_previous==6000:
+            if self.start_index_previous==5000:
                 start_id=self.os_keys2_indices[result[0][rr]][0][1]
             else:
                 for ii in self.os_keys2_indices[result[0][rr]][0][1:]:
@@ -2472,7 +2472,7 @@ class PathPlanning:
                 os_id2=indices_nodes[0]
 
                 
-                if 2000 not in init_groups and self.start_index_previous==6000:
+                if 2000 not in init_groups and self.start_index_previous==5000:
                     edges_list.append((os_id1,os_id2))
 
                     nodes_index=0
@@ -2510,7 +2510,7 @@ class PathPlanning:
     
                         if init_groups[nodes_index]==2000 and init_groups[nodes_index+1]==2000:
                             nodes_index=nodes_index+1
-                            os_id1=6000
+                            os_id1=5000
                             os_id2=indices_nodes[nodes_index]
     
                         else:
@@ -2717,7 +2717,7 @@ class PathPlanning:
                     p=transformer.transform(lat,lon)
                     self.graph.start_point=Point(tuple((p[0],p[1])))
             
-                    if self.start_index_previous==6000:
+                    if self.start_index_previous==5000:
                         self.graph.start_ind=self.start_index
                     else:
                         self.graph.start_ind=-1
@@ -2744,7 +2744,7 @@ class PathPlanning:
                         start_id=None
                         result = np.where(self.os_keys2_indices ==self.start_index)
                         rr=np.where(result[1] ==0)
-                        if self.start_index_previous==6000:
+                        if self.start_index_previous==5000:
                             start_id=self.os_keys2_indices[result[0][rr]][0][1]
                         else:
                             for ii in self.os_keys2_indices[result[0][rr]][0][1:]:
@@ -2781,7 +2781,7 @@ class PathPlanning:
                             os_id2=indices_nodes[0]
             
                             
-                            if 2000 not in init_groups and self.start_index_previous==6000:
+                            if 2000 not in init_groups and self.start_index_previous==5000:
                                 edges_list.append((os_id1,os_id2))
             
                                 nodes_index=0
@@ -2819,7 +2819,7 @@ class PathPlanning:
                 
                                     if init_groups[nodes_index]==2000 and init_groups[nodes_index+1]==2000:
                                         nodes_index=nodes_index+1
-                                        os_id1=6000
+                                        os_id1=5000
                                         os_id2=indices_nodes[nodes_index]
                 
                                     else:
