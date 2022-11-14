@@ -10,6 +10,7 @@ data/cache/py3/m2_hybrid/
 data/cache/py3/m2/
 data/cache/py3/m2_dark/
 plugins/streets/path_plan_dills
+plugins/scenario_maker/Vienna/pickles
 
 # Sphinx documentation
 docs/_build/
