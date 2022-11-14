@@ -32,7 +32,7 @@ class TrafficSpawner(Entity):
         self.alt = 100 * ft
         self.spd = 20 * kts
         # When to stop simulating
-        self.stop_time = 600
+        self.stop_time = 7*24*60*60
         # Start the logs
         bs.traf.conflog.start()
         bs.traf.loslog.start()
@@ -63,7 +63,7 @@ class TrafficSpawner(Entity):
     @command
     def stopsimt(self, time):
         # This will be the time at which we stop and quit.
-        self.stop_time = time
+        self.stop_time = int(time)
     
     def load_origins_destinations(self):
         with open(f'{self.path}/orig_dest_dict.pickle', 'rb') as f:

@@ -50,7 +50,8 @@ confheader = \
     'LON2 [deg],' + \
     'ALT2 [ft],' + \
     'CPALAT [lat],' + \
-    'CPALON [lon]\n'
+    'CPALON [lon],' + \
+    'TCPA [s]\n'
 
 losheader = \
     '#######################################################\n' + \
@@ -471,11 +472,12 @@ class Traffic(Entity):
                         continue
                     pair_idx = self.cd.confpairs.index(pair)
                     cpalatlon = geo.qdrpos(self.lat[idx1], self.lon[idx1], self.hdg[idx1], self.cd.dcpa[pair_idx]/nm)
-                        
-                    self.conflog.log(pair[0], pair[1],
-                                    self.lat[idx1], self.lon[idx1],self.alt[idx1],
-                                    self.lat[idx2], self.lon[idx2],self.alt[idx2],
-                                    cpalatlon[0], cpalatlon[1])
+                    
+                    if self.alt[idx1] > 90*ft and self.alt[idx1] > 90*ft:
+                        self.conflog.log(pair[0], pair[1],
+                                        self.lat[idx1], self.lon[idx1],self.alt[idx1],
+                                        self.lat[idx2], self.lon[idx2],self.alt[idx2],
+                                        cpalatlon[0], cpalatlon[1], self.cd.tcpa[pair_idx])
                 
         self.prevconfpairs = set(self.cd.confpairs)
         
@@ -525,10 +527,11 @@ class Traffic(Entity):
                 # Remove this aircraft pair from losmindist
                 self.losmindist.pop(dictkey)
                 #Log the LOS
-                self.loslog.log(losdata[8], losdata[7], pair[0], pair[1],
-                                losdata[1], losdata[2],losdata[3],
-                                losdata[4], losdata[5],losdata[6],
-                                losdata[0])
+                if losdata[3] > 90*ft and losdata[6] > 90*ft:
+                    self.loslog.log(losdata[8], losdata[7], pair[0], pair[1],
+                                    losdata[1], losdata[2],losdata[3],
+                                    losdata[4], losdata[5],losdata[6],
+                                    losdata[0])
                 
         
         self.prevlospairs = set(self.cd.lospairs)
