@@ -171,10 +171,11 @@ class SpeedBasedProj(ConflictResolution):
                 # to the heading difference.
                 in_front = (-80 < qdr_intruder < 80) and (self.heading_diff(qdr, qdr_intruder) < 30)
                 in_back = (qdr_intruder < -100 or 100 < qdr_intruder) and (self.heading_diff(qdr, qdr_intruder) < 30)
+
             # Determine if intruder is close in altitude:
             alt_ok = ((abs(ownship.alt[idx1] - intruder.alt[idx2])) > self.hpz)
             # Determine if we have a LOS
-            los = (dist <= self.rpz)
+            los = (True if idx_pair in conf.lospairs else False) or conf.dist_mat[idx1,idx2] < self.rpz or conf.dist[idx_pair] < self.rpz
             # Determine if intruder is right above or below
             above = ((ownship.alt[idx1] - intruder.alt[idx2]) < 0)
             below = ((ownship.alt[idx1] - intruder.alt[idx2]) > 0)
