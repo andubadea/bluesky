@@ -190,18 +190,36 @@ class ProjectedBasedFilter(ConflictDetection):
 
                     # get coordinates for route in utm
                     utm_coords =  self.path_plans.route_coords[idx]
+                    
+                    # Get the projection of the position on the current leg for aircraft
+                    # Step 1: Get leg coords
+                    if iactwp > 0:
+                        # Normal
+                        current_wpt = Point(self.transformer_to_utm.transform(route.wplat[iactwp], route.wplon[iactwp]))
+                        prev_wpt = Point(self.transformer_to_utm.transform(route.wplat[iactwp-1], route.wplon[iactwp-1]))
+                        
+                    else:
+                        # Just get next wpt
+                        prev_wpt = Point(self.transformer_to_utm.transform(route.wplat[iactwp], route.wplon[iactwp]))
+                        current_wpt = Point(self.transformer_to_utm.transform(route.wplat[iactwp+1], route.wplon[iactwp+1]))
+                        
+                    # Step 2: Create linestring
+                    current_leg = LineString([prev_wpt, current_wpt]).simplify(0.0001)
+                    
+                    # Step 3: Find nearest point
+                    p_cur_loc, _ = nearest_points(current_leg, current_loc)
 
                     # get all of the waypoints infront of iactwp including iactwp
-                    front_line = LineString([*current_loc.coords[:], *utm_coords[iactwp:]]).simplify(0.0001)
+                    front_line = LineString([*p_cur_loc.coords[:], *utm_coords[iactwp:]]).simplify(0.0001)
 
                     # get all of the waypoints behind iactwp not including iactwp
                     if iactwp == 0:
                         back_line = LineString([])
                     else:
-                        back_line = LineString([*utm_coords[:iactwp], *current_loc.coords]).simplify(0.0001)
+                        back_line = LineString([*utm_coords[:iactwp], *p_cur_loc.coords]).simplify(0.0001)
                     
-                    merged_line = self.get_projected_line_wpts(front_line, back_line, route_line, current_loc, look_ahead_dist)
-                    p1 = Point(current_loc.coords[0])
+                    merged_line = self.get_projected_line_wpts(front_line, back_line, route_line, p_cur_loc, look_ahead_dist)
+                    p1 = Point(p_cur_loc.coords[0])
 
                 # fill the geo_dict
                 geo_dict['geometry'].append(merged_line)
