@@ -17,11 +17,11 @@ import time
 def init_plugin():
 
     # Addtional initilisation code
-    bs.traf.nav = M2Navigation()
+    bs.traf.nav = ALTNavigation()
     # Configuration parameters
     config = {
         # The name of your plugin
-        'plugin_name':     'M2NAVIGATION',
+        'plugin_name':     'ALTNAVIGATION',
 
         # The type of this plugin. For now, only simulation plugins are possible.
         'plugin_type':     'sim'
@@ -29,7 +29,7 @@ def init_plugin():
 
     return config
 
-class M2Navigation(core.Entity):
+class ALTNavigation(core.Entity):
     def __init__(self):
         super().__init__() 
         self.hopping = True
@@ -64,9 +64,25 @@ class M2Navigation(core.Entity):
         # ALTITUDE STUFF-------------------------------------------------------
         # If an aircraft is turning, it should be in a turn layer. Thus, for aircraft that
         # are in a turn, set their selected
-        target_turn_layer = np.where(bs.traf.closest_turn_layer_bottom == 0, 
+        
+        # CAREFUL TURNING
+        # Let's change the conditions in which aircraft can turn
+        # Check above and below a certain amount to see if we can turn or not
+        can_ascend_4_turn, can_descend_4_turn = self.ascent_descent(64, bs.traf.dist_between_cruise_layers * 3, 
+                                                               -bs.traf.dist_between_cruise_layers * 3)
+        
+        # Set the turn layer for aircraft that can descend
+        target_turn_layer = np.where(np.logical_and(can_descend_4_turn, bs.traf.closest_turn_layer_bottom != 0), 
+                                      bs.traf.closest_turn_layer_bottom, 
+                                      0)
+        
+        # Set the turn layer for aircraft that can ascend
+        target_turn_layer = np.where(np.logical_and(can_ascend_4_turn, bs.traf.closest_turn_layer_top != 0), 
                                       bs.traf.closest_turn_layer_top, 
-                                      bs.traf.closest_turn_layer_bottom)*ft
+                                      target_turn_layer)
+        
+        # Convert to metres
+        target_turn_layer = target_turn_layer * ft
         
         in_turn_layer = bs.traf.flight_layer_type == 'T'
         
