@@ -363,43 +363,42 @@ def handle_replan(edges_changes):
         else:
             #print(next_node_osmnx_id,prev_node_osmnx_id,lat,lon)
             route,turns,edges,next_turn,groups,in_constrained,turn_speeds,replantype=path.replan(edges_changes,prev_node_osmnx_id,next_node_osmnx_id,lat,lon)
+            if replantype == 0:
+                log_no_replan_but_changes[idx] = 1
+
+            # if replantype is 2 it means it did not replan because of high traffic
+            # and aircraft has low or medium priority
+            elif replantype == 2:
+                log_no_replan_high_traffic[idx] = 1
+            
+            # if replantype is 3 it means it did not replan because it is near the last point of route
+            elif replantype == 3:
+                log_no_replan_last_point[idx] = 1
+
+            # if replantype is 4 it means that aircraft has route completely in open airspace
+            elif replantype == 4:
+                log_no_replan_open_airspace[idx] = 1
+            
             if len(route)>0:                    
 
                 acrte = Route._routes.get(acid)
 
                 # get old lats, lons of route
-                oldlats = set(acrte.wplat)
-                oldlons = set(acrte.wplon)
-
-                # If replantype is 0 this emeans that overall graph was updated but this aircraft
-                # was not affected
-                if replantype == 0:
-                    log_no_replan_but_changes[idx] = 1
-                
                 # if replantype is 1 this means that the aircraft replanned
                 # still unsure if it is the same route or previous route.
-                elif replantype == 1:
-                    newlats = {coord[1] for coord in route}
-                    newlons = {coord[0] for coord in route}
+                if replantype == 1:
+                    new_edges = set([f'{edge[0]}-{edge[1]}' for edge in edges])
+                    old_edges = set(edge_traffic.edgeap.edge_rou[idx].wpedgeid)
 
                     # now check if it is same route
-                    if newlats.issubset(oldlats) and newlons.issubset(oldlons):
+                    if new_edges.issubset(old_edges):
                         log_replan_same_route[idx] = 1
+                        print('AAAAAAA')
                     else:
                         log_replan_changed_routes[idx] = 1
-
-                # if replantype is 2 it means it did not replan because of high traffic
-                # and aircraft has low or medium priority
-                elif replantype == 2:
-                    log_no_replan_high_traffic[idx] = 1
                 
-                # if replantype is 3 it means it did not replan because it is near the last point of route
-                elif replantype == 3:
-                    log_no_replan_last_point[idx] = 1
-
-                # if replantype is 4 it means that aircraft has route completely in open airspace
-                elif replantype == 4:
-                    log_no_replan_open_airspace[idx] = 1
+                else:
+                    print("DEBUG ME #1")
 
                 # If the next waypoint is a turn waypoint, then remember the turnrad
                 nextqdr_to_remember = bs.traf.actwp.next_qdr[idx]
