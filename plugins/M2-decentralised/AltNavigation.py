@@ -33,6 +33,7 @@ class ALTNavigation(core.Entity):
     def __init__(self):
         super().__init__() 
         self.hopping = True
+        self.careful_hopping = False
         
     @timed_function(name='navtimedfunction', dt=0.5)
     def navtimedfunction(self):
@@ -71,15 +72,21 @@ class ALTNavigation(core.Entity):
         can_ascend_4_turn, can_descend_4_turn = self.ascent_descent(64, bs.traf.dist_between_cruise_layers * 3, 
                                                                -bs.traf.dist_between_cruise_layers * 3)
         
-        # Set the turn layer for aircraft that can descend
-        target_turn_layer = np.where(np.logical_and(can_descend_4_turn, bs.traf.closest_turn_layer_bottom != 0), 
-                                      bs.traf.closest_turn_layer_bottom, 
-                                      0)
-        
-        # Set the turn layer for aircraft that can ascend
-        target_turn_layer = np.where(np.logical_and(can_ascend_4_turn, bs.traf.closest_turn_layer_top != 0), 
+        if self.careful_hopping:
+            # Set the turn layer for aircraft that can descend
+            target_turn_layer = np.where(np.logical_and(can_descend_4_turn, bs.traf.closest_turn_layer_bottom != 0), 
+                                        bs.traf.closest_turn_layer_bottom, 
+                                        0)
+            
+            # Set the turn layer for aircraft that can ascend
+            target_turn_layer = np.where(np.logical_and(can_ascend_4_turn, bs.traf.closest_turn_layer_top != 0), 
+                                        bs.traf.closest_turn_layer_top, 
+                                        target_turn_layer)
+            
+        else:
+            target_turn_layer = np.where(bs.traf.closest_turn_layer_bottom == 0, 
                                       bs.traf.closest_turn_layer_top, 
-                                      target_turn_layer)
+                                      bs.traf.closest_turn_layer_bottom)*ft
         
         # Convert to metres
         target_turn_layer = target_turn_layer * ft
@@ -276,3 +283,11 @@ class ALTNavigation(core.Entity):
         can_ascend[ac_cannot_ascend] = np.zeros(len(ac_cannot_ascend), dtype = bool)
         
         return can_ascend, can_descend
+    
+    def reset(self):
+        self.hopping = True
+        self.careful_turning = False
+        
+    @stack.command
+    def carefulturning(self, value : bool):
+        self.careful_turning = True
