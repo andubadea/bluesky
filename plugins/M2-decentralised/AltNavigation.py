@@ -33,7 +33,7 @@ class ALTNavigation(core.Entity):
     def __init__(self):
         super().__init__() 
         self.hopping = True
-        self.careful_hopping = False
+        self.careful_turning = False
         
     @timed_function(name='navtimedfunction', dt=0.5)
     def navtimedfunction(self):
@@ -72,7 +72,7 @@ class ALTNavigation(core.Entity):
         can_ascend_4_turn, can_descend_4_turn = self.ascent_descent(64, bs.traf.dist_between_cruise_layers * 3, 
                                                                -bs.traf.dist_between_cruise_layers * 3)
         
-        if self.careful_hopping:
+        if self.careful_turning:
             # Set the turn layer for aircraft that can descend
             target_turn_layer = np.where(np.logical_and(can_descend_4_turn, bs.traf.closest_turn_layer_bottom != 0), 
                                         bs.traf.closest_turn_layer_bottom, 
