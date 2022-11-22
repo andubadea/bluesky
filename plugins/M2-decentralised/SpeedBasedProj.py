@@ -972,10 +972,6 @@ class SpeedBasedProj(ConflictResolution):
         '''
         return np.logical_and(self.active, self.altactivearr)
     
-    @stack.command
-    def headingbasedCR(self):
-        self.heading_based = True
-    
     def resumenav(self, conf, ownship, intruder):
         '''
             Decide for each aircraft in the conflict list whether the ASAS

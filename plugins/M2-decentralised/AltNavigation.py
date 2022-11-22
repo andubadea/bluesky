@@ -84,6 +84,7 @@ class ALTNavigation(core.Entity):
                                         target_turn_layer)
             
         else:
+            # VANILLA M2
             target_turn_layer = np.where(bs.traf.closest_turn_layer_bottom == 0, 
                                       bs.traf.closest_turn_layer_top, 
                                       bs.traf.closest_turn_layer_bottom)*ft
@@ -290,4 +291,4 @@ class ALTNavigation(core.Entity):
         
     @stack.command
     def carefulturning(self, value : bool):
-        self.careful_turning = True
+        self.careful_turning = value
