@@ -530,6 +530,22 @@ class SpeedBasedProj(ConflictResolution):
                                 solutions.append(self.norm(velocity))
                             else:
                                 solutions.append(-self.norm(velocity))
+                    elif type(intersection) == Point:
+                        # Take this as the velocity then
+                        velocity = [intersection.x, intersection.y]
+                        if np.degrees(self.angle(velocity, v1)) < 1:
+                            solutions.append(self.norm(velocity))
+                        else:
+                            solutions.append(-self.norm(velocity))
+                        
+                    elif type(intersection) == MultiPoint:
+                        for point in intersection:
+                            velocity = [point.x, point.y]
+                        if np.degrees(self.angle(velocity, v1)) < 1:
+                            solutions.append(self.norm(velocity))
+                        else:
+                            solutions.append(-self.norm(velocity))
+                            
                     else:
                         for line in intersection:
                             for velocity in list(line.coords):
