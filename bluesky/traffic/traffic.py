@@ -190,8 +190,8 @@ class Traffic(Entity):
         # Loggers and other vars
         self.flst = datalog.crelog('FLSTLOG', None, flstheader)
         self.conflog = datalog.crelog('CONFLOG', None, confheader)
-        # self.reglog = datalog.crelog('REGLOG', None, regheader)
-        self.flowlog = datalog.crelog('FLOWLOG', None, flowheader)
+        self.reglog = datalog.crelog('REGLOG', None, regheader)
+        # self.flowlog = datalog.crelog('FLOWLOG', None, flowheader)
         self.geolog = datalog.crelog('GEOLOG', None, geoheader)
         self.loslog = datalog.crelog('LOSLOG', None, losheader)
         self.geo_intrusions = dict()
@@ -699,14 +699,14 @@ class Traffic(Entity):
         
         self.prevlospairs = set(self.cd.lospairs)
         
-    # @timed_function(name='reglog', dt=30)
-    # def thereglog(self):
-    #     self.reglog.log(*self.id)
-    #     self.reglog.log(*self.alt/ft)
-    #     self.reglog.log(*self.lat)
-    #     self.reglog.log(*self.lon)
-    #     self.reglog.log(*self.actedge.wpedgeid)
-    #     return
+    @timed_function(name='reglog', dt=30)
+    def thereglog(self):
+        self.reglog.log(*self.id)
+        self.reglog.log(*self.alt/ft)
+        self.reglog.log(*self.lat)
+        self.reglog.log(*self.lon)
+        self.reglog.log(*self.actedge.wpedgeid)
+        return
 
     @timed_function(name='asas', dt=bs.settings.asas_dt, manual=True)
     def update_asas(self):
