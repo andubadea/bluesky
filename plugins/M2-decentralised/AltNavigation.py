@@ -87,7 +87,7 @@ class ALTNavigation(core.Entity):
             # VANILLA M2
             target_turn_layer = np.where(bs.traf.closest_turn_layer_bottom == 0, 
                                       bs.traf.closest_turn_layer_top, 
-                                      bs.traf.closest_turn_layer_bottom)*ft
+                                      bs.traf.closest_turn_layer_bottom)
         
         # Convert to metres
         target_turn_layer = target_turn_layer * ft
@@ -103,15 +103,6 @@ class ALTNavigation(core.Entity):
                                                    target_turn_layer != 0,
                                                    lnav_on,
                                                    np.logical_not(rogue)))
-        # if 'D53' in bs.traf.id:
-        #     idx = bs.traf.id.index('D53')
-        #     print('zzz', give_turn_command[idx])
-        #     print(in_turn[idx])
-        #     print(np.logical_not(in_vert_man)[idx])
-        #     print(np.logical_not(in_turn_layer)[idx])
-        #     print(in_constrained[idx])
-        #     print(target_turn_layer[idx])
-        #     print(lnav_on[idx])
         
         bs.traf.selalt = np.where(give_turn_command, target_turn_layer, bs.traf.selalt)
 
@@ -290,5 +281,8 @@ class ALTNavigation(core.Entity):
         self.careful_turning = False
         
     @stack.command
-    def carefulturning(self, value : bool):
-        self.careful_turning = value
+    def carefulturning(self, value):
+        if value == 'TRUE':
+            self.careful_turning = True
+        else:
+            self.careful_turning = False

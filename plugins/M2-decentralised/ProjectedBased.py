@@ -42,6 +42,7 @@ class ProjectedBased(ConflictDetection):
         self.dtlookahead_actual = 10 #s
         self.add_sb_conflicts = False
         self.proj_filter = False
+        self.sb_detect = False
 
         # create some transformers
         self.transformer_to_utm    = Transformer.from_crs("EPSG:4326", "EPSG:32633")
@@ -50,12 +51,26 @@ class ProjectedBased(ConflictDetection):
         return
     
     @stack.command
-    def ADDSBCONFLICTS(self, value : 'bool'):
-        self.add_sb_conflicts = value
+    def ADDSBCONFLICTS(self, value):
+        if value == 'TRUE':
+            self.add_sb_conflicts = True
+        else:
+            self.add_sb_conflicts = False
+        
         
     @stack.command
-    def PROJFILTER(self, value :'bool'):
-        self.proj_filter = value
+    def PROJFILTER(self, value):
+        if value == 'TRUE':
+            self.proj_filter = True
+        else:
+            self.proj_filter = False
+        
+    @stack.command
+    def SBDETECT(self, value):
+        if value == 'TRUE':
+            self.sb_detect = True
+        else:
+            self.sb_detect = False
         
     def clearconfdb(self):
         ''' Clear conflict database. '''
@@ -77,9 +92,29 @@ class ProjectedBased(ConflictDetection):
         self.conftrks = np.array([])
         self.add_sb_conflicts = False
         self.proj_filter = False
+        self.sb_detect = False
         return
         
     def update(self, ownship, intruder):
+        # Just do state-based
+        if self.sb_detect:
+            self.confpairs, self.lospairs, self.inconf, self.tcpamax, self.qdr, \
+            self.dist, self.dcpa, self.tcpa, self.tLOS, self.qdr_mat, self.dist_mat = \
+                self.statebased_detect(ownship, intruder, self.rpz, self.hpz, self.dtlookahead)
+                
+            # confpairs has conflicts observed from both sides (a, b) and (b, a)
+            # confpairs_unique keeps only one of these
+            confpairs_unique = {frozenset(pair) for pair in self.confpairs}
+            lospairs_unique = {frozenset(pair) for pair in self.lospairs}
+
+            self.confpairs_all.extend(confpairs_unique - self.confpairs_unique)
+            self.lospairs_all.extend(lospairs_unique - self.lospairs_unique)
+
+            # Update confpairs_unique and lospairs_unique
+            self.confpairs_unique = confpairs_unique
+            self.lospairs_unique = lospairs_unique   
+            return
+        
         ''' Perform an update step of the Conflict Detection implementation. '''
         self.confpairs, self.inconf, self.tcpamax, self.qdr, \
             self.dist, self.dcpa, self.tcpa, self.tLOS, self.projected_lats, self.projected_lons, \
