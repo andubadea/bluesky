@@ -1143,7 +1143,8 @@ class Traffic(Entity):
     def STARTM2LOG(self):
         self.flst.start()
         self.conflog.start()
-        self.flowlog.start()
+        #self.flowlog.start()
+        self.reglog.start()
         self.geolog.start()
         self.loslog.start()
         return
