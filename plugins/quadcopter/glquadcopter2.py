@@ -1,11 +1,13 @@
 """ Plugin to replace aircraft symbol with a quadcopter """
 import numpy as np
 from os import path
-
+import bluesky as bs
+from bluesky.tools.aero import ft, nm, kts
 from bluesky import settings
 from bluesky.ui.qtgl.gltraffic import Traffic
 from bluesky.ui.qtgl import glhelpers as glh
 from bluesky.ui import palette
+from bluesky.tools import geo
 
 # Register settings defaults
 settings.set_variable_defaults(
@@ -22,7 +24,7 @@ palette.set_default_colours(
 ### Initialization function of plugin.
 def init_plugin():
     config = {
-        'plugin_name':     'QUADGUI',
+        'plugin_name':     'QUADGUI2',
         'plugin_type':     'gui',
         }
 
@@ -37,7 +39,7 @@ ROUTE_SIZE = 5000
 TRAILS_SIZE = 1000000
 
 # Bird traffic class
-class QuadTraffic(Traffic):
+class QuadTraffic2(Traffic):
 
     def __init__(self, parent=None):
         super().__init__(parent)
