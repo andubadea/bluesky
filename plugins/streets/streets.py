@@ -12,6 +12,7 @@ from numpy import *
 from collections import Counter
 import pandas as pd
 from scipy.sparse import csr_matrix
+import random
 
 from shapely.geometry import LineString, Point, MultiLineString, MultiPoint, GeometryCollection
 from shapely.ops import nearest_points, split, transform, linemerge
@@ -72,7 +73,7 @@ queue_dict = dict()
 # initialise dill loading
 dill_to_load = -1
 angle_range = ''
-heading_based_constrained = False
+heading_based_random = False
 
 # TODO: 
 #   - update CREM2 command for pre processed path planning
@@ -124,14 +125,14 @@ def reset():
     use_flow_control = True
 
     # default setting for streets is not constrained
-    global heading_based_constrained
+    global heading_based_random
 
     # set hopping to true on the reset
     bs.traf.nav.hopping = True
     bs.traf.cr.hopping = True
     bs.traf.cr.heading_based = False
     
-    heading_based_constrained = False
+    heading_based_random = False
 
     # reset queue
     global queue_dict
@@ -443,7 +444,7 @@ def handle_replan(edges_changes):
                     edge_layer_type = edge_traffic.edge_dict[wpedgeid]['height_allocation']
                     edge_layer_dict = flight_layers.layer_dict["config"][edge_layer_type]['levels']
 
-                    if edge_layer_type != 'open' and heading_based_constrained:
+                    if edge_layer_type != 'open' and heading_based_random:
                         # Get the layer dictionary for the heading range
                         edge_layer_dict = edge_layer_dict[flight_layers.constrained_airspace_alloc[idx]]
 
@@ -627,12 +628,12 @@ def streetsenable():
     streets_bool = True
 
 @stack.command
-def headingconstrained():
+def headingrandom():
     """headingconstrained"""
     # # Turns on heading constrained airspace for scenario
-    global heading_based_constrained, nav
+    global heading_based_random, nav
 
-    heading_based_constrained = True
+    heading_based_random = True
 
     # set M2 Navigation hopping to False
     access_plugin_object('M2NAVIGATION').hopping = False
@@ -679,11 +680,11 @@ def queue_attempt_create(first_time, acid, actype, path_file, aclat, aclon, dest
         # First, set the global DILL loading variable
         dill_to_load = path_file
 
-        if heading_based_constrained:
+        if heading_based_random:
             # assign the flight layer allocation in constrained airspace
             # step 1: calculate the heading from origin to destination
-            qdr_full, _ = geo.qdrdist(aclat, aclon, destlat, destlon)
-            qdr_full = qdr_full % 360
+            qdr_full = random.random()*360
+            # qdr_full = qdr_full % 360
 
             # step 2: check between which heading range the aircraft is
             # TODO: make this dynamic
@@ -732,11 +733,11 @@ def queue_attempt_create(first_time, acid, actype, path_file, aclat, aclon, dest
         # First create the aircraft
         dill_to_load = path_file
 
-        if heading_based_constrained:
+        if heading_based_random:
             # assign the flight layer allocation in constrained airspace
             # step 1: calculate the heading from origin to destination
-            qdr_full, _ = geo.qdrdist(aclat, aclon, destlat, destlon)
-            qdr_full = qdr_full % 360
+            qdr_full = random.random()*360
+            # qdr_full = qdr_full % 360
 
             # step 2: check between which heading range the aircraft is
             # TODO: make this dynamic
@@ -775,11 +776,11 @@ def queue_attempt_create(first_time, acid, actype, path_file, aclat, aclon, dest
         # First create the aircraft
         dill_to_load = path_file
 
-        if heading_based_constrained:
+        if heading_based_random:
             # assign the flight layer allocation in constrained airspace
             # step 1: calculate the heading from origin to destination
-            qdr_full, _ = geo.qdrdist(aclat, aclon, destlat, destlon)
-            qdr_full = qdr_full % 360
+            qdr_full = random.random()*360
+            # qdr_full = qdr_full % 360
 
             # step 2: check between which heading range the aircraft is
             # TODO: make this dynamic
@@ -1707,7 +1708,7 @@ class PathPlans(Entity):
 
             # when layer type is not in open airspace check if there is a heading based
             # constrained airspace
-            if edge_layer_type != 'open' and heading_based_constrained:
+            if edge_layer_type != 'open' and heading_based_random:
                 # Get the layer number
                 edge_layer_dict = edge_layer_dict[angle_range]
 
