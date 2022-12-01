@@ -138,6 +138,16 @@ def reset():
     global queue_dict
     queue_dict = dict()
 
+######################## density count functions #########################
+@core.timed_function(dt=1)
+def constrained_density():
+    # edge_count_dict = dict(Counter(edge_traffic.actedge.wpedgeid)) #only contains edges with aircrafts
+    # group_count_dict = dict(Counter(edge_traffic.actedge.group_number)) 
+    # flow_count_dict = dict(Counter(edge_traffic.actedge.flow_number))
+
+    constrained_layer_alloc = np.where(edge_traffic.actedge.edge_airspace_type == 'constrained', flight_layers.constrained_airspace_alloc, 'open')
+    height_count_dict = dict(Counter(constrained_layer_alloc))
+
 ######################## FLOW CONTROL FUNCTIONS #########################
 @core.timed_function(dt=10)
 def do_flowcontrol():
@@ -628,6 +638,18 @@ def streetsenable():
     streets_bool = True
 
 @stack.command
+def fullconstrained():
+    """fullconstrained"""
+    # # Makes height allocation in airspace based on full density in airspace
+    global heading_based_fullconstrained, nav
+
+    heading_based_fullconstrained = True
+
+    # set M2 Navigation hopping to False
+    access_plugin_object('M2NAVIGATION').hopping = False
+    access_plugin_object('SPEEDBASEDM2').hopping = False
+
+@stack.command
 def headingrandom():
     """headingconstrained"""
     # # Turns on heading constrained airspace for scenario
@@ -681,20 +703,8 @@ def queue_attempt_create(first_time, acid, actype, path_file, aclat, aclon, dest
         dill_to_load = path_file
 
         if heading_based_random:
-            # assign the flight layer allocation in constrained airspace
-            # step 1: calculate the heading from origin to destination
-            qdr_full = random.random()*360
-            # qdr_full = qdr_full % 360
-
-            # step 2: check between which heading range the aircraft is
-            # TODO: make this dynamic
-            heading_ranges_constrained = np.array([0,72,144,216,288,360])
-
-            # check which two values qdr is in between
-            idx_qdr = np.where(qdr_full<heading_ranges_constrained)[0]
-
             # select the idx and the one before
-            angle_range = f'{heading_ranges_constrained[idx_qdr-1][0]}-{heading_ranges_constrained[idx_qdr][0]}'
+            angle_range = random_height_assignment()
 
         # Then create the aircraft
         bs.traf.cre(acid, actype, aclat, aclon, achdg, acalt, acspd)
@@ -734,20 +744,8 @@ def queue_attempt_create(first_time, acid, actype, path_file, aclat, aclon, dest
         dill_to_load = path_file
 
         if heading_based_random:
-            # assign the flight layer allocation in constrained airspace
-            # step 1: calculate the heading from origin to destination
-            qdr_full = random.random()*360
-            # qdr_full = qdr_full % 360
-
-            # step 2: check between which heading range the aircraft is
-            # TODO: make this dynamic
-            heading_ranges_constrained = np.array([0,72,144,216,288,360])
-
-            # check which two values qdr is in between
-            idx_qdr = np.where(qdr_full<heading_ranges_constrained)[0]
-
             # select the idx and the one before
-            angle_range = f'{heading_ranges_constrained[idx_qdr-1][0]}-{heading_ranges_constrained[idx_qdr][0]}'
+            angle_range = random_height_assignment()
             
         bs.traf.cre(acid, actype, aclat, aclon, achdg, acalt, acspd)
 
@@ -777,20 +775,8 @@ def queue_attempt_create(first_time, acid, actype, path_file, aclat, aclon, dest
         dill_to_load = path_file
 
         if heading_based_random:
-            # assign the flight layer allocation in constrained airspace
-            # step 1: calculate the heading from origin to destination
-            qdr_full = random.random()*360
-            # qdr_full = qdr_full % 360
-
-            # step 2: check between which heading range the aircraft is
-            # TODO: make this dynamic
-            heading_ranges_constrained = np.array([0,72,144,216,288,360])
-
-            # check which two values qdr is in between
-            idx_qdr = np.where(qdr_full<heading_ranges_constrained)[0]
-
             # select the idx and the one before
-            angle_range = f'{heading_ranges_constrained[idx_qdr-1][0]}-{heading_ranges_constrained[idx_qdr][0]}'
+            angle_range = random_height_assignment()
         
         bs.traf.cre(acid, actype, aclat, aclon, achdg, acalt, acspd)
 
@@ -1051,7 +1037,6 @@ class ActiveEdge(Entity):
 
             # Open to optimization!
             self.edge_layer_dict = np.array([], dtype=object)
-
             self.edge_airspace_type = np.array([], dtype=str)
 
             # speed limit
@@ -1756,3 +1741,25 @@ class PathPlans(Entity):
     
     def load_flow_dill(self, fpath):
         self.graph=dill.load(open(f"{fpath}/Flow_control.dill", "rb"))
+
+
+
+###### FUNCTIONS FOR LAYER HEIGHT ALLOCATION IN CONSTRAINED
+
+def random_height_assignment():
+
+    # assign a random layer of constrained airspace 
+    # assign the flight layer allocation in constrained airspace
+    # step 1: make random number
+    qdr_full = random.random()*360
+
+    # step 2: check between which heading range the aircraft is
+    heading_ranges_constrained = np.array([0,72,144,216,288,360])
+
+    # check which two values qdr is in between
+    idx_qdr = np.where(qdr_full<heading_ranges_constrained)[0]
+
+    # select the idx and the one before
+    angle_range = f'{heading_ranges_constrained[idx_qdr-1][0]}-{heading_ranges_constrained[idx_qdr][0]}'
+
+    return(angle_range)
