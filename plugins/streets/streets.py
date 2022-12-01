@@ -74,6 +74,9 @@ queue_dict = dict()
 dill_to_load = -1
 angle_range = ''
 heading_based_random = False
+heading_based_fulldensity = False
+height_count_dict = dict()
+height_allocs = ['0-72', '72-144', '144-216', '216-288', '288-360']
 
 # TODO: 
 #   - update CREM2 command for pre processed path planning
@@ -125,7 +128,7 @@ def reset():
     use_flow_control = True
 
     # default setting for streets is not constrained
-    global heading_based_random
+    global heading_based_random, heading_based_fulldensity
 
     # set hopping to true on the reset
     bs.traf.nav.hopping = True
@@ -133,6 +136,7 @@ def reset():
     bs.traf.cr.heading_based = False
     
     heading_based_random = False
+    heading_based_fulldensity = False
 
     # reset queue
     global queue_dict
@@ -141,12 +145,20 @@ def reset():
 ######################## density count functions #########################
 @core.timed_function(dt=1)
 def constrained_density():
+    global height_count_dict
     # edge_count_dict = dict(Counter(edge_traffic.actedge.wpedgeid)) #only contains edges with aircrafts
     # group_count_dict = dict(Counter(edge_traffic.actedge.group_number)) 
     # flow_count_dict = dict(Counter(edge_traffic.actedge.flow_number))
-
+    
+    # get the constrained airspace allocation
     constrained_layer_alloc = np.where(edge_traffic.actedge.edge_airspace_type == 'constrained', flight_layers.constrained_airspace_alloc, 'open')
+
+    # get a count of how many aircraft in constrained and where they are
     height_count_dict = dict(Counter(constrained_layer_alloc))
+    
+    # first check if all height allocations are in the dictionary
+    height_count_dict = {x: height_count_dict.get(x, 0) for x in height_allocs}
+
 
 ######################## FLOW CONTROL FUNCTIONS #########################
 @core.timed_function(dt=10)
@@ -454,9 +466,10 @@ def handle_replan(edges_changes):
                     edge_layer_type = edge_traffic.edge_dict[wpedgeid]['height_allocation']
                     edge_layer_dict = flight_layers.layer_dict["config"][edge_layer_type]['levels']
 
-                    if edge_layer_type != 'open' and heading_based_random:
-                        # Get the layer dictionary for the heading range
-                        edge_layer_dict = edge_layer_dict[flight_layers.constrained_airspace_alloc[idx]]
+                    if edge_layer_type != 'open': 
+                        if heading_based_random or heading_based_fulldensity:
+                            # Get the layer dictionary for the heading range
+                            edge_layer_dict = edge_layer_dict[flight_layers.constrained_airspace_alloc[idx]]
 
                     flow_number = edge_traffic.edge_dict[wpedgeid]['flow_group']
 
@@ -637,25 +650,19 @@ def streetsenable():
 
     streets_bool = True
 
-@stack.command
-def fullconstrained():
-    """fullconstrained"""
-    # # Makes height allocation in airspace based on full density in airspace
-    global heading_based_fullconstrained, nav
-
-    heading_based_fullconstrained = True
-
-    # set M2 Navigation hopping to False
-    access_plugin_object('M2NAVIGATION').hopping = False
-    access_plugin_object('SPEEDBASEDM2').hopping = False
 
 @stack.command
-def headingrandom():
-    """headingconstrained"""
+def allocateheights(allocation: 'txt'):
+    """allocate heights, options"""
     # # Turns on heading constrained airspace for scenario
-    global heading_based_random, nav
+    global nav
+    if allocation.upper() == 'RANDOM':
+        global heading_based_random
+        heading_based_random = True
 
-    heading_based_random = True
+    if allocation.upper() == 'FULLDENSITY':
+        global heading_based_fulldensity
+        heading_based_fulldensity = True
 
     # set M2 Navigation hopping to False
     access_plugin_object('M2NAVIGATION').hopping = False
@@ -703,8 +710,12 @@ def queue_attempt_create(first_time, acid, actype, path_file, aclat, aclon, dest
         dill_to_load = path_file
 
         if heading_based_random:
-            # select the idx and the one before
+            # asign the angle range randomly
             angle_range = random_height_assignment()
+
+        if heading_based_fulldensity:
+            # assign the angle range based on density of full constrained airspace
+            angle_range = fulldensity_height_assignment()
 
         # Then create the aircraft
         bs.traf.cre(acid, actype, aclat, aclon, achdg, acalt, acspd)
@@ -746,6 +757,10 @@ def queue_attempt_create(first_time, acid, actype, path_file, aclat, aclon, dest
         if heading_based_random:
             # select the idx and the one before
             angle_range = random_height_assignment()
+
+        if heading_based_fulldensity:
+            # assign the angle range based on density of full constrained airspace
+            angle_range = fulldensity_height_assignment()
             
         bs.traf.cre(acid, actype, aclat, aclon, achdg, acalt, acspd)
 
@@ -777,6 +792,10 @@ def queue_attempt_create(first_time, acid, actype, path_file, aclat, aclon, dest
         if heading_based_random:
             # select the idx and the one before
             angle_range = random_height_assignment()
+
+        if heading_based_fulldensity:
+            # assign the angle range based on density of full constrained airspace
+            angle_range = fulldensity_height_assignment()
         
         bs.traf.cre(acid, actype, aclat, aclon, achdg, acalt, acspd)
 
@@ -1693,9 +1712,11 @@ class PathPlans(Entity):
 
             # when layer type is not in open airspace check if there is a heading based
             # constrained airspace
-            if edge_layer_type != 'open' and heading_based_random:
-                # Get the layer number
-                edge_layer_dict = edge_layer_dict[angle_range]
+            if edge_layer_type != 'open':
+
+                if heading_based_random or heading_based_fulldensity:
+                    # Get the layer number
+                    edge_layer_dict = edge_layer_dict[angle_range]
 
             flow_number = edge_traffic.edge_dict[wpedgeid]['flow_group']
 
@@ -1762,4 +1783,18 @@ def random_height_assignment():
     # select the idx and the one before
     angle_range = f'{heading_ranges_constrained[idx_qdr-1][0]}-{heading_ranges_constrained[idx_qdr][0]}'
 
-    return(angle_range)
+    return angle_range
+
+
+def fulldensity_height_assignment():
+
+    # assign layer heights based on current densities at these heights in the air
+
+    # check which layer has smallest values
+    min_values = [key for key, value in height_count_dict.items() if value == min(height_count_dict.values())]
+    
+    # assign a height with lowest value
+    angle_range = min_values[0]
+
+
+    return angle_range
