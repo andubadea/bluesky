@@ -72,15 +72,18 @@ queue_dict = dict()
 
 # initialise dill loading
 dill_to_load = -1
+
+# prepare some constants for height allocations studies
+# note the use of heading is mostly an inheritance of the initial study which was 
+# actually a heading based allocation.
+# TODO: remove heading based from history
 angle_range = ''
-heading_based_random = False
-heading_based_fulldensity = False
+height_alloc_random = False
+height_alloc_fulldensity = False
+height_alloc_zonedensity = False
 height_count_dict = dict()
 height_allocs = ['0-72', '72-144', '144-216', '216-288', '288-360']
 
-# TODO: 
-#   - update CREM2 command for pre processed path planning
-#   - density tracking per height? 
 
 ######################## UPDATE FUNCTION  ##########################
 
@@ -128,15 +131,16 @@ def reset():
     use_flow_control = True
 
     # default setting for streets is not constrained
-    global heading_based_random, heading_based_fulldensity
+    global height_alloc_random, height_alloc_fulldensity, height_alloc_zonedensity
 
     # set hopping to true on the reset
     bs.traf.nav.hopping = True
     bs.traf.cr.hopping = True
     bs.traf.cr.heading_based = False
     
-    heading_based_random = False
-    heading_based_fulldensity = False
+    height_alloc_random = False
+    height_alloc_fulldensity = False
+    height_alloc_zonedensity = False
 
     # reset queue
     global queue_dict
@@ -158,6 +162,8 @@ def constrained_density():
     
     # first check if all height allocations are in the dictionary
     height_count_dict = {x: height_count_dict.get(x, 0) for x in height_allocs}
+
+    # Next part is to get a breakdown of density per flow group
 
 
 ######################## FLOW CONTROL FUNCTIONS #########################
@@ -467,7 +473,7 @@ def handle_replan(edges_changes):
                     edge_layer_dict = flight_layers.layer_dict["config"][edge_layer_type]['levels']
 
                     if edge_layer_type != 'open': 
-                        if heading_based_random or heading_based_fulldensity:
+                        if height_alloc_random or height_alloc_fulldensity or height_alloc_zonedensity:
                             # Get the layer dictionary for the heading range
                             edge_layer_dict = edge_layer_dict[flight_layers.constrained_airspace_alloc[idx]]
 
@@ -657,12 +663,16 @@ def allocateheights(allocation: 'txt'):
     # # Turns on heading constrained airspace for scenario
     global nav
     if allocation.upper() == 'RANDOM':
-        global heading_based_random
-        heading_based_random = True
+        global height_alloc_random
+        height_alloc_random = True
 
     if allocation.upper() == 'FULLDENSITY':
-        global heading_based_fulldensity
-        heading_based_fulldensity = True
+        global height_alloc_fulldensity
+        height_alloc_fulldensity = True
+
+    if allocation.upper() == 'ZONEDENSITY':
+        global height_alloc_zonedensity
+        height_alloc_zonedensity = True
 
     # set M2 Navigation hopping to False
     access_plugin_object('M2NAVIGATION').hopping = False
@@ -709,13 +719,17 @@ def queue_attempt_create(first_time, acid, actype, path_file, aclat, aclon, dest
         # First, set the global DILL loading variable
         dill_to_load = path_file
 
-        if heading_based_random:
+        if height_alloc_random:
             # asign the angle range randomly
             angle_range = random_height_assignment()
 
-        if heading_based_fulldensity:
+        if height_alloc_fulldensity:
             # assign the angle range based on density of full constrained airspace
             angle_range = fulldensity_height_assignment()
+
+        if height_alloc_zonedensity:
+            # assign the angle range based on density of zones in constrained airspace
+            angle_range = zonedensity_height_assignment()
 
         # Then create the aircraft
         bs.traf.cre(acid, actype, aclat, aclon, achdg, acalt, acspd)
@@ -754,13 +768,17 @@ def queue_attempt_create(first_time, acid, actype, path_file, aclat, aclon, dest
         # First create the aircraft
         dill_to_load = path_file
 
-        if heading_based_random:
+        if height_alloc_random:
             # select the idx and the one before
             angle_range = random_height_assignment()
 
-        if heading_based_fulldensity:
+        if height_alloc_fulldensity:
             # assign the angle range based on density of full constrained airspace
             angle_range = fulldensity_height_assignment()
+
+        if height_alloc_zonedensity:
+            # assign the angle range based on density of zones in constrained airspace
+            angle_range = zonedensity_height_assignment()
             
         bs.traf.cre(acid, actype, aclat, aclon, achdg, acalt, acspd)
 
@@ -789,13 +807,17 @@ def queue_attempt_create(first_time, acid, actype, path_file, aclat, aclon, dest
         # First create the aircraft
         dill_to_load = path_file
 
-        if heading_based_random:
+        if height_alloc_random:
             # select the idx and the one before
             angle_range = random_height_assignment()
 
-        if heading_based_fulldensity:
+        if height_alloc_fulldensity:
             # assign the angle range based on density of full constrained airspace
             angle_range = fulldensity_height_assignment()
+
+        if height_alloc_zonedensity:
+            # assign the angle range based on density of zones in constrained airspace
+            angle_range = zonedensity_height_assignment()
         
         bs.traf.cre(acid, actype, aclat, aclon, achdg, acalt, acspd)
 
@@ -1714,7 +1736,7 @@ class PathPlans(Entity):
             # constrained airspace
             if edge_layer_type != 'open':
 
-                if heading_based_random or heading_based_fulldensity:
+                if height_alloc_random or height_alloc_fulldensity or height_alloc_zonedensity:
                     # Get the layer number
                     edge_layer_dict = edge_layer_dict[angle_range]
 
@@ -1788,6 +1810,20 @@ def random_height_assignment():
 
 def fulldensity_height_assignment():
 
+    # assign layer heights based on current densities at these heights in the air
+
+    # check which layer has smallest values
+    min_values = [key for key, value in height_count_dict.items() if value == min(height_count_dict.values())]
+    
+    # assign a height with lowest value
+    angle_range = min_values[0]
+
+
+    return angle_range
+
+
+def zonedensity_height_assignment():
+    # TODO: finish this
     # assign layer heights based on current densities at these heights in the air
 
     # check which layer has smallest values
