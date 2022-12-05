@@ -1927,40 +1927,6 @@ def zonedensity_height_assignment(start_flow: int, check_time: str = 'start', cu
         new_angle_range = min_values[0]
 
     elif check_time == 'en_route':
-        # onky allow it to switch en route  if another is smaller
-
-        min_values = [key for key, value in flow_counts.items() if value == min(flow_counts.values())]
-
-        # however, here we also need to check if current range has the same minimum density so that we don't change
-        # without necessity
-        curr_range_density = flow_counts[current_range]
-
-        if curr_range_density == min(flow_counts.values()):
-            new_angle_range = current_range
-        else:
-            # assign a height with lowest value
-            new_angle_range = min_values[0]
-
-
-    return new_angle_range
-
-
-def zonedensity_height_assignment(start_flow: int, check_time: str = 'start', current_range=None):
-
-    # get count of aircraft in flow number
-    flow_counts = zone_count_dict[start_flow]
-
-    # this means that we are giving a zonedensity height assignment at the start of
-    # the route creation
-    if check_time == 'start':
-        # assign layer heights based on current densities at these heights in the air
-        # check which layer has smallest values
-        min_values = [key for key, value in flow_counts.items() if value == min(flow_counts.values())]
-        
-        # assign a height with lowest value
-        new_angle_range = min_values[0]
-
-    elif check_time == 'en_route':
         # this is a check being done by the autopilot so we must only allow
         # a switch between the layer sets above or below the current one
 
