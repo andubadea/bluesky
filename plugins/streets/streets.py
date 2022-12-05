@@ -149,21 +149,41 @@ def reset():
 ######################## density count functions #########################
 @core.timed_function(dt=1)
 def constrained_density():
-    global height_count_dict
-    # edge_count_dict = dict(Counter(edge_traffic.actedge.wpedgeid)) #only contains edges with aircrafts
-    # group_count_dict = dict(Counter(edge_traffic.actedge.group_number)) 
-    # flow_count_dict = dict(Counter(edge_traffic.actedge.flow_number))
-    
+    global height_count_dict, zone_count_dict
+
+    if height_alloc_random:
+        return
+
     # get the constrained airspace allocation
-    constrained_layer_alloc = np.where(edge_traffic.actedge.edge_airspace_type == 'constrained', flight_layers.constrained_airspace_alloc, 'open')
+    height_alloc_loc = np.where(edge_traffic.actedge.edge_airspace_type == 'constrained', flight_layers.constrained_airspace_alloc, 'open')
 
-    # get a count of how many aircraft in constrained and where they are
-    height_count_dict = dict(Counter(constrained_layer_alloc))
-    
-    # first check if all height allocations are in the dictionary
-    height_count_dict = {x: height_count_dict.get(x, 0) for x in height_allocs}
+    if height_alloc_fulldensity:
 
-    # Next part is to get a breakdown of density per flow group
+        # get a count of how many aircraft in constrained and where they are
+        height_count_dict = dict(Counter(height_alloc_loc))
+        
+        # Make the count of the dictionary without open airspace
+        height_count_dict = {x: height_count_dict.get(x, 0) for x in height_allocs}
+
+    if height_alloc_zonedensity:
+
+        # remove open airspace from constrained height allocation and get the flow numbers
+        constrained_height_alloc = height_alloc_loc[height_alloc_loc != 'open']
+        constrained_flow_number = edge_traffic.actedge.flow_number[height_alloc_loc != 'open']
+
+        zone_count_dict = {x: {} for x in edge_traffic.flow_numbers}
+
+        for flow_number in zone_count_dict:
+
+            # first check if flow number is inside the current flow numbers
+            occupied_heights = constrained_height_alloc[constrained_flow_number == flow_number]
+
+            height_per_flow_count = dict(Counter(occupied_heights))
+            height_per_flow_count = {x: height_per_flow_count.get(x, 0) for x in height_allocs}
+
+            zone_count_dict[flow_number] = height_per_flow_count
+
+
 
 
 ######################## FLOW CONTROL FUNCTIONS #########################
@@ -728,8 +748,10 @@ def queue_attempt_create(first_time, acid, actype, path_file, aclat, aclon, dest
             angle_range = fulldensity_height_assignment()
 
         if height_alloc_zonedensity:
+            # here we need to know which is the starting flow group
             # assign the angle range based on density of zones in constrained airspace
-            angle_range = zonedensity_height_assignment()
+            # this will be done in path_plans.cre because we need to check starting flow group
+            pass
 
         # Then create the aircraft
         bs.traf.cre(acid, actype, aclat, aclon, achdg, acalt, acspd)
@@ -777,8 +799,10 @@ def queue_attempt_create(first_time, acid, actype, path_file, aclat, aclon, dest
             angle_range = fulldensity_height_assignment()
 
         if height_alloc_zonedensity:
+            # here we need to know which is the starting flow group
             # assign the angle range based on density of zones in constrained airspace
-            angle_range = zonedensity_height_assignment()
+            # this will be done in path_plans.cre because we need to check starting flow group
+            pass
             
         bs.traf.cre(acid, actype, aclat, aclon, achdg, acalt, acspd)
 
@@ -816,8 +840,10 @@ def queue_attempt_create(first_time, acid, actype, path_file, aclat, aclon, dest
             angle_range = fulldensity_height_assignment()
 
         if height_alloc_zonedensity:
+            # here we need to know which is the starting flow group
             # assign the angle range based on density of zones in constrained airspace
-            angle_range = zonedensity_height_assignment()
+            # this will be done in path_plans.cre because we need to check starting flow group
+            pass
         
         bs.traf.cre(acid, actype, aclat, aclon, achdg, acalt, acspd)
 
@@ -936,6 +962,9 @@ class EdgeTraffic(Entity):
         # convert to sparse matrix to get the (u,v) to edge_id mapping
         self.uv_to_edge_matrix = csr_matrix(adj_matrix, dtype=np.uint16)
 
+        # get unique flow numbers
+        self.flow_numbers = np.unique(self.const_edge_flow_array)
+
 # "autopilot"
 class EdgesAp(Entity):
     def __init__(self):
@@ -979,7 +1008,43 @@ class EdgesAp(Entity):
             edge_traffic.actedge.turn_lat[i], edge_traffic.actedge.turn_lon[i], \
             edge_traffic.actedge.hdg_lat[i], edge_traffic.actedge.hdg_lon[i], \
             edge_traffic.actedge.const_lat[i], edge_traffic.actedge.const_lon[i], \
-            edge_traffic.actedge.edge_airspace_type[i] = self.edge_rou[i].getnextwp()      
+            edge_traffic.actedge.edge_airspace_type[i] = self.edge_rou[i].getnextwp()
+
+            # here do a check to see if there is a new flow group
+            # new flow group must be in constrained
+            if height_alloc_zonedensity and edge_traffic.actedge.edge_airspace_type[i] == 'constrained':
+                
+                # get the previous waypoint to see if there has been a change
+                iactwp = bs.traf.ap.route[i].iactwp
+                prev_iactwpt = iactwp - 1
+
+                # get the current and prev flow number
+                prev_flow_number = int(edge_traffic.edgeap.edge_rou[i].flow_number[prev_iactwpt])
+                current_flow_number = edge_traffic.actedge.flow_number[i]
+
+                if prev_flow_number != current_flow_number:
+
+                    # first find your current height to see if you need to change
+                    curr_range = get_curr_range(bs.traf.flight_levels[i])
+
+                    # if they are not equal then we need to potentially change heights      
+                    new_angle_range = zonedensity_height_assignment(current_flow_number, 'en_route', curr_range)
+
+                    # update the current edge layer dict
+                    edge_layer_type = edge_traffic.edge_dict[edge_traffic.actedge.wpedgeid[i]]['height_allocation']
+                    edge_layer_dict = flight_layers.layer_dict["config"][edge_layer_type]['levels'][new_angle_range]
+                    edge_traffic.actedge.edge_layer_dict[i] = edge_layer_dict
+
+                    # also update all future routes
+                    for idx, _ in enumerate(edge_traffic.edgeap.edge_rou[i].edge_layer_dict[iactwp + 1:], start=iactwp + 1):
+                        next_wpedgeid = edge_traffic.edgeap.edge_rou[i].wpedgeid[idx]
+                        edge_layer_type = edge_traffic.edge_dict[next_wpedgeid]['height_allocation']
+                        if edge_layer_type == 'open':
+                            # dont change open airspace dicts
+                            continue
+
+                        edge_layer_dict = flight_layers.layer_dict["config"][edge_layer_type]['levels'][new_angle_range]
+                        edge_traffic.edgeap.edge_rou[i].edge_layer_dict[idx] = edge_layer_dict
 
         # TODO: only calculate for drones that are in constrained airspace
         # get distance of drones to next intersection/turn intersection
@@ -1656,6 +1721,7 @@ class PathPlans(Entity):
         # Only do path planning for aircraft that are not Rogue aircraft.
         # Rogue aircraft will have an id that starts with 'R'
         acid = bs.traf.id[-1]
+        acidx = bs.traf.id2idx(acid)
         if acid[0] == 'R':
             self.pathplanning[-1] = None
             return
@@ -1696,6 +1762,9 @@ class PathPlans(Entity):
         utm_x = []
         utm_y = []
 
+        # flag for location of flow number to for head_alloc_zonedensity
+        zonedensity_flag = True
+
         for j, rte in enumerate(route):
             lat = rte[1] # deg
             lon = rte[0] # deg
@@ -1732,16 +1801,36 @@ class PathPlans(Entity):
             edge_layer_type = edge_traffic.edge_dict[wpedgeid]['height_allocation']
             edge_layer_dict = flight_layers.layer_dict["config"][edge_layer_type]['levels']
 
+            flow_number = edge_traffic.edge_dict[wpedgeid]['flow_group']
+
             # when layer type is not in open airspace check if there is a heading based
             # constrained airspace
             if edge_layer_type != 'open':
 
-                if height_alloc_random or height_alloc_fulldensity or height_alloc_zonedensity:
+                if height_alloc_random or height_alloc_fulldensity:
                     # Get the layer number
                     edge_layer_dict = edge_layer_dict[angle_range]
 
-            flow_number = edge_traffic.edge_dict[wpedgeid]['flow_group']
+                if height_alloc_zonedensity and zonedensity_flag:
+                    # If you go into here it is the first time in the loop that this happens
+                    # this means it is the first point of route in constrained airspace
+                    new_angle_range = zonedensity_height_assignment(int(flow_number), 'start')
+                    edge_layer_dict = edge_layer_dict[new_angle_range]
 
+                    # turn off flag to ensure it goes to elif below
+                    zonedensity_flag = False
+
+                    # reallocate constrained density if first waypoint
+                    if j == 0:
+                        flight_layers.constrained_airspace_alloc[acidx] = new_angle_range
+
+                elif height_alloc_zonedensity:
+                    # zonedensity_flag is off so we have gone through the if above and now we just check if it has changed
+                    # to let the autopilot know to perform a potential check of density in the future
+
+                    # just use the same new_angle_range as before to have a dummy variable
+                    edge_layer_dict = edge_layer_dict[new_angle_range]
+                    
             # get the edge_airspace_type
             if in_constrained[j]:
                 edge_airspace_type = 'constrained'
@@ -1822,15 +1911,128 @@ def fulldensity_height_assignment():
     return angle_range
 
 
-def zonedensity_height_assignment():
-    # TODO: finish this
-    # assign layer heights based on current densities at these heights in the air
+def zonedensity_height_assignment(start_flow: int, check_time: str = 'start', current_range=None):
 
-    # check which layer has smallest values
-    min_values = [key for key, value in height_count_dict.items() if value == min(height_count_dict.values())]
+    # get count of aircraft in flow number
+    flow_counts = zone_count_dict[start_flow]
+
+    # this means that we are giving a zonedensity height assignment at the start of
+    # the route creation
+    if check_time == 'start':
+        # assign layer heights based on current densities at these heights in the air
+        # check which layer has smallest values
+        min_values = [key for key, value in flow_counts.items() if value == min(flow_counts.values())]
+        
+        # assign a height with lowest value
+        new_angle_range = min_values[0]
+
+    elif check_time == 'en_route':
+        # onky allow it to switch en route  if another is smaller
+
+        min_values = [key for key, value in flow_counts.items() if value == min(flow_counts.values())]
+
+        # however, here we also need to check if current range has the same minimum density so that we don't change
+        # without necessity
+        curr_range_density = flow_counts[current_range]
+
+        if curr_range_density == min(flow_counts.values()):
+            new_angle_range = current_range
+        else:
+            # assign a height with lowest value
+            new_angle_range = min_values[0]
+
+
+    return new_angle_range
+
+
+def zonedensity_height_assignment(start_flow: int, check_time: str = 'start', current_range=None):
+
+    # get count of aircraft in flow number
+    flow_counts = zone_count_dict[start_flow]
+
+    # this means that we are giving a zonedensity height assignment at the start of
+    # the route creation
+    if check_time == 'start':
+        # assign layer heights based on current densities at these heights in the air
+        # check which layer has smallest values
+        min_values = [key for key, value in flow_counts.items() if value == min(flow_counts.values())]
+        
+        # assign a height with lowest value
+        new_angle_range = min_values[0]
+
+    elif check_time == 'en_route':
+        # this is a check being done by the autopilot so we must only allow
+        # a switch between the layer sets above or below the current one
+
+        # if the current range is '0-72'
+        if current_range == '0-72':
+            # only consider traffic in '0-72' and '72-144'
+            flow_count_dict = {
+                '0-72': flow_counts['0-72'], 
+                '72-144': flow_counts['72-144']
+                }
+        
+        elif current_range == '72-144':
+            
+            flow_count_dict = {
+                '0-72': flow_counts['0-72'], 
+                '72-144': flow_counts['72-144'], 
+                '144-216': flow_counts['144-216']
+                }
+
+        elif current_range == '144-216':
+            flow_count_dict = {
+                '72-144': flow_counts['72-144'], 
+                '144-216': flow_counts['144-216'], 
+                '216-288': flow_counts['216-288']}
+
+
+        elif current_range == '216-288':
+            flow_count_dict = {
+                '144-216': flow_counts['144-216'], 
+                '216-288': flow_counts['216-288'], 
+                '288-360': flow_counts['288-360']
+                }
+
+        elif current_range == '288-360':
+            flow_count_dict = {
+                '216-288': flow_counts['216-288'], 
+                '288-360': flow_counts['288-360'],
+                }
+
+        min_values = [key for key, value in flow_count_dict.items() if value == min(flow_count_dict.values())]
+
+        # however, here we also need to check if current range has the same minimum density so that we don't change
+        # without necessity
+        curr_range_density = flow_count_dict[current_range]
+
+        if curr_range_density == min(flow_count_dict.values()):
+            new_angle_range = current_range
+        else:
+            # assign a height with lowest value
+            new_angle_range = min_values[0]
+
+
+    return new_angle_range
+
+def get_curr_range(height: int = 0):
+
+    # function takes the current height and gives you the range you are in
     
-    # assign a height with lowest value
-    angle_range = min_values[0]
+    # if you are between 0 and 90 then you are
+    if height in [0, 30, 60, 90]:
+        new_angle_range = '0-72'
+    
+    elif height in [120, 150, 180]:
+        new_angle_range =  '72-144'
 
+    elif height in [210, 240, 270]:
+        new_angle_range =  '144-216'
 
-    return angle_range
+    elif height in [300, 330, 360]:
+        new_angle_range =  '216-288'
+
+    elif height in [390, 420, 450, 480, 500]:
+        new_angle_range =  '288-360'
+
+    return new_angle_range
