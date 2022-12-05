@@ -82,6 +82,7 @@ height_alloc_random = False
 height_alloc_fulldensity = False
 height_alloc_zonedensity = False
 height_count_dict = dict()
+zone_count_dict = dict()
 height_allocs = ['0-72', '72-144', '144-216', '216-288', '288-360']
 
 
@@ -1899,9 +1900,15 @@ def random_height_assignment():
 
 def fulldensity_height_assignment():
 
+    global height_count_dict
     # assign layer heights based on current densities at these heights in the air
 
     # check which layer has smallest values
+    # if empty make sure you assign 
+    if not height_count_dict:
+        # Make the count of the dictionary without open airspace
+        height_count_dict = {x: height_count_dict.get(x, 0) for x in height_allocs}
+
     min_values = [key for key, value in height_count_dict.items() if value == min(height_count_dict.values())]
     
     # assign a height with lowest value
@@ -1912,6 +1919,13 @@ def fulldensity_height_assignment():
 
 
 def zonedensity_height_assignment(start_flow: int, check_time: str = 'start', current_range=None):
+
+    global zone_count_dict
+
+    # if empty make sure you assign
+    if not zone_count_dict:
+        zone_count_dict = {x: {} for x in edge_traffic.flow_numbers}
+
 
     # get count of aircraft in flow number
     flow_counts = zone_count_dict[start_flow]
