@@ -1929,6 +1929,9 @@ def zonedensity_height_assignment(start_flow: int, check_time: str = 'start', cu
 
     # get count of aircraft in flow number
     flow_counts = zone_count_dict[start_flow]
+    
+    if not flow_counts:
+        flow_counts = {x: flow_counts.get(x,0) for x in height_allocs} 
 
     # this means that we are giving a zonedensity height assignment at the start of
     # the route creation
