@@ -81,6 +81,7 @@ angle_range = ''
 height_alloc_random = False
 height_alloc_fulldensity = False
 height_alloc_zonedensity = False
+height_alloc_distance = False
 height_count_dict = dict()
 zone_count_dict = dict()
 height_allocs = ['0-72', '72-144', '144-216', '216-288', '288-360']
@@ -132,7 +133,7 @@ def reset():
     use_flow_control = True
 
     # default setting for streets is not constrained
-    global height_alloc_random, height_alloc_fulldensity, height_alloc_zonedensity
+    global height_alloc_random, height_alloc_fulldensity, height_alloc_zonedensity, height_alloc_distance
 
     # set hopping to true on the reset
     bs.traf.nav.hopping = True
@@ -142,6 +143,7 @@ def reset():
     height_alloc_random = False
     height_alloc_fulldensity = False
     height_alloc_zonedensity = False
+    height_alloc_distance = False
 
     # reset queue
     global queue_dict
@@ -152,7 +154,7 @@ def reset():
 def constrained_density():
     global height_count_dict, zone_count_dict
 
-    if height_alloc_random:
+    if height_alloc_random or height_alloc_distance:
         return
 
     # get the constrained airspace allocation
@@ -494,7 +496,7 @@ def handle_replan(edges_changes):
                     edge_layer_dict = flight_layers.layer_dict["config"][edge_layer_type]['levels']
 
                     if edge_layer_type != 'open': 
-                        if height_alloc_random or height_alloc_fulldensity or height_alloc_zonedensity:
+                        if height_alloc_random or height_alloc_fulldensity or height_alloc_zonedensity or height_alloc_distance:
                             # Get the layer dictionary for the heading range
                             edge_layer_dict = edge_layer_dict[flight_layers.constrained_airspace_alloc[idx]]
 
@@ -695,6 +697,10 @@ def allocateheights(allocation: 'txt'):
         global height_alloc_zonedensity
         height_alloc_zonedensity = True
 
+    if allocation.upper() == 'DISTANCE':
+        global height_alloc_distance
+        height_alloc_distance = True
+
     # set M2 Navigation hopping to False
     access_plugin_object('M2NAVIGATION').hopping = False
     access_plugin_object('SPEEDBASEDM2').hopping = False
@@ -754,6 +760,10 @@ def queue_attempt_create(first_time, acid, actype, path_file, aclat, aclon, dest
             # this will be done in path_plans.cre because we need to check starting flow group
             pass
 
+        if height_alloc_distance:
+            distance_od = geo.kwikdist(float(aclat), float(aclon), float(destlat), float(destlon)) 
+            angle_range = distance_height_assignment(dist=distance_od)
+
         # Then create the aircraft
         bs.traf.cre(acid, actype, aclat, aclon, achdg, acalt, acspd)
 
@@ -805,6 +815,10 @@ def queue_attempt_create(first_time, acid, actype, path_file, aclat, aclon, dest
             # this will be done in path_plans.cre because we need to check starting flow group
             pass
             
+        if height_alloc_distance:
+            distance_od = geo.kwikdist(float(aclat), float(aclon), float(destlat), float(destlon)) 
+            angle_range = distance_height_assignment(dist=distance_od)
+
         bs.traf.cre(acid, actype, aclat, aclon, achdg, acalt, acspd)
 
         acidx = bs.traf.id.index(acid)
@@ -845,7 +859,11 @@ def queue_attempt_create(first_time, acid, actype, path_file, aclat, aclon, dest
             # assign the angle range based on density of zones in constrained airspace
             # this will be done in path_plans.cre because we need to check starting flow group
             pass
-        
+       
+        if height_alloc_distance:
+            distance_od = geo.kwikdist(float(aclat), float(aclon), float(destlat), float(destlon)) 
+            angle_range = distance_height_assignment(dist=distance_od)
+
         bs.traf.cre(acid, actype, aclat, aclon, achdg, acalt, acspd)
 
         acidx = bs.traf.id.index(acid)
@@ -1808,7 +1826,7 @@ class PathPlans(Entity):
             # constrained airspace
             if edge_layer_type != 'open':
 
-                if height_alloc_random or height_alloc_fulldensity:
+                if height_alloc_random or height_alloc_fulldensity or height_alloc_distance:
                     # Get the layer number
                     edge_layer_dict = edge_layer_dict[angle_range]
 
@@ -1995,6 +2013,30 @@ def zonedensity_height_assignment(start_flow: int, check_time: str = 'start', cu
             # assign a height with lowest value
             new_angle_range = min_values[0]
 
+
+    return new_angle_range
+
+def distance_height_assignment(dist: float) -> str:
+    
+    if dist < 2838:
+
+        new_angle_range = '0-72'
+    
+    elif dist < 4528:
+        
+        new_angle_range = '72-144'
+
+    elif dist < 6272:
+
+        new_angle_range = '133-216'
+
+    elif dist < 8186:
+
+        new_angle_range = '216-288'
+    
+    else:
+        
+        new_angle_range = '288-360'
 
     return new_angle_range
 
