@@ -2018,6 +2018,9 @@ def zonedensity_height_assignment(start_flow: int, check_time: str = 'start', cu
 
 def distance_height_assignment(dist: float) -> str:
     
+    # convert to meters
+    dist = dist*nm
+
     if dist < 2838:
 
         new_angle_range = '0-72'
