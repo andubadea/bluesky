@@ -2031,7 +2031,7 @@ def distance_height_assignment(dist: float) -> str:
 
     elif dist < 6272:
 
-        new_angle_range = '133-216'
+        new_angle_range = '144-216'
 
     elif dist < 8186:
 
