@@ -53,12 +53,6 @@ class M2Navigation(core.Entity):
                                          bs.traf.actwp.swlastwp,
                                          np.logical_not(still_going_to_dest)))
 
-        # adding some extra bools to ensure things are available for logging
-        give_descent_command = False
-        give_ascent_command = False
-        can_ascend = False
-        can_descend = False
-
         # CRUISE SPEED STUFF -----------------------------------------
         set_cruise_speed = np.logical_and.reduce((lnav_on, np.logical_not(rogue)))
         
@@ -233,7 +227,7 @@ class M2Navigation(core.Entity):
         # check to see if give_descent_command and give_ascent_command, can_descend exist
         log_transitions(give_turn_command, give_constrained_cruise_command,
                         give_descent_command, give_ascent_command, 
-                        bs.traf.cr.stuck, can_descend)
+                        bs.traf.cr.stuck, can_descend, self.hopping)
         # Aircraft to delete
         # We delete aircraft if:
         # 1. They have lnav off
@@ -273,65 +267,74 @@ class M2Navigation(core.Entity):
         
         return can_ascend, can_descend
 
-def log_transitions(turning, cruising, descend, ascend, cr_stuck, can_descend):
-
+def log_transitions(turning, cruising, descend, ascend, cr_stuck, can_descend, hopping):
+    
+    # Log vertical transition information
+    
+    id_arr = np.asarray(bs.traf.id, dtype=object)
     # First step is to figure out which aircraft were given a turn command
     # These aircraft can move up or down
-    turning_transition =  bs.traf.id[turning] 
+
+    turning_transitions =  id_arr[turning] 
     turning_distance = transition_distance(turning) 
 
     # Second step is to figure out which aircraft were given a cruise command
     # These aircraft either just finished a turn or have just entered constrained airspace.
     # at the moment assume that all cruise commands are given only for turning aircraft
-    cruise_transitions = bs.traf.id[cruising]
+    cruise_transitions = id_arr[cruising]
     cruise_distance = transition_distance(cruising) 
 
-    # Third step is to figure out which aircaft where given a descent command
-    if not descend:
-        descent_transitions = bs.traf.id[descend]
+    if hopping:
+        # Third step is to figure out which aircaft where given a descent command
+        descent_transitions = id_arr[descend]
         descent_distance = transition_distance(descend) 
-    else:
-        descent_transitions = ''
-        descent_distance= ''
 
-    # Fourth step is to figure out which aircaft were given an ascend command
-    # currently all ascend commands are only given for aircraft that resolve
-    # conflicts or have aircraft beneath them.
-    if not ascend:
-        ascent_transitions_cr_bool = np.logical_and.reduce(ascend,
-                                                       cr_stuck)
-        ascent_transitions_cr = bs.traf.id[ascent_transitions_cr_bool]
+
+        # Fourth step is to figure out which aircaft were given an ascend command
+        # currently all ascend commands are only given for aircraft that resolve
+        # conflicts or have aircraft beneath them.
+        ascent_transitions_cr_bool = np.logical_and.reduce((ascend,
+                                                    ascend))
+        ascent_transitions_cr = id_arr[ascent_transitions_cr_bool]
         ascent_cr_distance = transition_distance(ascent_transitions_cr_bool)
 
-        ascent_transitions_hop_bool = np.logical_and.reduce(ascend,
-                                                   np.logical_not(can_descend),
-                                                   np.logical_not(cr_stuck)
-                                                   )
-        ascent_transitions_hop = bs.traf.id[ascent_transitions_hop_bool]
+        ascent_transitions_hop_bool = np.logical_and.reduce((ascend,
+                                                np.logical_not(can_descend),
+                                                np.logical_not(cr_stuck)
+                                                ))
+        ascent_transitions_hop = id_arr[ascent_transitions_hop_bool]
         ascent_hop_distance = transition_distance(ascent_transitions_hop_bool)
+     
     else:
-        ascent_transitions_cr = ''
-        ascent_transitions_hop = ''
-        ascent_cr_distance = ''
-        ascent_hop_distance = ''
-    
-    # TODO: if everything is empty then do not Log
 
-    # now add everything to the log
-    bs.traf.translog.log(*turning_transition)
-    bs.traf.translog.log(*turning_distance)
+        # Set empty arrays if no hopping
+        descent_transitions = np.array([])
+        descent_distance= np.array([])
+        ascent_transitions_cr = np.array([])
+        ascent_transitions_hop = np.array([])
+        ascent_cr_distance = np.array([])
+        ascent_hop_distance = np.array([])
 
-    bs.traf.translog.log(*cruise_transitions)
-    bs.traf.translog.log(*cruise_distance)
-    
-    bs.traf.translog.log(*descent_transitions)
-    bs.traf.translog(*descent_distance)
+    sum_lens = turning_transitions.size + cruise_transitions.size + descent_transitions.size \
+        + ascent_transitions_cr.size + ascent_transitions_hop.size
 
-    bs.traf.translog.log(*ascent_transitions_cr)
-    bs.traf.translog.log(*ascent_cr_distance)
+    # ony log if there is something to log
+    if sum_lens:
+        # now add everything to the log
+        bs.traf.translog.log(*turning_transitions)
+        bs.traf.translog.log(*turning_distance)
 
-    bs.traf.translog.log(*ascent_transitions_hop)
-    bs.traf.translog.log(*ascent_hop_distance)
+        bs.traf.translog.log(*cruise_transitions)
+        bs.traf.translog.log(*cruise_distance)
+        
+        bs.traf.translog.log(*descent_transitions)
+        bs.traf.translog.log(*descent_distance)
+
+        bs.traf.translog.log(*ascent_transitions_cr)
+        bs.traf.translog.log(*ascent_cr_distance)
+
+        bs.traf.translog.log(*ascent_transitions_hop)
+        bs.traf.translog.log(*ascent_hop_distance)
 
 def transition_distance(trans_bool):
     return bs.traf.selalt[trans_bool] - bs.traf.alt[trans_bool]
