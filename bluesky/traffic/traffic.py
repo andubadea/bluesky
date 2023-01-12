@@ -152,7 +152,7 @@ transheader = \
     '#######################################################\n\n' + \
     'Parameters [Units]:\n' + \
     'Simulation time [s], ' + \
-    'ACIDs_TURN [-], TURN_DIST [ft], ACIDs_CRUISE [-], CRUISE_DIST [m], \
+    'ACIDs_TURN [-], TURN_DIST [m], ACIDs_CRUISE [-], CRUISE_DIST [m], \
     ACIDs_DESCEND [-], DESCEND_DIST [m], ACIDs_ASCENDCR [-], ASCENDCR_DIST [m], \
     ACIDs_ASCENDHOP, ASCENDCR_DIST [m]\n'
 
