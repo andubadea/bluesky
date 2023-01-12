@@ -145,6 +145,17 @@ flowheader = \
     BOOL_REPLAN, BOOL_ATTEMPT_REPLAN, BOOL_UPDATED_GRAPH_NO_REPLAN, BOOL_HIGH_TRAF_NO_REPLAN, \
     BOOL_LAST_POINT_NO_REPLAN\n'
     
+transheader = \
+    '#######################################################\n' + \
+    'VERT TRANSITION LOG\n' + \
+    'Statistics recorded regularly at a certain simtime interval.\n' + \
+    '#######################################################\n\n' + \
+    'Parameters [Units]:\n' + \
+    'Simulation time [s], ' + \
+    'ACIDs_TURN [-], TURN_DIST [ft], ACIDs_CRUISE [-], CRUISE_DIST [m], \
+    ACIDs_DESCEND [-], DESCEND_DIST [m], ACIDs_ASCENDCR [-], ASCENDCR_DIST [m], \
+    ACIDs_ASCENDHOP, ASCENDCR_DIST [m]\n'
+
 geoheader = \
     '#######################################################\n' + \
     'GEOFENCE LOG\n' + \
@@ -192,6 +203,7 @@ class Traffic(Entity):
         self.conflog = datalog.crelog('CONFLOG', None, confheader)
         self.reglog = datalog.crelog('REGLOG', None, regheader)
         # self.flowlog = datalog.crelog('FLOWLOG', None, flowheader)
+        self.translog = datalog.crelog('TRANSLOG', None, transheader)
         self.geolog = datalog.crelog('GEOLOG', None, geoheader)
         self.loslog = datalog.crelog('LOSLOG', None, losheader)
         self.geo_intrusions = dict()
@@ -1145,6 +1157,7 @@ class Traffic(Entity):
         self.conflog.start()
         #self.flowlog.start()
         self.reglog.start()
+        self.translog.start()
         self.geolog.start()
         self.loslog.start()
         return
