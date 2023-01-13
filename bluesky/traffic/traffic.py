@@ -95,10 +95,12 @@ confheader = \
     'CPALON [lon],' + \
     'AIRSPACETYPE1 [-],' + \
     'AIRSPACETYPE2 [-],' + \
-    'LAYERTYE1 [-],' + \
+    'LAYERTYPE1 [-],' + \
     'LAYERTYPE2 [-],' + \
     'EDGEID1 [-],' + \
-    'EDGEID2 [-]\n'
+    'EDGEID2 [-],' + \
+    'AIRSPACEALLOC1 [-],' + \
+    'AIRSPACEALLOC2 [-]\n'
     
 losheader = \
     '#######################################################\n' + \
@@ -120,12 +122,14 @@ losheader = \
     'DIST [m]' + \
     'AIRSPACETYPE1 [-],' + \
     'AIRSPACETYPE2 [-],' + \
-    'LAYERTYE1 [-],' + \
+    'LAYERTYPE1 [-],' + \
     'LAYERTYPE2 [-],' + \
     'EDGEID1 [-],' + \
     'EDGEID2 [-],' + \
     'HDG1 [deg],' + \
-    'HDG2 [deg]\n'
+    'HDG2 [deg],' + \
+    'AIRSPACEALLOC1 [-],' + \
+    'AIRSPACEALLOC2 [-]\n'
 
 regheader = \
     '#######################################################\n' + \
@@ -648,7 +652,8 @@ class Traffic(Entity):
                                     cpalatlon[0], cpalatlon[1],
                                     self.actedge.edge_airspace_type[idx1], self.actedge.edge_airspace_type[idx2], 
                                     self.flight_layer_type[idx1], self.flight_layer_type[idx2], 
-                                    self.actedge.wpedgeid[idx1],self.actedge.wpedgeid[idx2])
+                                    self.actedge.wpedgeid[idx1],self.actedge.wpedgeid[idx2],
+                                    self.actedge.constrained_airspace_alloc[idx1], self.actedge.constrained_airspace_alloc[idx2])
                 
         self.prevconfpairs = set(self.cd.confpairs)
         
@@ -678,7 +683,10 @@ class Traffic(Entity):
                                                 self.actedge.edge_airspace_type[idx1], self.actedge.edge_airspace_type[idx2], 
                                                 self.flight_layer_type[idx1], self.flight_layer_type[idx2],  
                                                 self.actedge.wpedgeid[idx1],self.actedge.wpedgeid[idx2],
-                                                self.hdg[idx1], self.hdg[idx2]]
+                                                self.hdg[idx1], self.hdg[idx2],
+                                                self.actedge.constrained_airspace_alloc[idx1], 
+                                                self.actedge.constrained_airspace_alloc[idx2]
+                                                ]
                 else:
                     # Entry exists, check if calculated is smaller
                     if self.losmindist[dictkey][0] > losdistance:
@@ -690,7 +698,8 @@ class Traffic(Entity):
                                                 self.losmindist[dictkey][9], self.losmindist[dictkey][10],
                                                 self.losmindist[dictkey][11], self.losmindist[dictkey][12],
                                                 self.losmindist[dictkey][13], self.losmindist[dictkey][14],
-                                                self.losmindist[dictkey][15], self.losmindist[dictkey][16]
+                                                self.losmindist[dictkey][15], self.losmindist[dictkey][16],
+                                                self.losmindist[dictkey][17], self.losmindist[dictkey][18]
                                                 ]
         
         # Log data if there are aircraft that are no longer in LOS
@@ -712,7 +721,7 @@ class Traffic(Entity):
                                 losdata[4], losdata[5],losdata[6],
                                 losdata[0], losdata[9], losdata[10],
                                 losdata[11], losdata[12], losdata[13], losdata[14],
-                                losdata[15], losdata[16])
+                                losdata[15], losdata[16], losdata[17], losdata[18])
                 
         
         self.prevlospairs = set(self.cd.lospairs)
