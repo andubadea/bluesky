@@ -1065,6 +1065,20 @@ class EdgesAp(Entity):
                         edge_layer_dict = flight_layers.layer_dict["config"][edge_layer_type]['levels'][new_angle_range]
                         edge_traffic.edgeap.edge_rou[i].edge_layer_dict[idx] = edge_layer_dict
 
+            # Next part is to do a check if aircraft has entered constrained airspace from open airspace
+            # first check if current aircraft is in constrained airspace
+            if edge_traffic.actedge.edge_airspace_type[i] == 'constrained':
+                
+                # for aircraft which are in constrained we should check the previous airspace type
+                iactwp = bs.traf.ap.route[i].iactwp
+                prev_iactwpt = iactwp - 1
+                
+                prev_airspace = edge_traffic.edgeap.edge_rou[i].edge_airspace_type[prev_iactwpt]
+
+                if prev_airspace == 'open':
+                    # this means that the aircraft has just entered constrained airspace
+                    bs.traf.conslog.log(bs.traf.id[i], bs.traf.alt[i])
+
         # TODO: only calculate for drones that are in constrained airspace
         # get distance of drones to next intersection/turn intersection
         dis_to_int = np.where(bs.traf.roguetraffic.rogue_bool, 9999.9, 

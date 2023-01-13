@@ -177,6 +177,14 @@ geoheader = \
     'Intrusion LON [deg],' + \
     'Intrusion time [s]\n'
 
+constheader = \
+    '#######################################################\n' + \
+    'ENTER CONSTRAINED LOG\n' + \
+    'Statistics recorded upon aircraft deletion\n' + \
+    '#######################################################\n\n' + \
+    'Parameters [Units]:\n' + \
+    'Simulation time [s], ACIDs_ENTER_CONSTRAINED [-], ENTRY_ALTITUDE [m]\n'
+
 class Traffic(Entity):
     """
     Traffic class definition    : Traffic data
@@ -211,6 +219,7 @@ class Traffic(Entity):
         # self.flowlog = datalog.crelog('FLOWLOG', None, flowheader)
         self.translog = datalog.crelog('TRANSLOG', None, transheader)
         self.geolog = datalog.crelog('GEOLOG', None, geoheader)
+        self.conslog = datalog.crelog('CONSLOG', None, constheader)
         self.loslog = datalog.crelog('LOSLOG', None, losheader)
         self.geo_intrusions = dict()
         self.prevconfpairs = set()
@@ -653,7 +662,7 @@ class Traffic(Entity):
                                     self.actedge.edge_airspace_type[idx1], self.actedge.edge_airspace_type[idx2], 
                                     self.flight_layer_type[idx1], self.flight_layer_type[idx2], 
                                     self.actedge.wpedgeid[idx1],self.actedge.wpedgeid[idx2],
-                                    self.actedge.constrained_airspace_alloc[idx1], self.actedge.constrained_airspace_alloc[idx2])
+                                    self.constrained_airspace_alloc[idx1], self.constrained_airspace_alloc[idx2])
                 
         self.prevconfpairs = set(self.cd.confpairs)
         
@@ -684,8 +693,8 @@ class Traffic(Entity):
                                                 self.flight_layer_type[idx1], self.flight_layer_type[idx2],  
                                                 self.actedge.wpedgeid[idx1],self.actedge.wpedgeid[idx2],
                                                 self.hdg[idx1], self.hdg[idx2],
-                                                self.actedge.constrained_airspace_alloc[idx1], 
-                                                self.actedge.constrained_airspace_alloc[idx2]
+                                                self.constrained_airspace_alloc[idx1], 
+                                                self.constrained_airspace_alloc[idx2]
                                                 ]
                 else:
                     # Entry exists, check if calculated is smaller
@@ -1173,6 +1182,7 @@ class Traffic(Entity):
         #self.flowlog.start()
         self.reglog.start()
         self.translog.start()
+        self.conslog.start()
         self.geolog.start()
         self.loslog.start()
         return
