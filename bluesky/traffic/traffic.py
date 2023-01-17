@@ -74,7 +74,8 @@ flstheader = \
     'Pilot ALT [ft], ' + \
     'Pilot SPD (TAS) [kts], ' + \
     'Pilot HDG [deg], ' + \
-    'Pilot VS [fpm]\n'
+    'Pilot VS [fpm] ' + \
+    'AIRSPACEALLOC\n'
 
 confheader = \
     '#######################################################\n' + \
@@ -138,7 +139,7 @@ regheader = \
     '#######################################################\n\n' + \
     'Parameters [Units]:\n' + \
     'Simulation time [s], ' + \
-    'ACIDs [-], ALTs [ft], LATs [deg], LONs [deg], EDGEID [-]\n'
+    'ACIDs [-], ALTs [ft], LATs [deg], LONs [deg], EDGEID [-], AIRSPACETYPE[-], LAYERTYPE [-]\n'
     
 flowheader = \
     '#######################################################\n' + \
@@ -566,7 +567,8 @@ class Traffic(Entity):
             self.aporasas.alt[idx]/ft,
             self.aporasas.tas[idx]/kts,
             self.aporasas.vs[idx]/fpm,
-            self.aporasas.hdg[idx])
+            self.aporasas.hdg[idx],
+            self.constrained_airspace_alloc[idx])
 
         if acid in self.geo_intrusions:
             geo_intr = self.geo_intrusions[acid]
@@ -742,6 +744,8 @@ class Traffic(Entity):
         self.reglog.log(*self.lat)
         self.reglog.log(*self.lon)
         self.reglog.log(*self.actedge.wpedgeid)
+        self.reglog.log(*self.actedge.edge_airspace_type)
+        self.reglog.log(*self.flight_layer_type)
         return
 
     @timed_function(name='asas', dt=bs.settings.asas_dt, manual=True)
