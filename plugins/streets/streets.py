@@ -480,6 +480,7 @@ def handle_replan(edges_changes):
                         # Either it's a flyby, or a typo.
                         acrte.swflyby   = True
                         acrte.swflyturn = False
+                        acrte.turnspd = -999
                     
                     name    = acid
                     wptype  = Route.wplatlon
@@ -1819,6 +1820,7 @@ class PathPlans(Entity):
                 # Either it's a flyby, or a typo.
                 acrte.swflyby   = True
                 acrte.swflyturn = False
+                acrte.turnspd = -999
             
             name    = acid
             wptype  = Route.wplatlon
@@ -1945,8 +1947,8 @@ def fulldensity_height_assignment():
     
     # assign a height with lowest value
     angle_range = min_values[0]
-
-
+    
+    
     return angle_range
 
 
