@@ -62,7 +62,7 @@ class SpeedBasedM2(ConflictResolution):
         newvs       = np.copy(ownship.vs)
         newalt      = np.copy(ownship.alt)
         newtrack    = np.copy(ownship.trk)
-        
+
         # idx1 is of the ownship, idx2 is of the intruder
         # Iterate over aircraft in conflict
         for idx1 in np.argwhere(conf.inconf).flatten():     
@@ -122,7 +122,8 @@ class SpeedBasedM2(ConflictResolution):
         rogue_list = [False] * n_intr
         open_airspace = bs.traf.actedge.edge_airspace_type[idx1] == 0
         landing = (not bs.traf.swlnav[idx1]) and bs.traf.actwp.swlastwp[idx1]
-        
+        # Landing always False for M2sensitivy
+        landing =  False
         # Initialise track new
         track_new = bs.traf.ap.trk[idx1]
         
@@ -1016,7 +1017,9 @@ class SpeedBasedM2(ConflictResolution):
                 # triggered again, or a new conflict will be triggered and CR will take over again.
                 if self.tas[idx1] > bs.traf.ap.tas[idx1]:
                     self.tas[idx1] = bs.traf.ap.tas[idx1]
-                    
+                
+                # NOTE: This is just set in AM experiments because there is never ladnding
+                landing = False
                 # What if we want to land?
                 if landing:
                     #Attempt to land if nobody below. Otherwise, hold altitude and speed 0.
