@@ -1877,6 +1877,10 @@ class PathPlans(Entity):
             edge_traffic.edgeap.edge_rou[ridx].addwpt(ridx, name, wpedgeid, group_number, flow_number, edge_layer_dict, 
                                         turn_lat, turn_lon, edge_airspace_type)
 
+        # add last waypoint twice because of landin issues
+        wpidx = acrte.addwpt_simple(ridx, name, wptype, lat, lon, alt, spd)
+        edge_traffic.edgeap.edge_rou[ridx].addwpt(ridx, name, wpedgeid, group_number, flow_number, edge_layer_dict, 
+                                        turn_lat, turn_lon, edge_airspace_type)
         # For this aircraft, manually set the first "next_qdr" in actwp
         # We basically need to find the qdr between the second and the third waypoint, as
         # the first one is the origin
