@@ -82,6 +82,7 @@ height_alloc_random = False
 height_alloc_fulldensity = False
 height_alloc_zonedensity = False
 height_alloc_distance = False
+height_alloc_speed = False
 height_count_dict = dict()
 zone_count_dict = dict()
 height_allocs = ['0-72', '72-144', '144-216', '216-288', '288-360']
@@ -133,7 +134,7 @@ def reset():
     use_flow_control = True
 
     # default setting for streets is not constrained
-    global height_alloc_random, height_alloc_fulldensity, height_alloc_zonedensity, height_alloc_distance
+    global height_alloc_random, height_alloc_fulldensity, height_alloc_zonedensity, height_alloc_distance, height_alloc_speed
 
     # set hopping to true on the reset
     bs.traf.nav.hopping = True
@@ -144,6 +145,7 @@ def reset():
     height_alloc_fulldensity = False
     height_alloc_zonedensity = False
     height_alloc_distance = False
+    height_alloc_speed = False
 
     # reset queue
     global queue_dict
@@ -154,7 +156,7 @@ def reset():
 def constrained_density():
     global height_count_dict, zone_count_dict
 
-    if height_alloc_random or height_alloc_distance:
+    if height_alloc_random or height_alloc_distance or height_alloc_speed:
         return
 
     # get the constrained airspace allocation
@@ -497,7 +499,7 @@ def handle_replan(edges_changes):
                     edge_layer_dict = flight_layers.layer_dict["config"][edge_layer_type]['levels']
 
                     if edge_layer_type != 'open': 
-                        if height_alloc_random or height_alloc_fulldensity or height_alloc_zonedensity or height_alloc_distance:
+                        if height_alloc_random or height_alloc_fulldensity or height_alloc_zonedensity or height_alloc_distance or height_alloc_speed:
                             # Get the layer dictionary for the heading range
                             edge_layer_dict = edge_layer_dict[flight_layers.constrained_airspace_alloc[idx]]
 
@@ -702,6 +704,10 @@ def allocateheights(allocation: 'txt'):
         global height_alloc_distance
         height_alloc_distance = True
 
+    if allocation.upper() == 'SPEED':
+        global height_alloc_speed
+        height_alloc_speed = True
+
     # set M2 Navigation hopping to False
     access_plugin_object('M2NAVIGATION').hopping = False
     access_plugin_object('SPEEDBASEDM2').hopping = False
@@ -765,6 +771,10 @@ def queue_attempt_create(first_time, acid, actype, path_file, aclat, aclon, dest
             distance_od = geo.kwikdist(float(aclat), float(aclon), float(destlat), float(destlon)) 
             angle_range = distance_height_assignment(dist=distance_od)
 
+        if height_alloc_speed:
+            # assign the angle range based on height
+            angle_range = speed_height_assignment(actype)
+
         # Then create the aircraft
         bs.traf.cre(acid, actype, aclat, aclon, achdg, acalt, acspd)
 
@@ -820,6 +830,10 @@ def queue_attempt_create(first_time, acid, actype, path_file, aclat, aclon, dest
             distance_od = geo.kwikdist(float(aclat), float(aclon), float(destlat), float(destlon)) 
             angle_range = distance_height_assignment(dist=distance_od)
 
+        if height_alloc_speed:
+            # assign the angle range based on cruise speed
+            angle_range = speed_height_assignment()
+
         bs.traf.cre(acid, actype, aclat, aclon, achdg, acalt, acspd)
 
         acidx = bs.traf.id.index(acid)
@@ -864,6 +878,10 @@ def queue_attempt_create(first_time, acid, actype, path_file, aclat, aclon, dest
         if height_alloc_distance:
             distance_od = geo.kwikdist(float(aclat), float(aclon), float(destlat), float(destlon)) 
             angle_range = distance_height_assignment(dist=distance_od)
+
+        if height_alloc_speed:
+            # assign the angle range based on cruise speed
+            angle_range = speed_height_assignment()
 
         bs.traf.cre(acid, actype, aclat, aclon, achdg, acalt, acspd)
 
@@ -1842,7 +1860,7 @@ class PathPlans(Entity):
             # constrained airspace
             if edge_layer_type != 'open':
 
-                if height_alloc_random or height_alloc_fulldensity or height_alloc_distance:
+                if height_alloc_random or height_alloc_fulldensity or height_alloc_speed:
                     # Get the layer number
                     edge_layer_dict = edge_layer_dict[angle_range]
 
@@ -1931,9 +1949,9 @@ def random_height_assignment():
     idx_qdr = np.where(qdr_full<heading_ranges_constrained)[0]
 
     # select the idx and the one before
-    angle_range = f'{heading_ranges_constrained[idx_qdr-1][0]}-{heading_ranges_constrained[idx_qdr][0]}'
+    new_angle_range = f'{heading_ranges_constrained[idx_qdr-1][0]}-{heading_ranges_constrained[idx_qdr][0]}'
 
-    return angle_range
+    return new_angle_range
 
 
 def fulldensity_height_assignment():
@@ -2062,6 +2080,47 @@ def distance_height_assignment(dist: float) -> str:
         new_angle_range = '288-360'
 
     return new_angle_range
+
+def speed_height_assignment(actype: str = '') -> str:
+
+    # First check the aircraft type.
+    # IF MP20 assign to three lower layers
+    # IF MP30 assign to three higher layers
+    # Note that there will be one layer of both
+
+    if actype == 'MP20':
+
+        # assign a random layer of constrained airspace 
+        # assign the flight layer allocation in constrained airspace
+        # step 1: make random number
+        qdr_full = random.randint(0,216)
+
+        # step 2: check between which heading range the aircraft is
+        heading_ranges_constrained = np.array([0,72,144,216])
+
+        # check which two values qdr is in between
+        idx_qdr = np.where(qdr_full<heading_ranges_constrained)[0]
+
+        # select the idx and the one before
+        new_angle_range = f'{heading_ranges_constrained[idx_qdr-1][0]}-{heading_ranges_constrained[idx_qdr][0]}'
+
+    elif actype == 'MP30':
+         # assign a random layer of constrained airspace 
+        # assign the flight layer allocation in constrained airspace
+        # step 1: make random number
+        qdr_full = random.randint(144,360)
+
+        # step 2: check between which heading range the aircraft is
+        heading_ranges_constrained = np.array([144,216,288,360])
+
+        # check which two values qdr is in between
+        idx_qdr = np.where(qdr_full<heading_ranges_constrained)[0]
+
+        # select the idx and the one before
+        new_angle_range = f'{heading_ranges_constrained[idx_qdr-1][0]}-{heading_ranges_constrained[idx_qdr][0]}'
+       
+    return new_angle_range
+    
 
 def get_curr_range(height: int = 0):
 
