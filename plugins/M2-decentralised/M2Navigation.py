@@ -225,9 +225,9 @@ class M2Navigation(core.Entity):
         
         # log veritcal transitions
         # check to see if give_descent_command and give_ascent_command, can_descend exist
-        log_transitions(give_turn_command, give_constrained_cruise_command,
-                        give_descent_command, give_ascent_command, 
-                        bs.traf.cr.stuck, can_descend, self.hopping)
+        # log_transitions(give_turn_command, give_constrained_cruise_command,
+        #                 give_descent_command, give_ascent_command, 
+        #                 bs.traf.cr.stuck, can_descend, self.hopping)
         # Aircraft to delete
         # We delete aircraft if:
         # 1. They have lnav off

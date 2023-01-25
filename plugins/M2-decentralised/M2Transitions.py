@@ -37,13 +37,17 @@ class M2Transitions(core.Entity):
             self.starting_layer = np.array([], dtype=str)
             self.ending_layer = np.array([], dtype=str)
             self.transition_and_conf = np.array([], dtype=bool)
-
+            self.ac_starting_transition = np.array([], dtype=bool)
+            self.ac_ending_transition = np.array([], dtype=bool)
+            self.selected_altitude = np.array([], dtype=int)
+            self.interrupted_transition = np.array([], dtype=bool)
+            self.aircraft_interrupted = np.array([], dtype=bool)
         
         self.transition_start_time = dict()
 
     def update(self):
 
-        # First step is to gather some nice information about the current situation
+        # First step is to check which aircraft are currently performing a transition
         self.aircraft_vs_now = np.abs(bs.traf.vs) > 0
         
         # check which aircraft in cr
@@ -51,14 +55,14 @@ class M2Transitions(core.Entity):
         aircraft_with_conf = np.logical_or.reduce(
             (
                 bs.traf.cd.inconf,
-                np.in1d(bs.traf.id, reso_pair_arr)
+                np.in1d(bs.traf.id, reso_pair_arr),
                 
             )
         )
 
         # Second: check which aircraft have begun a transition
         # This is done by seeing if there are any True values in self.aircraft_with_vs that were not in self.in_transition
-        ac_starting_transition = np.logical_and.reduce(
+        self.ac_starting_transition = np.logical_and.reduce(
             (
                 self.aircraft_vs_now, # this checks for cases when there is a difference between aircraft with a vertical speed and those in transition
                 np.logical_not(self.aircraft_vs_prev),
@@ -66,44 +70,82 @@ class M2Transitions(core.Entity):
         )
 
         # For aircraft starting a transition check their current layer
-        self.starting_layer = np.where(ac_starting_transition, bs.traf.flight_layer_type, self.starting_layer)
-        self.starting_altitude = np.where(ac_starting_transition, bs.traf.flight_levels, self.starting_altitude)
+        self.starting_layer = np.where(self.ac_starting_transition, bs.traf.flight_layer_type, self.starting_layer)
+        self.starting_altitude = np.where(self.ac_starting_transition, bs.traf.flight_levels, self.starting_altitude)
+        # also important to get the selected altitude to check at the end whether it was a succesful or failed transition
+        self.selected_altitude = np.where(self.ac_starting_transition, np.rint(bs.traf.selalt/ft), self.selected_altitude)
 
         # now also log if the transition was trigerred while the aircraft was in a conflict
         starting_transition_and_conf = np.logical_and.reduce(
             (
                 aircraft_with_conf,
-                ac_starting_transition
+                self.ac_starting_transition,
             )
         )
+
+        # also check if the conflict happened during a transition
+        during_transition_and_conf = np.logical_and.reduce(
+            (
+                aircraft_with_conf,
+                self.aircraft_vs_now,
+            )
+        )
+        # now check
         # save for ending transition
         self.transition_and_conf = np.where(starting_transition_and_conf, starting_transition_and_conf, self.transition_and_conf)
-
+        self.transition_and_conf = np.where(during_transition_and_conf, during_transition_and_conf, self.transition_and_conf)
+       
+        # self.transition_and_conf = np.where(during_transition_and_conf, )
         # Third: check which aircraft have ended a transition
-        ac_ending_transition = np.logical_and.reduce(
+        self.ac_ending_transition = np.logical_and.reduce(
             (
                 np.logical_not(self.aircraft_vs_now), # this checks for cases when there is a difference between aircraft with a vertical speed and those in transition
-                self.aircraft_vs_prev
+                self.aircraft_vs_prev,
             )
         )
 
         # for aircraft ending a transition check their current layer
-        self.ending_layer = np.where(ac_ending_transition, bs.traf.flight_layer_type, self.ending_layer)
-        self.ending_altitude = np.where(ac_ending_transition, bs.traf.flight_levels, self.ending_altitude)
+        self.ending_layer = np.where(self.ac_ending_transition, bs.traf.flight_layer_type, self.ending_layer)
+        self.ending_altitude = np.where(self.ac_ending_transition, bs.traf.flight_levels, self.ending_altitude)
         
+        # now do a check for interrupted transitions due to a conflict
+        self.interrupted_transition = np.logical_and.reduce(
+            (
+                self.ac_ending_transition,
+                self.transition_and_conf,
+                np.rint(bs.traf.alt/ft) != self.selected_altitude
+            )
+            
+        )
+
         # begin my log
-        self.log(self.starting_layer, self.ending_layer, self.ending_altitude, self.starting_altitude, self.transition_and_conf)
+        self.log()
+
+        # keep count of which aircraft where interrupted to log the recover transition
+        self.aircraft_interrupted = np.where(self.interrupted_transition, True, self.aircraft_interrupted)
 
         # set aircraft with vs to in transition
         self.aircraft_vs_prev = self.aircraft_vs_now
 
     def log(self):
+
+        id_arr = np.asarray(bs.traf.id, dtype=object)
+
+
+        # Only select aircraft in constrained airspace
+        in_constrained = np.where(bs.traf.actedge.edge_airspace_type == 'open', False, True)
+
+        # don't log aircraft that are priority 4 since they travel in unused layers
+        emergency = bs.traf.priority == 4
         
         # case 1: transtion due to CR
         cr_trans = np.logical_and.reduce(
             (
-                self.ending_altitude != 'T',
-                self.transition_and_conf
+                self.ending_layer != 'T',
+                self.transition_and_conf,
+                self.ac_ending_transition,
+                in_constrained,
+                np.logical_not(emergency)
             )
         )
 
@@ -113,7 +155,10 @@ class M2Transitions(core.Entity):
                 np.logical_not(self.transition_and_conf),
                 self.starting_layer == 'C',
                 self.ending_layer == 'C',
-                self.ending_altitude - self.starting_altitude > 0
+                self.ending_altitude - self.starting_altitude > 0,
+                self.ac_ending_transition,
+                in_constrained,
+                np.logical_not(emergency)
             )
         )
 
@@ -123,23 +168,183 @@ class M2Transitions(core.Entity):
                 np.logical_not(self.transition_and_conf),
                 self.starting_layer == 'C',
                 self.ending_layer == 'C',
-                self.ending_altitude - self.starting_altitude < 0
+                self.ending_altitude - self.starting_altitude < 0,
+                self.ac_ending_transition,
+                in_constrained,
+                np.logical_not(emergency)
             )
         )
 
         # case 4: transition due to turning
         cruise_to_turn_trans = np.logical_and.reduce(
             (
-                self.starting_altitude == 'C',
-                self.ending_altitude == 'T',
+                self.starting_layer== 'C',
+                self.ending_layer == 'T',
+                self.ac_ending_transition,
+                in_constrained,
+                np.logical_not(emergency)
             )
         )
 
         # case 5: transition due to turning
         turn_to_cruise_trans = np.logical_and.reduce(
             (
-                self.starting_altitude == 'T',
-                self.ending_altitude == 'C',
-                np.logical_not(self.transition_and_conf)
+                self.starting_layer == 'T',
+                self.ending_layer == 'C',
+                np.logical_not(self.transition_and_conf),
+                self.ac_ending_transition,
+                in_constrained,
+                np.logical_not(emergency)
             )
         )
+
+        # case 6
+        takeoff_trans = np.logical_and.reduce(
+            (
+                self.starting_altitude == 0,
+                np.logical_not(self.transition_and_conf),
+                self.ac_ending_transition,
+                in_constrained,
+                np.logical_not(emergency)
+            )
+        )
+        
+        # case 7 interrupted transition
+        # TODO: log type of interruption from Cruise from Turn?
+        interrupted_transition = np.logical_and.reduce(
+            (
+                self.interrupted_transition,
+                in_constrained,
+                np.logical_not(emergency)
+            )
+        )
+    
+
+        # case 8: recovering transition
+        recover_transition =  np.logical_and.reduce(
+            (
+                self.ac_ending_transition,
+                self.aircraft_interrupted,
+                in_constrained,
+                np.logical_not(emergency)
+            )
+        )
+
+        # case 9 is from a free to a cruise or a turn
+        free_to_turn_transition = np.logical_and.reduce(
+            (
+                self.ac_ending_transition,
+                self.starting_layer == 'F',
+                self.ending_layer == 'T',
+                np.logical_not(emergency)
+
+            )
+        )
+
+        # case 10 missed transition
+        # TODO: find missed transtions
+        missed_transitions = np.logical_and.reduce(
+            (
+                np.logical_not(cr_trans),
+                np.logical_not(hopping_up),
+                np.logical_not(hopping_down),
+                np.logical_not(cruise_to_turn_trans),
+                np.logical_not(turn_to_cruise_trans),
+                np.logical_not(takeoff_trans),
+                np.logical_not(interrupted_transition),
+                np.logical_not(recover_transition),
+                np.logical_not(free_to_turn_transition),
+                self.ac_ending_transition,
+                in_constrained,
+                np.logical_not(emergency)
+
+            )
+        )
+
+        if np.any(cr_trans):
+            print('CR transition')
+            print(bs.sim.simt)
+            print(id_arr[cr_trans])
+            print('----------------')
+
+        if np.any(hopping_up):
+            print('Hopping up')
+            print(bs.sim.simt)
+            print(id_arr[hopping_up])
+            print('----------------')
+
+        if np.any(hopping_down):
+            print('Hopping down')
+            print(bs.sim.simt)
+            print(id_arr[hopping_down])
+            print('----------------')
+
+        if np.any(cruise_to_turn_trans):
+            print('Cruise to Turn Transtion')
+            print(bs.sim.simt)
+            print(id_arr[cruise_to_turn_trans])
+            print('----------------')
+
+        if np.any(turn_to_cruise_trans):
+            print('Turn to Cruise Transtion')
+            print(bs.sim.simt)
+            print(id_arr[turn_to_cruise_trans])
+            print('----------------')
+
+        if np.any(takeoff_trans):
+            print('Takeoff Transtion')
+            print(bs.sim.simt)
+            print(id_arr[takeoff_trans])
+            print('----------------')
+
+        if np.any(interrupted_transition):
+            print('Interrupted Transtion')
+            print(bs.sim.simt)
+            print(id_arr[interrupted_transition])
+            print('----------------')
+
+        if np.any(recover_transition):
+            print('Recover Transtion')
+            print(bs.sim.simt)
+            print(id_arr[recover_transition])
+            print('----------------')
+
+        if np.any(free_to_turn_transition):
+            print('Free layer Transtion')
+            print(bs.sim.simt)
+            print(id_arr[free_to_turn_transition])
+            print('----------------')
+
+        if np.any(missed_transitions):
+            print('Missed Transtion')
+            print(bs.sim.simt)
+            print(id_arr[missed_transitions])
+            print('----------------')
+
+
+        # Some cleanup
+
+        # after logging a recover transition ensure that it gets removed from recovering transitions
+        recovered_ac = np.logical_and.reduce(
+            (
+                recover_transition,
+                self.aircraft_interrupted,
+                in_constrained
+            )
+        )
+        self.aircraft_interrupted = np.where(recovered_ac, False, self.aircraft_interrupted)
+
+
+        # aircraft may have turned even if they were in self.transition_and_conf
+        # aircraft may have done the cr transition already so clean it up
+        # Therefore after a cruise_to_turn transition we should again set self.transition_and_conf to false
+        cleanup_conf_transition = np.logical_and.reduce(
+            (
+                np.logical_or(cruise_to_turn_trans, cr_trans),
+                self.transition_and_conf                
+            )
+        )
+        self.transition_and_conf = np.where(cleanup_conf_transition, False, self.transition_and_conf)
+
+        # also if aircraft is not in constrained then cleanup the conflict
+        self.transition_and_conf = np.where(in_constrained, self.transition_and_conf, False)
