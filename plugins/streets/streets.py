@@ -832,7 +832,7 @@ def queue_attempt_create(first_time, acid, actype, path_file, aclat, aclon, dest
 
         if height_alloc_speed:
             # assign the angle range based on cruise speed
-            angle_range = speed_height_assignment()
+            angle_range = speed_height_assignment(actype)
 
         bs.traf.cre(acid, actype, aclat, aclon, achdg, acalt, acspd)
 
@@ -881,7 +881,7 @@ def queue_attempt_create(first_time, acid, actype, path_file, aclat, aclon, dest
 
         if height_alloc_speed:
             # assign the angle range based on cruise speed
-            angle_range = speed_height_assignment()
+            angle_range = speed_height_assignment(actype)
 
         bs.traf.cre(acid, actype, aclat, aclon, achdg, acalt, acspd)
 
@@ -2095,6 +2095,9 @@ def speed_height_assignment(actype: str = '') -> str:
         # step 1: make random number
         qdr_full = random.randint(0,216)
 
+        qdr_full = 1 if qdr_full == 0 else qdr_full
+        qdr_full = 215 if qdr_full == 216 else qdr_full
+
         # step 2: check between which heading range the aircraft is
         heading_ranges_constrained = np.array([0,72,144,216])
 
@@ -2109,6 +2112,9 @@ def speed_height_assignment(actype: str = '') -> str:
         # assign the flight layer allocation in constrained airspace
         # step 1: make random number
         qdr_full = random.randint(144,360)
+
+        qdr_full = 359 if qdr_full == 360 else qdr_full
+        qdr_full = 145 if qdr_full == 144 else qdr_full
 
         # step 2: check between which heading range the aircraft is
         heading_ranges_constrained = np.array([144,216,288,360])
