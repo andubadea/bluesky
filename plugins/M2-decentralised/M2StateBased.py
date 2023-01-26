@@ -54,6 +54,9 @@ class M2StateBased(ConflictDetection):
             self.dist, self.dcpa, self.tcpa, self.tLOS, self.qdr_mat, self.dist_mat = \
                 self.detect(ownship, intruder, self.rpz, self.hpz, self.dtlookahead)
 
+        # set CR altitude to 10 at start of resolution
+        bs.traf.cr.altitudeCR.fill(10)
+
         # confpairs has conflicts observed from both sides (a, b) and (b, a)
         # confpairs_unique keeps only one of these
         confpairs_unique = {frozenset(pair) for pair in self.confpairs}

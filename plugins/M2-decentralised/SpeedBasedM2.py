@@ -61,6 +61,7 @@ class SpeedBasedM2(ConflictResolution):
             # 7 = hopping to cruise layer due to rogue
             # 8 = hopping to unused layer due to rogue
             # 9 = hopping due to head-on
+            # 10 = nothing
             self.altitudeCR = np.array([])
         
     def resolve(self, conf, ownship, intruder):
