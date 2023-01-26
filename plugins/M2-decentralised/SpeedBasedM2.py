@@ -43,6 +43,8 @@ class SpeedBasedM2(ConflictResolution):
         self.rpz = 40
         
         self.heading_based = False
+        
+        self.last_update_simt = bs.sim.simt
     
         with self.settrafarrays():
             self.in_headon = []
@@ -50,6 +52,16 @@ class SpeedBasedM2(ConflictResolution):
             self.dest_lat = np.array([])
             self.dest_lon = np.array([])
             self.altactivearr = np.array([], dtype = bool)
+            # The following array contains information about the altitude related commands
+            # coming from CR. The coding is the following:
+            # 0 = ascending to solve conflict
+            # 1 = descending to solve conflict
+            # 2 = holding altitude to avoid conflict
+            # 3 = following the alt command of the autopilot
+            # 7 = hopping to cruise layer due to rogue
+            # 8 = hopping to unused layer due to rogue
+            # 9 = hopping due to head-on
+            self.altitudeCR = np.array([])
         
     def resolve(self, conf, ownship, intruder):
         '''We want to only solve in the velocity direction while still following the heading
@@ -356,6 +368,7 @@ class SpeedBasedM2(ConflictResolution):
                                 stack.stack(f'ALT {ownship.id[idx1]} {alt}')
                                 stack.stack(f'LNAV {ownship.id[idx1]} ON') 
                                 stack.stack(f'VNAV {ownship.id[idx1]} ON')
+                                self.altitudeCR[idx1] = 9
                         #print('In front, head-on, attempt alt change.')
                         
                     self.in_headon[idx1] = True
@@ -434,6 +447,7 @@ class SpeedBasedM2(ConflictResolution):
                         stack.stack(f'ALT {ownship.id[idx1]} {alt}')
                         stack.stack(f'LNAV {ownship.id[idx1]} ON') 
                         stack.stack(f'VNAV {ownship.id[idx1]} ON')
+                        self.altitudeCR[idx1] = 7
                 else:
                     #Go to unused layer above
                     alt = self.get_above_empty_layer(ownship, idx1)
@@ -441,6 +455,7 @@ class SpeedBasedM2(ConflictResolution):
                         stack.stack(f'ALT {ownship.id[idx1]} {alt}')
                         stack.stack(f'LNAV {ownship.id[idx1]} ON') 
                         stack.stack(f'VNAV {ownship.id[idx1]} ON')
+                        self.altitudeCR[idx1] = 8
                         
         if ascend and can_ascend and self.in_headon[idx1] != True:
             alt = self.get_above_cruise_layer(ownship, idx1)
@@ -448,6 +463,7 @@ class SpeedBasedM2(ConflictResolution):
                 stack.stack(f'ALT {ownship.id[idx1]} {alt}')
                 stack.stack(f'LNAV {ownship.id[idx1]} ON') 
                 stack.stack(f'VNAV {ownship.id[idx1]} ON')
+                self.altitudeCR[idx1] = 0
             
         elif descend and can_descend and self.in_headon[idx1] != True:
             alt = self.get_below_cruise_layer(ownship, idx1)
@@ -455,6 +471,7 @@ class SpeedBasedM2(ConflictResolution):
                 stack.stack(f'ALT {ownship.id[idx1]} {alt}')
                 stack.stack(f'LNAV {ownship.id[idx1]} ON') 
                 stack.stack(f'VNAV {ownship.id[idx1]} ON')
+                self.altitudeCR[idx1] = 1
             
         #If we cannot ascend, let's mark ourselves as stuck
         if not can_ascend and ascend:
@@ -565,9 +582,11 @@ class SpeedBasedM2(ConflictResolution):
             #print('Hold altitude.')
             alt_new = ownship.alt[idx1]
             self.altactivearr[idx1] = True
+            self.altitudeCR[idx1] = 2
         else:
             alt_new = ownship.ap.alt[idx1]
             self.altactivearr[idx1] = False
+            self.altitudeCR[idx1] = 3
             
         return gs_new, alt_new, track_new
             

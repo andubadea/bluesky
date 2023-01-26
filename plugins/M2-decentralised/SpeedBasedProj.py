@@ -9,7 +9,7 @@ from bluesky.traffic.asas import ConflictResolution
 from shapely.geometry import Point, LineString, MultiPoint
 from shapely.geometry.polygon import Polygon
 from shapely.ops import cascaded_union, nearest_points
-from shapely.affinity import translate
+from shapely.affinity import translate, rotate
 from bluesky.tools.geo import kwikdist, kwikqdrdist, latlondist, qdrdist
 from bluesky.tools.aero import nm, ft, kts
 import bluesky as bs
@@ -656,7 +656,8 @@ class SpeedBasedProj(ConflictResolution):
         hdg_intruder = conf.conftrks[idx_pair][1]
         gs_ownship = ownship.gs[idx1]
         gs_intruder = intruder.gs[idx2]
-    
+        v1_actual = np.array([ownship.gseast[idx1], ownship.gsnorth[idx1]])
+        v1 = np.array([gs_ownship * np.sin(np.radians(hdg_ownship)), gs_ownship * np.cos(np.radians(hdg_ownship))])
         v2 = np.array([gs_intruder * np.sin(np.radians(hdg_intruder)), gs_intruder * np.cos(np.radians(hdg_intruder))])
         
         t = conf.dtlookahead[idx1]
@@ -678,6 +679,15 @@ class SpeedBasedProj(ConflictResolution):
         final_poly = Polygon([right_leg_extended, (0,0), left_leg_extended])
         # Translate it by the velocity of the intruder
         final_poly_translated = translate(final_poly, v2[0], v2[1])
+        # We also want to rotate this guy in case we're using projected values
+        # Get the angle between v1 and v1_real
+        vel_angle = np.rad2deg(self.angle(v1, v1_actual))
+        # Also get the cross product to determine which order to rotate
+        cross = np.cross(v1, v1_actual)
+        # Rotate this velocity obstacle if vel_angle is big enough
+        if vel_angle > 1:
+            final_poly_rotated = rotate(final_poly_translated, vel_angle * np.sign(cross))
+            return final_poly_rotated
         # Return
         return final_poly_translated
     
