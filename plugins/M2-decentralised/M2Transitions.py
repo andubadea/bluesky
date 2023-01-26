@@ -128,7 +128,7 @@ class M2Transitions(core.Entity):
             (
                 
                 np.logical_not(self.aircraft_vs_now), # this checks for cases when there is a difference between aircraft with a vertical speed and those in transition
-                self.selected_al
+                # self.selected_al
                 self.aircraft_vs_prev,
             )
         )
