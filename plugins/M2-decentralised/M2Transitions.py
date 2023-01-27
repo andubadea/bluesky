@@ -30,6 +30,7 @@ class M2Transitions(core.Entity):
         super().__init__()
 
         with self.settrafarrays():
+            self.vs_prev = np.array([], dtype=float)
             self.aircraft_vs_now = np.array([], dtype=np.bool8)
             self.aircraft_vs_prev = np.array([], dtype=np.bool8)
             self.starting_altitude = np.array([], dtype=int)
@@ -45,6 +46,8 @@ class M2Transitions(core.Entity):
             self.aircraft_interrupted = np.array([], dtype=bool)
             self.command_from_cr_start = np.array([], dtype=int)
             self.command_from_cr_during = np.array([], dtype=int)
+            self.ac_sign_now = np.array([], dtype=str)
+            self.ac_sign_prev = np.array([], dtype=str)
 
         self.transition_start_time = dict()
 
@@ -57,6 +60,12 @@ class M2Transitions(core.Entity):
 
         # First step is to check which aircraft are currently performing a transition
         self.aircraft_vs_now = np.abs(bs.traf.vs) > 0
+
+        # calculate the difference in vs from prev and now
+        self.ac_sign_now = np.where(bs.traf.vs < 0, 'negative', self.ac_sign_now)        
+        self.ac_sign_now = np.where(bs.traf.vs > 0, 'postive', self.ac_sign_now)
+        self.ac_sign_now = np.where(bs.traf.vs == 0, 'zero', self.ac_sign_now)
+
         
         # check which aircraft in cr
         reso_pair_arr = np.array(bs.traf.cr.resopairs).flatten()
@@ -104,7 +113,7 @@ class M2Transitions(core.Entity):
         command_from_cr_during = np.logical_and.reduce(
             (
                 aircraft_with_conf,
-                self.command_from_cr_during,
+                self.aircraft_vs_prev,
                 bs.traf.cr.altitudeCR < 10,
             )
         )
@@ -128,10 +137,12 @@ class M2Transitions(core.Entity):
             (
                 
                 np.logical_not(self.aircraft_vs_now), # this checks for cases when there is a difference between aircraft with a vertical speed and those in transition
-                # self.selected_al
                 self.aircraft_vs_prev,
             )
         )
+
+        # There is another condition for ending a transition and this is when the sign of the bs.traf.vs changes in one iteration
+
 
         # for aircraft ending a transition check their current layer
         self.ending_layer = np.where(self.ac_ending_transition, bs.traf.flight_layer_type, self.ending_layer)
@@ -152,8 +163,10 @@ class M2Transitions(core.Entity):
         # keep count of which aircraft where interrupted to log the recover transition
         self.aircraft_interrupted = np.where(self.interrupted_transition, True, self.aircraft_interrupted)
 
-        # set aircraft with vs to in transition
+        # save stuff for next iteration
         self.aircraft_vs_prev = self.aircraft_vs_now
+        self.vs_prev = bs.traf.vs
+        self.ac_sign_prev = self.ac_sign_now
 
     def log(self):
 
@@ -187,7 +200,7 @@ class M2Transitions(core.Entity):
             )
         )
 
-        # case 3: transtion due to CR would only happen if there was a conflict
+        # case 3: transtion due to CR would mainly happen if there was a conflict
         # at the start of the transition
         cr_trans = np.logical_and.reduce(
             (
@@ -195,13 +208,31 @@ class M2Transitions(core.Entity):
                 self.starting_transition_and_conf,
                 self.ac_ending_transition,
                 in_constrained,
+                self.command_from_cr_start != 2, # ensure that CR did not tell aircraft to hold
                 np.logical_not(emergency),
                 np.logical_not(interrupted_transition),
                 np.logical_not(recover_transition)
             )
         )
 
-        # case 4: transition due to hopping up
+        # case 4
+        # smart hop up: There are some cases where CR tells the aircraft to hold
+        # however, if M2 NAV notices that there is space above then it will 
+        # perform hop regardless of CR
+        smart_hop = np.logical_and.reduce(
+            (
+                self.ending_layer != 'T',
+                self.starting_transition_and_conf,
+                self.ac_ending_transition,
+                in_constrained,
+                self.command_from_cr_start == 2, # ensure that CR did not tell aircraft to hold
+                np.logical_not(emergency),
+                np.logical_not(interrupted_transition),
+                np.logical_not(recover_transition)
+            )
+        )
+
+        # case 5: transition due to hopping up
         hopping_up =  np.logical_and.reduce(
             (
                 np.logical_not(self.starting_transition_and_conf),
@@ -216,7 +247,7 @@ class M2Transitions(core.Entity):
             )
         )
 
-        # case 5: transiton to hopping down
+        # case 6: transiton to hopping down
         hopping_down =  np.logical_and.reduce(
             (
                 np.logical_not(self.starting_transition_and_conf),
@@ -231,7 +262,7 @@ class M2Transitions(core.Entity):
             )
         )
 
-        # case 6: transition due to turning
+        # case 7: transition due to turning
         cruise_to_turn_trans = np.logical_and.reduce(
             (
                 self.starting_layer== 'C',
@@ -244,7 +275,7 @@ class M2Transitions(core.Entity):
             )
         )
 
-        # case 7: transition due to returning to cruise
+        # case 8: transition due to returning to cruise
         turn_to_cruise_trans = np.logical_and.reduce(
             (
                 self.starting_layer == 'T',
@@ -258,7 +289,7 @@ class M2Transitions(core.Entity):
             )
         )
 
-        # case 8: Takeoff
+        # case 9: Takeoff
         takeoff_trans = np.logical_and.reduce(
             (
                 self.starting_altitude == 0,
@@ -271,7 +302,7 @@ class M2Transitions(core.Entity):
             )
         )
 
-        # case 9 is from a free to a cruise or a turn
+        # case 10 is from a free to a cruise or a turn
         # this usually happens when turn is to close to take off
         # or when entering constrained airspace from open airspace
         free_to_other_transition = np.logical_and.reduce(
@@ -286,11 +317,11 @@ class M2Transitions(core.Entity):
             )
         )
 
-        # case 10 missed transition
-        # TODO: find missed transtions
+        # case 11 missed transition
         missed_transitions = np.logical_and.reduce(
             (
                 np.logical_not(cr_trans),
+                np.logical_not(smart_hop),
                 np.logical_not(hopping_up),
                 np.logical_not(hopping_down),
                 np.logical_not(cruise_to_turn_trans),
@@ -314,6 +345,14 @@ class M2Transitions(core.Entity):
             print(self.command_from_cr_start[cr_trans])
             print('----------------')
 
+        if np.any(smart_hop):
+            print('Smart transition')
+            print(bs.sim.simt)
+            print(id_arr[smart_hop])
+            print('Command from CR')
+            print(self.command_from_cr_start[smart_hop])
+            print('----------------')
+
         if np.any(hopping_up):
             print('Hopping up')
             print(bs.sim.simt)
@@ -327,25 +366,25 @@ class M2Transitions(core.Entity):
             print('----------------')
 
         if np.any(cruise_to_turn_trans):
-            print('Cruise to Turn Transtion')
+            print('Cruise to Turn transition')
             print(bs.sim.simt)
             print(id_arr[cruise_to_turn_trans])
             print('----------------')
 
         if np.any(turn_to_cruise_trans):
-            print('Turn to Cruise Transtion')
+            print('Turn to Cruise transition')
             print(bs.sim.simt)
             print(id_arr[turn_to_cruise_trans])
             print('----------------')
 
         if np.any(takeoff_trans):
-            print('Takeoff Transtion')
+            print('Takeoff transition')
             print(bs.sim.simt)
             print(id_arr[takeoff_trans])
             print('----------------')
 
         if np.any(interrupted_transition):
-            print('Interrupted Transtion')
+            print('Interrupted transition')
             print(bs.sim.simt)
             print(id_arr[interrupted_transition])
             print('Command from CR')
@@ -353,19 +392,19 @@ class M2Transitions(core.Entity):
             print('----------------')
 
         if np.any(recover_transition):
-            print('Recover Transtion')
+            print('Recover transition')
             print(bs.sim.simt)
             print(id_arr[recover_transition])
             print('----------------')
 
         if np.any(free_to_other_transition):
-            print('Free layer Transtion')
+            print('Free layer transition')
             print(bs.sim.simt)
             print(id_arr[free_to_other_transition])
             print('----------------')
 
         if np.any(missed_transitions):
-            print('Missed Transtion')
+            print('Missed transition')
             print(bs.sim.simt)
             print(id_arr[missed_transitions])
             print('----------------')
