@@ -62,7 +62,7 @@ class M2Transitions(core.Entity):
             self.command_from_cr_during = np.array([], dtype=int)
             self.ac_sign_now = np.array([], dtype=str)
             self.ac_sign_prev = np.array([], dtype=str)
-            self.intended_transition_layer = np.array([], dtype=str)
+            self.intended_transition_type = np.array([], dtype=str)
             self.start_transition_time = np.array([], dtype=float)
             self.id_arr = np.array([], dtype=str)
 
@@ -73,17 +73,12 @@ class M2Transitions(core.Entity):
         super().create(n)
         self.command_from_cr_start[-n:] = 10
         self.command_from_cr_during[-n:] = 10
-        self.intended_transition_layer[-n:] = ""
+        self.intended_transition_type[-n:] = ""
 
     def update(self):
 
         # First step is to check which aircraft are currently performing a transition
         self.aircraft_vs_now = np.abs(bs.traf.vs) > 0
-
-        # calculate the difference in vs from prev and now
-        # self.ac_sign_now = np.where(bs.traf.vs < 0, 'negative', self.ac_sign_now)        
-        # self.ac_sign_now = np.where(bs.traf.vs > 0, 'postive', self.ac_sign_now)
-        # self.ac_sign_now = np.where(bs.traf.vs == 0, 'zero', self.ac_sign_now)
 
         # gather some more information
         # Only select aircraft in constrained airspace
@@ -184,8 +179,8 @@ class M2Transitions(core.Entity):
         # figure out intended transitions
         self.intended_transition()
 
-        # begin my log
-        self.log()
+        # figure out final transitions
+        self.final_transitions()
 
         # keep count of which aircraft where interrupted to log the recover transition
         self.aircraft_interrupted = np.where(self.interrupted_transition, True, self.aircraft_interrupted)
@@ -193,9 +188,8 @@ class M2Transitions(core.Entity):
         # save stuff for next iteration
         self.aircraft_vs_prev = self.aircraft_vs_now
         self.vs_prev = bs.traf.vs
-        # self.ac_sign_prev = self.ac_sign_now
 
-    def log(self):
+    def final_transitions(self):
 
         # get the intended end layer
         self.intended_layer = bs.traf.selalt
@@ -521,11 +515,16 @@ class M2Transitions(core.Entity):
         for idx, acid in enumerate(self.id_arr[transition]):
             # get the log array
             acidx = acidxs[idx]
+
+            if self.intended_transition_type[acidx] == '':
+                self.intended_transition_type[acidx] = '12'
+                final_transition_type = '12'
+
             log_array = [
                         self.start_transition_time[acidx], 
                         acid,
                         final_transition_type, 
-                        self.intended_transition_layer[acidx],
+                        self.intended_transition_type[acidx],
                         self.starting_altitude[acidx],
                         np.rint(bs.traf.alt/ft)[acidx],
                         ]
@@ -574,7 +573,7 @@ class M2Transitions(core.Entity):
                 # Begin the logging
         # LOG types
         
-        self.intended_transition_layer =  np.where(recover_transition, '2', self.intended_transition_layer)
+        self.intended_transition_type =  np.where(recover_transition, '2', self.intended_transition_type)
 
         # case 3: transtion due to CR would mainly happen if there was a conflict
         # at the start of the transition
@@ -590,7 +589,7 @@ class M2Transitions(core.Entity):
             )
         )
 
-        self.intended_transition_layer =  np.where(cr_trans, '3', self.intended_transition_layer)
+        self.intended_transition_type =  np.where(cr_trans, '3', self.intended_transition_type)
 
         # case 4
         # smart hop up: There are some cases where CR tells the aircraft to hold
@@ -608,7 +607,7 @@ class M2Transitions(core.Entity):
             )
         )
 
-        self.intended_transition_layer =  np.where(smart_hop, '4', self.intended_transition_layer)
+        self.intended_transition_type =  np.where(smart_hop, '4', self.intended_transition_type)
 
         # case 5: transition due to hopping up
         hopping_up =  np.logical_and.reduce(
@@ -624,7 +623,7 @@ class M2Transitions(core.Entity):
             )
         )
 
-        self.intended_transition_layer =  np.where(hopping_up, '5', self.intended_transition_layer)
+        self.intended_transition_type =  np.where(hopping_up, '5', self.intended_transition_type)
 
         # case 6: transiton to hopping down
         hopping_down =  np.logical_and.reduce(
@@ -640,7 +639,7 @@ class M2Transitions(core.Entity):
             )
         )
 
-        self.intended_transition_layer =  np.where(hopping_down, '6', self.intended_transition_layer)
+        self.intended_transition_type =  np.where(hopping_down, '6', self.intended_transition_type)
 
         # case 7: transition due to turning
         cruise_to_turn_trans = np.logical_and.reduce(
@@ -654,7 +653,7 @@ class M2Transitions(core.Entity):
             )
         )
 
-        self.intended_transition_layer =  np.where(cruise_to_turn_trans, '7', self.intended_transition_layer)
+        self.intended_transition_type =  np.where(cruise_to_turn_trans, '7', self.intended_transition_type)
 
         # case 8: transition due to returning to cruise
         turn_to_cruise_trans = np.logical_and.reduce(
@@ -669,7 +668,7 @@ class M2Transitions(core.Entity):
             )
         )
 
-        self.intended_transition_layer =  np.where(turn_to_cruise_trans, '8', self.intended_transition_layer)
+        self.intended_transition_type =  np.where(turn_to_cruise_trans, '8', self.intended_transition_type)
 
         # case 9: Takeoff
         takeoff_trans = np.logical_and.reduce(
@@ -683,7 +682,7 @@ class M2Transitions(core.Entity):
             )
         )
 
-        self.intended_transition_layer =  np.where(takeoff_trans, '9', self.intended_transition_layer)
+        self.intended_transition_type =  np.where(takeoff_trans, '9', self.intended_transition_type)
 
         # case 10 is from a free to a cruise or a turn
         # this usually happens when turn is to close to take off
@@ -698,7 +697,7 @@ class M2Transitions(core.Entity):
             )
         )
 
-        self.intended_transition_layer =  np.where(free_to_other_transition, '10', self.intended_transition_layer)
+        self.intended_transition_type =  np.where(free_to_other_transition, '10', self.intended_transition_type)
 
         # case 11 missed transition
         missed_transitions = np.logical_and.reduce(
@@ -719,7 +718,7 @@ class M2Transitions(core.Entity):
             )
         )
 
-        self.intended_transition_layer =  np.where(missed_transitions, '11', self.intended_transition_layer)
+        self.intended_transition_type =  np.where(missed_transitions, '11', self.intended_transition_type)
 
         # if np.any(cr_trans):
         #     print('CR transition')
