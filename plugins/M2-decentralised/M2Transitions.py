@@ -55,12 +55,16 @@ class M2Transitions(core.Entity):
             self.ac_ending_transition = np.array([], dtype=bool)
             self.selected_altitude = np.array([], dtype=int)
             self.interrupted_transition = np.array([], dtype=bool)
+            self.in_constrained = np.array([], dtype=bool)
+            self.emergency = np.array([], dtype=bool)
             self.aircraft_interrupted = np.array([], dtype=bool)
             self.command_from_cr_start = np.array([], dtype=int)
             self.command_from_cr_during = np.array([], dtype=int)
             self.ac_sign_now = np.array([], dtype=str)
             self.ac_sign_prev = np.array([], dtype=str)
-            self.intended_transtion_type = np.array([], dtype=str)
+            self.intended_transtion_type = np.array([], dtype=str),
+            self.start_transition_time = np.array([], dtype=float),
+            self.id_arr = np.array([], dtype=str)
 
         self.select_layer_pattern = np.vectorize(self.get_layer_type)
 
@@ -79,6 +83,13 @@ class M2Transitions(core.Entity):
         self.ac_sign_now = np.where(bs.traf.vs < 0, 'negative', self.ac_sign_now)        
         self.ac_sign_now = np.where(bs.traf.vs > 0, 'postive', self.ac_sign_now)
         self.ac_sign_now = np.where(bs.traf.vs == 0, 'zero', self.ac_sign_now)
+
+        # gather some more information
+        # Only select aircraft in constrained airspace
+        self.in_constrained = np.where(bs.traf.actedge.edge_airspace_type == 'open', False, True)
+        # don't log aircraft that are priority 4 since they travel in unused layers
+        self.emergency = bs.traf.priority == 4
+        self.id_arr = np.asarray(bs.traf.id, dtype=object)
 
         
         # check which aircraft in cr
@@ -185,25 +196,15 @@ class M2Transitions(core.Entity):
 
     def log(self):
 
-        id_arr = np.asarray(bs.traf.id, dtype=object)
-
-
-        # Only select aircraft in constrained airspace
-        in_constrained = np.where(bs.traf.actedge.edge_airspace_type == 'open', False, True)
-
-        # don't log aircraft that are priority 4 since they travel in unused layers
-        emergency = bs.traf.priority == 4
-
         # get the intended end layer
         self.intended_layer = bs.traf.selalt
         
         # case 1 interrupted transition
-        # TODO: log type of interruption from Cruise from Turn? etc...
         interrupted_transition = np.logical_and.reduce(
             (
                 self.interrupted_transition,
-                in_constrained,
-                np.logical_not(emergency)
+                self.in_constrained,
+                np.logical_not(self.emergency)
             )
         )
 
@@ -212,8 +213,8 @@ class M2Transitions(core.Entity):
             (
                 self.ac_ending_transition,
                 self.aircraft_interrupted,
-                in_constrained,
-                np.logical_not(emergency),
+                self.in_constrained,
+                np.logical_not(self.emergency),
                 np.logical_not(interrupted_transition),
             )
         )
@@ -225,9 +226,9 @@ class M2Transitions(core.Entity):
                 self.ending_layer != 'T',
                 self.starting_transition_and_conf,
                 self.ac_ending_transition,
-                in_constrained,
+                self.in_constrained,
                 self.command_from_cr_start != 2, # ensure that CR did not tell aircraft to hold
-                np.logical_not(emergency),
+                np.logical_not(self.emergency),
                 np.logical_not(interrupted_transition),
                 np.logical_not(recover_transition)
             )
@@ -242,9 +243,9 @@ class M2Transitions(core.Entity):
                 self.ending_layer != 'T',
                 self.starting_transition_and_conf,
                 self.ac_ending_transition,
-                in_constrained,
+                self.in_constrained,
                 self.command_from_cr_start == 2, # ensure that CR did not tell aircraft to hold
-                np.logical_not(emergency),
+                np.logical_not(self.emergency),
                 np.logical_not(interrupted_transition),
                 np.logical_not(recover_transition)
             )
@@ -258,8 +259,8 @@ class M2Transitions(core.Entity):
                 self.ending_layer == 'C',
                 self.ending_altitude - self.starting_altitude > 0,
                 self.ac_ending_transition,
-                in_constrained,
-                np.logical_not(emergency),
+                self.in_constrained,
+                np.logical_not(self.emergency),
                 np.logical_not(interrupted_transition),
                 np.logical_not(recover_transition)
             )
@@ -273,8 +274,8 @@ class M2Transitions(core.Entity):
                 self.ending_layer == 'C',
                 self.ending_altitude - self.starting_altitude < 0,
                 self.ac_ending_transition,
-                in_constrained,
-                np.logical_not(emergency),
+                self.in_constrained,
+                np.logical_not(self.emergency),
                 np.logical_not(interrupted_transition),
                 np.logical_not(recover_transition)
             )
@@ -286,8 +287,8 @@ class M2Transitions(core.Entity):
                 self.starting_layer== 'C',
                 self.ending_layer == 'T',
                 self.ac_ending_transition,
-                in_constrained,
-                np.logical_not(emergency),
+                self.in_constrained,
+                np.logical_not(self.emergency),
                 np.logical_not(interrupted_transition),
                 np.logical_not(recover_transition)
             )
@@ -300,8 +301,8 @@ class M2Transitions(core.Entity):
                 self.ending_layer == 'C',
                 np.logical_not(self.starting_transition_and_conf),
                 self.ac_ending_transition,
-                in_constrained,
-                np.logical_not(emergency),
+                self.in_constrained,
+                np.logical_not(self.emergency),
                 np.logical_not(interrupted_transition),
                 np.logical_not(recover_transition)
             )
@@ -313,8 +314,8 @@ class M2Transitions(core.Entity):
                 self.starting_altitude == 0,
                 np.logical_not(self.starting_transition_and_conf),
                 self.ac_ending_transition,
-                in_constrained,
-                np.logical_not(emergency),
+                self.in_constrained,
+                np.logical_not(self.emergency),
                 np.logical_not(interrupted_transition),
                 np.logical_not(recover_transition)
             )
@@ -327,7 +328,7 @@ class M2Transitions(core.Entity):
             (
                 self.ac_ending_transition,
                 self.starting_layer == 'F',
-                np.logical_not(emergency),
+                np.logical_not(self.emergency),
                 np.logical_not(takeoff_trans),
                 np.logical_not(interrupted_transition),
                 np.logical_not(recover_transition)
@@ -349,8 +350,8 @@ class M2Transitions(core.Entity):
                 np.logical_not(recover_transition),
                 np.logical_not(free_to_other_transition),
                 self.ac_ending_transition,
-                in_constrained,
-                np.logical_not(emergency)
+                self.in_constrained,
+                np.logical_not(self.emergency)
 
             )
         )
@@ -362,7 +363,7 @@ class M2Transitions(core.Entity):
             # print('Command from CR')
             # print(self.command_from_cr_start[cr_trans])
             # print('----------------')
-            for _ in id_arr[cr_trans]:
+            for _ in self.id_arr[cr_trans]:
                 self.cr_trans_count += 1
 
         if np.any(smart_hop):
@@ -372,7 +373,7 @@ class M2Transitions(core.Entity):
             # print('Command from CR')
             # print(self.command_from_cr_start[smart_hop])
             # print('----------------')
-            for _ in id_arr[smart_hop]:
+            for _ in self.id_arr[smart_hop]:
                 self.smart_hop_count += 1
 
         if np.any(hopping_up):
@@ -380,7 +381,7 @@ class M2Transitions(core.Entity):
             # print(bs.sim.simt)
             # print(id_arr[hopping_up])
             # print('----------------')
-            for _ in id_arr[hopping_up]:
+            for _ in self.id_arr[hopping_up]:
                 self.hopping_up_count += 1
 
 
@@ -389,7 +390,7 @@ class M2Transitions(core.Entity):
             # print(bs.sim.simt)
             # print(id_arr[hopping_down])
             # print('----------------')
-            for _ in id_arr[hopping_down]:
+            for _ in self.id_arr[hopping_down]:
                 self.hopping_down_count += 1
 
         if np.any(cruise_to_turn_trans):
@@ -397,7 +398,7 @@ class M2Transitions(core.Entity):
             # print(bs.sim.simt)
             # print(id_arr[cruise_to_turn_trans])
             # print('----------------')
-            for _ in id_arr[cruise_to_turn_trans]:
+            for _ in self.id_arr[cruise_to_turn_trans]:
                 self.cruise_to_turn_count += 1
 
         if np.any(turn_to_cruise_trans):
@@ -405,7 +406,7 @@ class M2Transitions(core.Entity):
             # print(bs.sim.simt)
             # print(id_arr[turn_to_cruise_trans])
             # print('----------------')
-            for _ in id_arr[turn_to_cruise_trans]:
+            for _ in self.id_arr[turn_to_cruise_trans]:
                 self.turn_to_cruise_count += 1
 
         if np.any(takeoff_trans):
@@ -413,7 +414,7 @@ class M2Transitions(core.Entity):
             # print(bs.sim.simt)
             # print(id_arr[takeoff_trans])
             # print('----------------')
-            for _ in id_arr[takeoff_trans]:
+            for _ in self.id_arr[takeoff_trans]:
                 self.takeoff_transition_count += 1
 
         if np.any(interrupted_transition):
@@ -423,7 +424,7 @@ class M2Transitions(core.Entity):
             # print('Command from CR')
             # print(self.command_from_cr_during[interrupted_transition])
             # print('----------------')
-            for _ in id_arr[interrupted_transition]:
+            for _ in self.id_arr[interrupted_transition]:
                 self.interrupted_transition_count += 1
         
         if np.any(recover_transition):
@@ -431,7 +432,7 @@ class M2Transitions(core.Entity):
             # print(bs.sim.simt)
             # print(id_arr[recover_transition])
             # print('----------------')
-            for _ in id_arr[recover_transition]:
+            for _ in self.id_arr[recover_transition]:
                 self.recover_transition_count += 1
 
         if np.any(free_to_other_transition):
@@ -439,7 +440,7 @@ class M2Transitions(core.Entity):
             # print(bs.sim.simt)
             # print(id_arr[free_to_other_transition])
             # print('----------------')
-            for _ in id_arr[free_to_other_transition]:
+            for _ in self.id_arr[free_to_other_transition]:
                 self.free_to_other_transition_count += 1
 
         if np.any(missed_transitions):
@@ -451,7 +452,7 @@ class M2Transitions(core.Entity):
             # # stack.stack(f'PAN {acid}')
             # # stack.stack(f'ZOOM 200')
             # print('----------------')
-            for _ in id_arr[missed_transitions]:
+            for _ in self.id_arr[missed_transitions]:
                 self.missed_transition_count += 1 
 
         total_tranistion_count = self.cr_trans_count + self.smart_hop_count + self.hopping_up_count + self.hopping_down_count \
@@ -464,7 +465,7 @@ class M2Transitions(core.Entity):
             (
                 recover_transition,
                 self.aircraft_interrupted,
-                in_constrained
+                self.in_constrained
             )
         )
         self.aircraft_interrupted = np.where(recovered_ac, False, self.aircraft_interrupted)
@@ -480,7 +481,7 @@ class M2Transitions(core.Entity):
             )
         )
         self.starting_transition_and_conf = np.where(starting_cleanup_conf_transition, False, self.starting_transition_and_conf)
-        self.starting_transition_and_conf = np.where(in_constrained, self.starting_transition_and_conf, False)
+        self.starting_transition_and_conf = np.where(self.in_constrained, self.starting_transition_and_conf, False)
         self.command_from_cr_start = np.where(starting_cleanup_conf_transition, 10, self.command_from_cr_start)
 
         # aircraft may have finished the cr transition
@@ -492,7 +493,7 @@ class M2Transitions(core.Entity):
         )
 
         self.during_transition_and_conf = np.where(cleanup_during_transition_conf, False, self.during_transition_and_conf)
-        self.during_transition_and_conf = np.where(in_constrained, self.during_transition_and_conf, False)
+        self.during_transition_and_conf = np.where(self.in_constrained, self.during_transition_and_conf, False)
         self.command_from_cr_during = np.where(cleanup_during_transition_conf, 10, self.command_from_cr_during)
 
     @staticmethod
@@ -514,10 +515,7 @@ class M2Transitions(core.Entity):
         if bs.traf.ntraf == 0:
             return
         
-        # get traf array
-        id_arr = np.asarray(bs.traf.id, dtype=object)
-
-        # get the selcted altitude of aircraft
+        # get the selcted altitude of aircraft in ft
         selected_altitude = np.rint(bs.traf.selalt/ft)
        
         # get the indices of where the aircraft are want to go in bs.traf.layer_set_levels 
@@ -526,12 +524,6 @@ class M2Transitions(core.Entity):
         # get the selected layern pattern type
         selected_layer = self.select_layer_pattern(bs.traf.actedge.edge_layer_type, indices)
 
-        # Only select aircraft in constrained airspace
-        in_constrained = np.where(bs.traf.actedge.edge_airspace_type == 'open', False, True)
-
-        # don't log aircraft that are priority 4 since they travel in unused layers
-        emergency = bs.traf.priority == 4
-
         # case 1: interrupted transition. not included in intentions
 
         # case 2: trecover transition
@@ -539,8 +531,8 @@ class M2Transitions(core.Entity):
             (
                 self.ac_starting_transition,
                 self.aircraft_interrupted,
-                in_constrained,
-                np.logical_not(emergency),
+                self.in_constrained,
+                np.logical_not(self.emergency),
             )
         )
         
@@ -553,9 +545,9 @@ class M2Transitions(core.Entity):
                 selected_layer != 'T',
                 self.starting_transition_and_conf,
                 self.ac_starting_transition,
-                in_constrained,
+                self.in_constrained,
                 self.command_from_cr_start != 2, # ensure that CR did not tell aircraft to hold
-                np.logical_not(emergency),
+                np.logical_not(self.emergency),
                 np.logical_not(recover_transition)
             )
         )
@@ -571,9 +563,9 @@ class M2Transitions(core.Entity):
                 selected_layer != 'T',
                 self.starting_transition_and_conf,
                 self.ac_starting_transition,
-                in_constrained,
+                self.in_constrained,
                 self.command_from_cr_start == 2, # ensure that CR did not tell aircraft to hold
-                np.logical_not(emergency),
+                np.logical_not(self.emergency),
                 np.logical_not(recover_transition)
             )
         )
@@ -588,8 +580,8 @@ class M2Transitions(core.Entity):
                 selected_layer == 'C',
                 selected_altitude - self.starting_altitude > 0,
                 self.ac_starting_transition,
-                in_constrained,
-                np.logical_not(emergency),
+                self.in_constrained,
+                np.logical_not(self.emergency),
                 np.logical_not(recover_transition)
             )
         )
@@ -604,8 +596,8 @@ class M2Transitions(core.Entity):
                 selected_layer == 'C',
                 selected_altitude - self.starting_altitude < 0,
                 self.ac_starting_transition,
-                in_constrained,
-                np.logical_not(emergency),
+                self.in_constrained,
+                np.logical_not(self.emergency),
                 np.logical_not(recover_transition)
             )
         )
@@ -618,8 +610,8 @@ class M2Transitions(core.Entity):
                 self.starting_layer== 'C',
                 selected_layer == 'T',
                 self.ac_starting_transition,
-                in_constrained,
-                np.logical_not(emergency),
+                self.in_constrained,
+                np.logical_not(self.emergency),
                 np.logical_not(recover_transition)
             )
         )
@@ -633,8 +625,8 @@ class M2Transitions(core.Entity):
                 selected_layer == 'C',
                 np.logical_not(self.starting_transition_and_conf),
                 self.ac_starting_transition,
-                in_constrained,
-                np.logical_not(emergency),
+                self.in_constrained,
+                np.logical_not(self.emergency),
                 np.logical_not(recover_transition)
             )
         )
@@ -647,8 +639,8 @@ class M2Transitions(core.Entity):
                 self.starting_altitude == 0,
                 np.logical_not(self.starting_transition_and_conf),
                 self.ac_starting_transition,
-                in_constrained,
-                np.logical_not(emergency),
+                self.in_constrained,
+                np.logical_not(self.emergency),
                 np.logical_not(recover_transition)
             )
         )
@@ -662,7 +654,7 @@ class M2Transitions(core.Entity):
             (
                 self.ac_starting_transition,
                 self.starting_layer == 'F',
-                np.logical_not(emergency),
+                np.logical_not(self.emergency),
                 np.logical_not(takeoff_trans),
                 np.logical_not(recover_transition)
             )
@@ -683,8 +675,8 @@ class M2Transitions(core.Entity):
                 np.logical_not(free_to_other_transition),
                 np.logical_not(recover_transition),
                 self.ac_starting_transition,
-                in_constrained,
-                np.logical_not(emergency)
+                self.in_constrained,
+                np.logical_not(self.emergency)
 
             )
         )
@@ -694,7 +686,7 @@ class M2Transitions(core.Entity):
         if np.any(cr_trans):
             print('CR transition')
             print(bs.sim.simt)
-            print(id_arr[cr_trans])
+            print(self.id_arr[cr_trans])
             print('Command from CR')
             print(self.command_from_cr_start[cr_trans])
             print('----------------')
@@ -702,7 +694,7 @@ class M2Transitions(core.Entity):
         if np.any(smart_hop):
             print('Smart transition')
             print(bs.sim.simt)
-            print(id_arr[smart_hop])
+            print(self.id_arr[smart_hop])
             print('Command from CR')
             print(self.command_from_cr_start[smart_hop])
             print('----------------')
@@ -710,43 +702,43 @@ class M2Transitions(core.Entity):
         if np.any(hopping_up):
             print('Hopping up')
             print(bs.sim.simt)
-            print(id_arr[hopping_up])
+            print(self.id_arr[hopping_up])
             print('----------------')
 
         if np.any(hopping_down):
             print('Hopping down')
             print(bs.sim.simt)
-            print(id_arr[hopping_down])
+            print(self.id_arr[hopping_down])
             print('----------------')
 
         if np.any(cruise_to_turn_trans):
             print('Cruise to Turn transition')
             print(bs.sim.simt)
-            print(id_arr[cruise_to_turn_trans])
+            print(self.id_arr[cruise_to_turn_trans])
             print('----------------')
 
         if np.any(turn_to_cruise_trans):
             print('Turn to Cruise transition')
             print(bs.sim.simt)
-            print(id_arr[turn_to_cruise_trans])
+            print(self.id_arr[turn_to_cruise_trans])
             print('----------------')
 
         if np.any(takeoff_trans):
             print('Takeoff transition')
             print(bs.sim.simt)
-            print(id_arr[takeoff_trans])
+            print(self.id_arr[takeoff_trans])
             print('----------------')
 
         if np.any(recover_transition):
             print('Recover transition')
             print(bs.sim.simt)
-            print(id_arr[recover_transition])
+            print(self.id_arr[recover_transition])
             print('----------------')
 
         if np.any(free_to_other_transition):
             print('Free layer transition')
             print(bs.sim.simt)
-            print(id_arr[free_to_other_transition])
+            print(self.id_arr[free_to_other_transition])
             print('----------------')
 
 
