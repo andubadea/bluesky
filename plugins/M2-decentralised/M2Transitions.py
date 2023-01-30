@@ -526,7 +526,7 @@ class M2Transitions(core.Entity):
                         final_transition_type, 
                         self.intended_transition_type[acidx],
                         self.starting_altitude[acidx],
-                        np.rint(bs.traf.alt/ft)[acidx],
+                        int(np.rint(bs.traf.alt/ft)[acidx]),
                         ]
             
             bs.traf.translog.log(*log_array)
