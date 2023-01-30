@@ -62,8 +62,8 @@ class M2Transitions(core.Entity):
             self.command_from_cr_during = np.array([], dtype=int)
             self.ac_sign_now = np.array([], dtype=str)
             self.ac_sign_prev = np.array([], dtype=str)
-            self.intended_transtion_type = np.array([], dtype=str),
-            self.start_transition_time = np.array([], dtype=float),
+            self.intended_transition_layer = np.array([], dtype=str)
+            self.start_transition_time = np.array([], dtype=float)
             self.id_arr = np.array([], dtype=str)
 
         self.select_layer_pattern = np.vectorize(self.get_layer_type)
@@ -73,6 +73,7 @@ class M2Transitions(core.Entity):
         super().create(n)
         self.command_from_cr_start[-n:] = 10
         self.command_from_cr_during[-n:] = 10
+        self.intended_transition_layer[-n:] = ""
 
     def update(self):
 
@@ -80,9 +81,9 @@ class M2Transitions(core.Entity):
         self.aircraft_vs_now = np.abs(bs.traf.vs) > 0
 
         # calculate the difference in vs from prev and now
-        self.ac_sign_now = np.where(bs.traf.vs < 0, 'negative', self.ac_sign_now)        
-        self.ac_sign_now = np.where(bs.traf.vs > 0, 'postive', self.ac_sign_now)
-        self.ac_sign_now = np.where(bs.traf.vs == 0, 'zero', self.ac_sign_now)
+        # self.ac_sign_now = np.where(bs.traf.vs < 0, 'negative', self.ac_sign_now)        
+        # self.ac_sign_now = np.where(bs.traf.vs > 0, 'postive', self.ac_sign_now)
+        # self.ac_sign_now = np.where(bs.traf.vs == 0, 'zero', self.ac_sign_now)
 
         # gather some more information
         # Only select aircraft in constrained airspace
@@ -110,7 +111,7 @@ class M2Transitions(core.Entity):
                 np.logical_not(self.aircraft_vs_prev),
             )
         )
-
+        self.start_transition_time = np.where(self.ac_starting_transition, bs.sim.simt, self.start_transition_time)
         # For aircraft starting a transition check their current layer
         self.starting_layer = np.where(self.ac_starting_transition, bs.traf.flight_layer_type, self.starting_layer)
         self.starting_altitude = np.where(self.ac_starting_transition, bs.traf.flight_levels, self.starting_altitude)
@@ -192,7 +193,7 @@ class M2Transitions(core.Entity):
         # save stuff for next iteration
         self.aircraft_vs_prev = self.aircraft_vs_now
         self.vs_prev = bs.traf.vs
-        self.ac_sign_prev = self.ac_sign_now
+        # self.ac_sign_prev = self.ac_sign_now
 
     def log(self):
 
@@ -356,104 +357,119 @@ class M2Transitions(core.Entity):
             )
         )
 
+
+        # Begin the logging
+        # LOG types
+        # 1 Interrupted Transition
+        # 2 Recover Transition
+        # 3 CR transtion
+        # 4 Smart Hopping
+        # 5 Hopping up
+        # 6 Hopping down
+        # 7 Cruise to Turn
+        # 8 Turn to Cruise
+        # 9 Takeoff
+        # 10 Free transition
+        # 11 Missed Transition
+
+        if np.any(interrupted_transition):
+            # print('Interrupted transition')
+            # print(bs.sim.simt)
+            # print(self.id_arr[interrupted_transition])
+            # print('Command from CR')
+            # print(self.command_from_cr_during[interrupted_transition])
+            # print('----------------')
+            
+            self.log_things(interrupted_transition, '1')
+        
+        if np.any(recover_transition):
+            # print('Recover transition')
+            # print(bs.sim.simt)
+            # print(self.id_arr[recover_transition])
+            # print('----------------')
+            self.log_things(recover_transition, '2')
+
+
         if np.any(cr_trans):
             # print('CR transition')
             # print(bs.sim.simt)
-            # print(id_arr[cr_trans])
+            # print(self.id_arr[cr_trans])
             # print('Command from CR')
             # print(self.command_from_cr_start[cr_trans])
             # print('----------------')
-            for _ in self.id_arr[cr_trans]:
-                self.cr_trans_count += 1
+            self.log_things(cr_trans, '3')
+
 
         if np.any(smart_hop):
             # print('Smart transition')
             # print(bs.sim.simt)
-            # print(id_arr[smart_hop])
+            # print(self.id_arr[smart_hop])
             # print('Command from CR')
             # print(self.command_from_cr_start[smart_hop])
             # print('----------------')
-            for _ in self.id_arr[smart_hop]:
-                self.smart_hop_count += 1
+            self.log_things(smart_hop, '4')
+
 
         if np.any(hopping_up):
             # print('Hopping up')
             # print(bs.sim.simt)
-            # print(id_arr[hopping_up])
+            # print(self.id_arr[hopping_up])
             # print('----------------')
-            for _ in self.id_arr[hopping_up]:
-                self.hopping_up_count += 1
+            self.log_things(hopping_up, '5')
+
 
 
         if np.any(hopping_down):
             # print('Hopping down')
             # print(bs.sim.simt)
-            # print(id_arr[hopping_down])
+            # print(self.id_arr[hopping_down])
             # print('----------------')
-            for _ in self.id_arr[hopping_down]:
-                self.hopping_down_count += 1
+            self.log_things(hopping_down, '6')
+
 
         if np.any(cruise_to_turn_trans):
             # print('Cruise to Turn transition')
             # print(bs.sim.simt)
-            # print(id_arr[cruise_to_turn_trans])
+            # print(self.id_arr[cruise_to_turn_trans])
             # print('----------------')
-            for _ in self.id_arr[cruise_to_turn_trans]:
-                self.cruise_to_turn_count += 1
+            self.log_things(cruise_to_turn_trans, '7')
+
 
         if np.any(turn_to_cruise_trans):
             # print('Turn to Cruise transition')
             # print(bs.sim.simt)
-            # print(id_arr[turn_to_cruise_trans])
+            # print(self.id_arr[turn_to_cruise_trans])
             # print('----------------')
-            for _ in self.id_arr[turn_to_cruise_trans]:
-                self.turn_to_cruise_count += 1
+            self.log_things(turn_to_cruise_trans, '8')
+
 
         if np.any(takeoff_trans):
             # print('Takeoff transition')
             # print(bs.sim.simt)
-            # print(id_arr[takeoff_trans])
+            # print(self.id_arr[takeoff_trans])
             # print('----------------')
-            for _ in self.id_arr[takeoff_trans]:
-                self.takeoff_transition_count += 1
+            self.log_things(takeoff_trans, '9')
 
-        if np.any(interrupted_transition):
-            # print('Interrupted transition')
-            # print(bs.sim.simt)
-            # print(id_arr[interrupted_transition])
-            # print('Command from CR')
-            # print(self.command_from_cr_during[interrupted_transition])
-            # print('----------------')
-            for _ in self.id_arr[interrupted_transition]:
-                self.interrupted_transition_count += 1
-        
-        if np.any(recover_transition):
-            # print('Recover transition')
-            # print(bs.sim.simt)
-            # print(id_arr[recover_transition])
-            # print('----------------')
-            for _ in self.id_arr[recover_transition]:
-                self.recover_transition_count += 1
 
         if np.any(free_to_other_transition):
             # print('Free layer transition')
             # print(bs.sim.simt)
-            # print(id_arr[free_to_other_transition])
+            # print(self.id_arr[free_to_other_transition])
             # print('----------------')
-            for _ in self.id_arr[free_to_other_transition]:
-                self.free_to_other_transition_count += 1
+            self.log_things(free_to_other_transition, '10')
+
 
         if np.any(missed_transitions):
             # print('Missed transition')
             # print(bs.sim.simt)
-            # print(id_arr[missed_transitions])
-            # acid = id_arr[missed_transitions][0]
+            # print(self.id_arr[missed_transitions])
+            # acid = self.id_arr[missed_transitions][0]
             # # bs.sim.hold()
             # # stack.stack(f'PAN {acid}')
             # # stack.stack(f'ZOOM 200')
             # print('----------------')
-            for _ in self.id_arr[missed_transitions]:
-                self.missed_transition_count += 1 
+            self.log_things(missed_transitions, '11')
+
 
         total_tranistion_count = self.cr_trans_count + self.smart_hop_count + self.hopping_up_count + self.hopping_down_count \
         + self.cruise_to_turn_count  +self.turn_to_cruise_count + self.takeoff_transition_count  + self.interrupted_transition_count \
@@ -496,6 +512,26 @@ class M2Transitions(core.Entity):
         self.during_transition_and_conf = np.where(self.in_constrained, self.during_transition_and_conf, False)
         self.command_from_cr_during = np.where(cleanup_during_transition_conf, 10, self.command_from_cr_during)
 
+
+    def log_things(self, transition, final_transition_type):
+
+        # mask to get acidx and acid easy
+        acidxs = np.where(transition)[0]
+
+        for idx, acid in enumerate(self.id_arr[transition]):
+            # get the log array
+            acidx = acidxs[idx]
+            log_array = [
+                        self.start_transition_time[acidx], 
+                        acid,
+                        final_transition_type, 
+                        self.intended_transition_layer[acidx],
+                        self.starting_altitude[acidx],
+                        np.rint(bs.traf.alt/ft)[acidx],
+                        ]
+            
+            bs.traf.translog.log(*log_array)
+
     @staticmethod
     def get_layer_type(layer_type, index_alt):
 
@@ -535,8 +571,10 @@ class M2Transitions(core.Entity):
                 np.logical_not(self.emergency),
             )
         )
+                # Begin the logging
+        # LOG types
         
-        self.intended_transtion_type =  np.where(recover_transition, 'RECOVER', self.intended_transtion_type)
+        self.intended_transition_layer =  np.where(recover_transition, '2', self.intended_transition_layer)
 
         # case 3: transtion due to CR would mainly happen if there was a conflict
         # at the start of the transition
@@ -552,7 +590,7 @@ class M2Transitions(core.Entity):
             )
         )
 
-        self.intended_transtion_type =  np.where(cr_trans, 'CR', self.intended_transtion_type)
+        self.intended_transition_layer =  np.where(cr_trans, '3', self.intended_transition_layer)
 
         # case 4
         # smart hop up: There are some cases where CR tells the aircraft to hold
@@ -570,7 +608,7 @@ class M2Transitions(core.Entity):
             )
         )
 
-        self.intended_transtion_type =  np.where(smart_hop, 'SMART_HOP', self.intended_transtion_type)
+        self.intended_transition_layer =  np.where(smart_hop, '4', self.intended_transition_layer)
 
         # case 5: transition due to hopping up
         hopping_up =  np.logical_and.reduce(
@@ -586,7 +624,7 @@ class M2Transitions(core.Entity):
             )
         )
 
-        self.intended_transtion_type =  np.where(hopping_up, 'HOP_UP', self.intended_transtion_type)
+        self.intended_transition_layer =  np.where(hopping_up, '5', self.intended_transition_layer)
 
         # case 6: transiton to hopping down
         hopping_down =  np.logical_and.reduce(
@@ -602,7 +640,7 @@ class M2Transitions(core.Entity):
             )
         )
 
-        self.intended_transtion_type =  np.where(hopping_down, 'HOP_DOWN', self.intended_transtion_type)
+        self.intended_transition_layer =  np.where(hopping_down, '6', self.intended_transition_layer)
 
         # case 7: transition due to turning
         cruise_to_turn_trans = np.logical_and.reduce(
@@ -616,7 +654,7 @@ class M2Transitions(core.Entity):
             )
         )
 
-        self.intended_transtion_type =  np.where(cruise_to_turn_trans, 'C_T', self.intended_transtion_type)
+        self.intended_transition_layer =  np.where(cruise_to_turn_trans, '7', self.intended_transition_layer)
 
         # case 8: transition due to returning to cruise
         turn_to_cruise_trans = np.logical_and.reduce(
@@ -631,7 +669,7 @@ class M2Transitions(core.Entity):
             )
         )
 
-        self.intended_transtion_type =  np.where(turn_to_cruise_trans, 'T_C', self.intended_transtion_type)
+        self.intended_transition_layer =  np.where(turn_to_cruise_trans, '8', self.intended_transition_layer)
 
         # case 9: Takeoff
         takeoff_trans = np.logical_and.reduce(
@@ -645,7 +683,7 @@ class M2Transitions(core.Entity):
             )
         )
 
-        self.intended_transtion_type =  np.where(takeoff_trans, 'TO', self.intended_transtion_type)
+        self.intended_transition_layer =  np.where(takeoff_trans, '9', self.intended_transition_layer)
 
         # case 10 is from a free to a cruise or a turn
         # this usually happens when turn is to close to take off
@@ -660,7 +698,7 @@ class M2Transitions(core.Entity):
             )
         )
 
-        self.intended_transtion_type =  np.where(free_to_other_transition, 'F', self.intended_transtion_type)
+        self.intended_transition_layer =  np.where(free_to_other_transition, '10', self.intended_transition_layer)
 
         # case 11 missed transition
         missed_transitions = np.logical_and.reduce(
@@ -681,64 +719,64 @@ class M2Transitions(core.Entity):
             )
         )
 
-        self.intended_transtion_type =  np.where(missed_transitions, 'M', self.intended_transtion_type)
+        self.intended_transition_layer =  np.where(missed_transitions, '11', self.intended_transition_layer)
 
-        if np.any(cr_trans):
-            print('CR transition')
-            print(bs.sim.simt)
-            print(self.id_arr[cr_trans])
-            print('Command from CR')
-            print(self.command_from_cr_start[cr_trans])
-            print('----------------')
+        # if np.any(cr_trans):
+        #     print('CR transition')
+        #     print(bs.sim.simt)
+        #     print(self.id_arr[cr_trans])
+        #     print('Command from CR')
+        #     print(self.command_from_cr_start[cr_trans])
+        #     print('----------------')
 
-        if np.any(smart_hop):
-            print('Smart transition')
-            print(bs.sim.simt)
-            print(self.id_arr[smart_hop])
-            print('Command from CR')
-            print(self.command_from_cr_start[smart_hop])
-            print('----------------')
+        # if np.any(smart_hop):
+        #     print('Smart transition')
+        #     print(bs.sim.simt)
+        #     print(self.id_arr[smart_hop])
+        #     print('Command from CR')
+        #     print(self.command_from_cr_start[smart_hop])
+        #     print('----------------')
 
-        if np.any(hopping_up):
-            print('Hopping up')
-            print(bs.sim.simt)
-            print(self.id_arr[hopping_up])
-            print('----------------')
+        # if np.any(hopping_up):
+        #     print('Hopping up')
+        #     print(bs.sim.simt)
+        #     print(self.id_arr[hopping_up])
+        #     print('----------------')
 
-        if np.any(hopping_down):
-            print('Hopping down')
-            print(bs.sim.simt)
-            print(self.id_arr[hopping_down])
-            print('----------------')
+        # if np.any(hopping_down):
+        #     print('Hopping down')
+        #     print(bs.sim.simt)
+        #     print(self.id_arr[hopping_down])
+        #     print('----------------')
 
-        if np.any(cruise_to_turn_trans):
-            print('Cruise to Turn transition')
-            print(bs.sim.simt)
-            print(self.id_arr[cruise_to_turn_trans])
-            print('----------------')
+        # if np.any(cruise_to_turn_trans):
+        #     print('Cruise to Turn transition')
+        #     print(bs.sim.simt)
+        #     print(self.id_arr[cruise_to_turn_trans])
+        #     print('----------------')
 
-        if np.any(turn_to_cruise_trans):
-            print('Turn to Cruise transition')
-            print(bs.sim.simt)
-            print(self.id_arr[turn_to_cruise_trans])
-            print('----------------')
+        # if np.any(turn_to_cruise_trans):
+        #     print('Turn to Cruise transition')
+        #     print(bs.sim.simt)
+        #     print(self.id_arr[turn_to_cruise_trans])
+        #     print('----------------')
 
-        if np.any(takeoff_trans):
-            print('Takeoff transition')
-            print(bs.sim.simt)
-            print(self.id_arr[takeoff_trans])
-            print('----------------')
+        # if np.any(takeoff_trans):
+        #     print('Takeoff transition')
+        #     print(bs.sim.simt)
+        #     print(self.id_arr[takeoff_trans])
+        #     print('----------------')
 
-        if np.any(recover_transition):
-            print('Recover transition')
-            print(bs.sim.simt)
-            print(self.id_arr[recover_transition])
-            print('----------------')
+        # if np.any(recover_transition):
+        #     print('Recover transition')
+        #     print(bs.sim.simt)
+        #     print(self.id_arr[recover_transition])
+        #     print('----------------')
 
-        if np.any(free_to_other_transition):
-            print('Free layer transition')
-            print(bs.sim.simt)
-            print(self.id_arr[free_to_other_transition])
-            print('----------------')
+        # if np.any(free_to_other_transition):
+        #     print('Free layer transition')
+        #     print(bs.sim.simt)
+        #     print(self.id_arr[free_to_other_transition])
+        #     print('----------------')
 
 
