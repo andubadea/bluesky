@@ -514,7 +514,7 @@ def handle_replan(edges_changes):
                     turn_lon = next_turn[j][0]
                     
                     wpidxstreets = edge_traffic.edgeap.edge_rou[idx].addwpt(idx, name, wpedgeid, group_number, flow_number, edge_layer_dict, 
-                                                turn_lat, turn_lon, edge_airspace_type)
+                                                turn_lat, turn_lon, edge_airspace_type, edge_layer_type)
                 # Calculate flight plan
                 acrte.calcfp()
                 edge_traffic.edgeap.edge_rou[idx].direct(idx,edge_traffic.edgeap.edge_rou[idx].wpname[1])
@@ -564,7 +564,7 @@ def queuem2(acid, actype: str="B744", path_file: str="", aclat: float=52., aclon
 
 @stack.command
 def addwptm2(acid: 'acid', lat: float, lon: float, alt: float = -999, spd: float = -999, wpedgeid: 'txt'="",  
-            group_number: 'txt' = "", action_lat: float=48.1351, action_lon: float = 11.58, airspace_type: 'txt' ="0"):
+            group_number: 'txt' = "", action_lat: float=48.1351, action_lon: float = 11.58, edge_layer_type: 'txt' ="0"):
     """ADDWPTM2 acid, (lat,lon),[alt],[spd],[edgeid],[turn_node]"""
     # DEPRECATED
     # edgeid comes from graph
@@ -586,18 +586,18 @@ def addwptm2(acid: 'acid', lat: float, lon: float, alt: float = -999, spd: float
     # get layer type
     edge_layer_type = edge_traffic.edge_dict[wpedgeid]['height_allocation']
 
-    # dictionary of layers
+    # dictionary of layerss
     edge_layer_dict = flight_layers.layer_dict["config"][edge_layer_type]['levels']
 
     # get the edge_airspace_type
-    if airspace_type=="1":
+    if edge_layer_type=="1":
         edge_airspace_type = 'constrained'
     else:
         edge_airspace_type = 'open'
 
     # add edge info to stack
     edge_traffic.edgeap.edge_rou[acid].addwptedgeStack(acid, latlon, alt, spd, wpedgeid, group_number, flow_number, 
-                                                       edge_layer_dict, action_lat, action_lon, edge_airspace_type)
+                                                       edge_layer_dict, action_lat, action_lon, edge_airspace_type, edge_layer_type)
 
 @stack.command
 def CREM2(acid, actype: str="B744", aclat: float=52., aclon: float=4., achdg: float=None, acalt: float=0,  
@@ -1046,7 +1046,7 @@ class EdgesAp(Entity):
             edge_traffic.actedge.turn_lat[i], edge_traffic.actedge.turn_lon[i], \
             edge_traffic.actedge.hdg_lat[i], edge_traffic.actedge.hdg_lon[i], \
             edge_traffic.actedge.const_lat[i], edge_traffic.actedge.const_lon[i], \
-            edge_traffic.actedge.edge_airspace_type[i] = self.edge_rou[i].getnextwp()
+            edge_traffic.actedge.edge_airspace_type[i], edge_traffic.actedge.edge_layer_type[i] = self.edge_rou[i].getnextwp()
 
             # here do a check to see if there is a new flow group
             # new flow group must be in constrained
@@ -1200,6 +1200,8 @@ class ActiveEdge(Entity):
             # speed limit
             self.speed_limit = np.array([], dtype=np.int32)
 
+            self.edge_layer_type = np.array([], dtype=str)
+
     
     def create(self, n=1):
         super().create(n)
@@ -1233,6 +1235,8 @@ class ActiveEdge(Entity):
         self.edge_airspace_type[-n:]        = ""
 
         self.speed_limit[-n:]               = 999
+
+        self.edge_layer_type[-n:]         = ''
 
 # route_edge class. keeps track of when aircraft move to new edges and adds edges to stack
 class Route_edge(Replaceable):
@@ -1269,7 +1273,10 @@ class Route_edge(Replaceable):
         # initialize the airspace type
         self.edge_airspace_type = []
 
-    def addwptedgeStack(self, idx, latlon, alt, spd, wpedgeid, group_number, flow_number, edge_layer_dict, action_lat, action_lon, edge_airspace_type): 
+        # get the height allocation
+        self.edge_layer_type = []
+
+    def addwptedgeStack(self, idx, latlon, alt, spd, wpedgeid, group_number, flow_number, edge_layer_dict, action_lat, action_lon, edge_airspace_type, edge_layer_type): 
 
         # if airspace type is 'constrained' then the action_lat/lon is the location of next turn
         # if airspace type is 'open' thne the action_lat/lon is the locaiton where an altitude change must occur due to heading rules
@@ -1280,7 +1287,7 @@ class Route_edge(Replaceable):
         name    = bs.traf.id[idx]
         
         # Add waypoint
-        wpidx = self.addwpt(idx, name, wpedgeid, group_number, flow_number, edge_layer_dict, action_lat, action_lon, edge_airspace_type)
+        wpidx = self.addwpt(idx, name, wpedgeid, group_number, flow_number, edge_layer_dict, action_lat, action_lon, edge_airspace_type, edge_layer_type)
 
         # Check for success by checking inserted location in flight plan >= 0
         if wpidx < 0:
@@ -1297,23 +1304,23 @@ class Route_edge(Replaceable):
 
         return True
     
-    def overwrite_wpt_data(self, wpidx, wpname, wpedgeid, group_number, flow_number, edge_layer_dict, action_lat, action_lon, edge_airspace_type):
+    def overwrite_wpt_data(self, wpidx, wpname, wpedgeid, group_number, flow_number, edge_layer_dict, action_lat, action_lon, edge_airspace_type, edge_layer_type):
         """
         Overwrites information for a waypoint, via addwpt_data/9
         """
         # TODO: check if it works
 
-        self.addwpt_data(True, wpidx, wpname, wpedgeid, group_number, flow_number, edge_layer_dict, action_lat, action_lon, edge_airspace_type)
+        self.addwpt_data(True, wpidx, wpname, wpedgeid, group_number, flow_number, edge_layer_dict, action_lat, action_lon, edge_airspace_type, edge_layer_type)
     
-    def insert_wpt_data(self, wpidx, wpname, wpedgeid, group_number, flow_number, edge_layer_dict, action_lat, action_lon, edge_airspace_type):
+    def insert_wpt_data(self, wpidx, wpname, wpedgeid, group_number, flow_number, edge_layer_dict, action_lat, action_lon, edge_airspace_type, edge_layer_type):
         """
         Inserts information for a waypoint, via addwpt_data/9
         """
         # TODO: check if it works
         
-        self.addwpt_data(True, wpidx, wpname, wpedgeid, group_number, flow_number, edge_layer_dict, action_lat, action_lon, edge_airspace_type)
+        self.addwpt_data(True, wpidx, wpname, wpedgeid, group_number, flow_number, edge_layer_dict, action_lat, action_lon, edge_airspace_type, edge_layer_type)
 
-    def addwpt_data(self, overwrt, wpidx, wpname, wpedgeid, group_number, flow_number, edge_layer_dict, action_lat, action_lon, edge_airspace_type):
+    def addwpt_data(self, overwrt, wpidx, wpname, wpedgeid, group_number, flow_number, edge_layer_dict, action_lat, action_lon, edge_airspace_type, edge_layer_type):
         """
         Overwrites or inserts information for a waypoint
         """
@@ -1344,6 +1351,7 @@ class Route_edge(Replaceable):
             self.turn_lat[wpidx] = action_lat
             self.turn_lon[wpidx] = action_lon
             self.edge_airspace_type[wpidx] = edge_airspace_type
+            self.edge_layer_type[wpidx] = edge_layer_type
 
         else:
             self.wpname.insert(wpidx, wpname)
@@ -1356,8 +1364,9 @@ class Route_edge(Replaceable):
             self.hdg_lat.insert(wpidx, hdg_lat)
             self.hdg_lon.insert(wpidx, hdg_lon)
             self.edge_airspace_type.insert(wpidx, edge_airspace_type)
+            self.edge_layer_type.insert(wpidx, edge_layer_type)
 
-    def addwpt(self, iac, name, wpedgeid ="", group_number="", flow_number="", edge_layer_dict ="", action_lat=48.1351, action_lon=11.582, edge_airspace_type="open"):
+    def addwpt(self, iac, name, wpedgeid ="", group_number="", flow_number="", edge_layer_dict ="", action_lat=48.1351, action_lon=11.582, edge_airspace_type="open", edge_layer_type=''):
         """Adds waypoint an returns index of waypoint, lat/lon [deg], alt[m]"""
 
         # For safety
@@ -1370,7 +1379,7 @@ class Route_edge(Replaceable):
 
         wpidx = self.nwp
 
-        self.addwpt_data(False, wpidx, newname, wpedgeid, group_number, flow_number, edge_layer_dict, action_lat, action_lon, edge_airspace_type)
+        self.addwpt_data(False, wpidx, newname, wpedgeid, group_number, flow_number, edge_layer_dict, action_lat, action_lon, edge_airspace_type, edge_layer_type)
 
         idx = wpidx
         self.nwp += 1
@@ -1408,6 +1417,8 @@ class Route_edge(Replaceable):
 
             # set edge airspace type
             edge_traffic.actedge.edge_airspace_type[idx] = self.edge_airspace_type[wpidx]
+            edge_traffic.actedge.edge_layer_type[idx] = self.edge_layer_type[wpidx]
+
 
             return True
         else:
@@ -1422,6 +1433,9 @@ class Route_edge(Replaceable):
 
         # get airspace type
         edge_airspace_type = self.edge_airspace_type[self.iactwp]
+
+        # get edge type
+        edge_layer_type = self.edge_layer_type[self.iactwp]
 
         # get next edge id
         wpedgeid = self.wpedgeid[self.iactwp]
@@ -1449,7 +1463,7 @@ class Route_edge(Replaceable):
         edge_layer_dict = self.edge_layer_dict[self.iactwp]
 
         return wpedgeid, intersection_lat, intersection_lon, group_number, flow_number, edge_layer_dict, turn_lat, turn_lon, hdg_lat, hdg_lon, \
-            const_lat, const_lon, edge_airspace_type
+            const_lat, const_lon, edge_airspace_type, edge_layer_type
 
     @staticmethod
     def get_available_name(data, name_, len_=2):
@@ -1597,6 +1611,14 @@ class FlightLayers(Entity):
         self.dist_between_cruise_layers = cruise_layers[1] - cruise_layers[0]
         
         bs.traf.dist_between_cruise_layers = self.dist_between_cruise_layers
+        
+        # save this for transition logging
+        bs.traf.layer_set_pattern = {
+            '0': np.array([''] + self.layer_dict['config']['0']['pattern']),
+            '1': np.array([''] + self.layer_dict['config']['1']['pattern']),
+            'open': ''
+            }
+        bs.traf.layer_set_levels = np.array([0] + self.layer_dict['info']['levels'])
 
     def layer_tracking(self):
         
@@ -1856,6 +1878,7 @@ class PathPlans(Entity):
 
             flow_number = edge_traffic.edge_dict[wpedgeid]['flow_group']
 
+
             # when layer type is not in open airspace check if there is a heading based
             # constrained airspace
             if edge_layer_type != 'open':
@@ -1893,12 +1916,12 @@ class PathPlans(Entity):
             turn_lat = next_turn[j][1]
             turn_lon = next_turn[j][0]
             edge_traffic.edgeap.edge_rou[ridx].addwpt(ridx, name, wpedgeid, group_number, flow_number, edge_layer_dict, 
-                                        turn_lat, turn_lon, edge_airspace_type)
+                                        turn_lat, turn_lon, edge_airspace_type, edge_layer_type)
 
         # add last waypoint twice because of landin issues
         wpidx = acrte.addwpt_simple(ridx, name, wptype, lat, lon, alt, spd)
         edge_traffic.edgeap.edge_rou[ridx].addwpt(ridx, name, wpedgeid, group_number, flow_number, edge_layer_dict, 
-                                        turn_lat, turn_lon, edge_airspace_type)
+                                        turn_lat, turn_lon, edge_airspace_type, edge_layer_type)
         # For this aircraft, manually set the first "next_qdr" in actwp
         # We basically need to find the qdr between the second and the third waypoint, as
         # the first one is the origin
