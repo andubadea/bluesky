@@ -1883,7 +1883,7 @@ class PathPlans(Entity):
             # constrained airspace
             if edge_layer_type != 'open':
 
-                if height_alloc_random or height_alloc_fulldensity or height_alloc_speed:
+                if height_alloc_random or height_alloc_fulldensity or height_alloc_speed or height_alloc_distance:
                     # Get the layer number
                     edge_layer_dict = edge_layer_dict[angle_range]
 
