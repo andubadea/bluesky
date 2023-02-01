@@ -65,6 +65,7 @@ class M2Transitions(core.Entity):
             self.intended_transition_type = np.array([], dtype=str)
             self.start_transition_time = np.array([], dtype=float)
             self.id_arr = np.array([], dtype=str)
+            self.start_conf_time = np.array([], dtype=float)
 
         self.select_layer_pattern = np.vectorize(self.get_layer_type)
 
@@ -516,9 +517,47 @@ class M2Transitions(core.Entity):
             # get the log array
             acidx = acidxs[idx]
 
+            # set start time as start search for conflict
+            start_conf_time =  self.start_transition_time[acidx]
+            # set current time as end search for conflict
+            end_conf_time = bs.sim.simt
+
             if self.intended_transition_type[acidx] == '':
                 self.intended_transition_type[acidx] = '12'
                 final_transition_type = '12'
+
+            # now also check that end conflict time
+
+            # cruise to turn transitions
+            if final_transition_type == '7':
+                # measure the time to reach your turnspeed
+                current_turn_spd = bs.traf.actwp.turnspd[acidx]
+
+                # there could be cases where the transition is a bit late
+                # so be prepared to look back if it is negative
+                iactwp = bs.traf.ap.route[acidx].iactwp
+
+                while current_turn_spd < 0:
+                    iactwp = iactwp - 1
+                    current_turn_spd = bs.traf.ap.route[acidx].wpturnspd[iactwp]
+
+                time_to_reach_spd = timeaccel(current_turn_spd, bs.traf.gs[acidx], 3.5)
+                end_conf_time = time_to_reach_spd
+                
+                # this has a special value
+                start_conf_time = self.start_conf_time[acidx]
+
+
+            # for turn to cruise
+            if final_transition_type == '8':
+                # measure how much time to reach selspd time
+                # after reaching cruise speed
+                time_to_reach_spd = timeaccel(bs.traf.selspd[acidx], bs.traf.gs[acidx], 3.5)
+                end_conf_time = time_to_reach_spd
+
+                # this has a calculate value
+                start_conf_time = self.start_conf_time[acidx]
+
 
             log_array = [
                         self.start_transition_time[acidx], 
@@ -527,6 +566,8 @@ class M2Transitions(core.Entity):
                         self.intended_transition_type[acidx],
                         self.starting_altitude[acidx],
                         int(np.rint(bs.traf.alt/ft)[acidx]),
+                        start_conf_time,
+                        end_conf_time
                         ]
             
             bs.traf.translog.log(*log_array)
@@ -748,17 +789,71 @@ class M2Transitions(core.Entity):
         #     print(self.id_arr[hopping_down])
         #     print('----------------')
 
-        # if np.any(cruise_to_turn_trans):
-        #     print('Cruise to Turn transition')
-        #     print(bs.sim.simt)
-        #     print(self.id_arr[cruise_to_turn_trans])
-        #     print('----------------')
+        if np.any(cruise_to_turn_trans):
+            # print('Start Cruise to Turn transition')
 
-        # if np.any(turn_to_cruise_trans):
-        #     print('Turn to Cruise transition')
-        #     print(bs.sim.simt)
-        #     print(self.id_arr[turn_to_cruise_trans])
-        #     print('----------------')
+            acidxs = np.where(cruise_to_turn_trans)[0]
+
+            # for cruise to turn start we just check if current aircraft 
+            # is flying at it's cruise speed
+            for idx, acid in enumerate(self.id_arr[cruise_to_turn_trans]):
+                # get the log array
+                acidx = acidxs[idx]
+                
+                # get the nominal cruise speed of the aircraft
+                nominal_cruise_speed = int(bs.traf.type[acidx][-2:]) * kts
+                
+                # get the current speed
+                current_speed = bs.traf.gs[acidx]
+
+                # accelration is 3.5 m/s2
+                time_since_slow_down = timeaccel(current_speed, nominal_cruise_speed, 3.5)
+
+                # now calculate the simulation time to start looking for conflicts due to transition
+                start_time_for_conflict = bs.sim.simt - time_since_slow_down 
+
+                self.start_conf_time[acidx] = round(start_time_for_conflict,2)
+
+        if np.any(turn_to_cruise_trans):
+            # print('Start Turn to Cruise transition')
+
+            acidxs = np.where(turn_to_cruise_trans)[0]
+
+            for idx, acid in enumerate(self.id_arr[turn_to_cruise_trans]):
+                # get the log array
+                acidx = acidxs[idx]
+                
+                # get the previous waypoint to see if there has been a change
+                iactwp = bs.traf.ap.route[acidx].iactwp
+                prev_iactwpt = iactwp - 1
+                
+                # previous turnspeed may be -999
+                prev_turnspd = -999
+                # if previous turnspeed is less than zero then
+                while prev_turnspd < 0:
+                    # get the turn speed
+                    prev_turnspd = bs.traf.ap.route[acidx].wpturnspd[prev_iactwpt]
+                    # if previous turnspeed is negative then keep looking back
+
+                    if prev_turnspd < 0:
+                        prev_iactwpt = prev_iactwpt - 1
+
+                # now that we have the previous turnspeed we can calculate the time
+                # from when it started speeding up
+                current_speed = bs.traf.gs[acidx]
+
+                # accelration is 3.5 m/s2
+                time_since_speed_up = timeaccel(current_speed, prev_turnspd, 3.5)
+
+                # now calculate the simulation time to start looking for conflicts due to transition
+                start_time_for_conflict = bs.sim.simt - time_since_speed_up 
+
+                self.start_conf_time[acidx] = round(start_time_for_conflict,2)
+
+            # print(self.start_conf_time)
+            # print(bs.sim.simt)
+            # print(self.id_arr[turn_to_cruise_trans])
+            # print('----------------')
 
         # if np.any(takeoff_trans):
         #     print('Takeoff transition')
@@ -778,4 +873,10 @@ class M2Transitions(core.Entity):
         #     print(self.id_arr[free_to_other_transition])
         #     print('----------------')
 
+def timeaccel(vf, vo, ax):
+    acceltime = abs((vf - vo)/ ax)
 
+    # only return time if larger than 1 else just use 1
+    # acceltime = 1 if actual_time < 1 else actual_time
+    
+    return acceltime

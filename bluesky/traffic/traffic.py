@@ -158,10 +158,9 @@ transheader = \
     'Statistics recorded regularly at a certain simtime interval.\n' + \
     '#######################################################\n\n' + \
     'Parameters [Units]:\n' + \
-    'Simulation time [s], ' + \
-    'ACIDs_TURN [-], TURN_DIST [m], ACIDs_CRUISE [-], CRUISE_DIST [m], \
-    ACIDs_DESCEND [-], DESCEND_DIST [m], ACIDs_ASCENDCR [-], ASCENDCR_DIST [m], \
-    ACIDs_ASCENDHOP, ASCENDCR_DIST [m]\n'
+    'End transition time [s], Start transition time [s], ACID [-], TRANSITION_TYPE [-], \
+    INTENDED_TRANSITION_TYPE [-], START_ALT [ft], END_ALT [ft], START_CONF_SEARCH [s], \
+    END_CONF_SEARCH[s]\n'
 
 geoheader = \
     '#######################################################\n' + \
