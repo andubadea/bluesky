@@ -542,7 +542,7 @@ class M2Transitions(core.Entity):
                     current_turn_spd = bs.traf.ap.route[acidx].wpturnspd[iactwp]
 
                 time_to_reach_spd = timeaccel(current_turn_spd, bs.traf.gs[acidx], 3.5)
-                end_conf_time = time_to_reach_spd
+                end_conf_time = bs.sim.simt + time_to_reach_spd
                 
                 # this has a special value
                 start_conf_time = self.start_conf_time[acidx]
@@ -553,7 +553,7 @@ class M2Transitions(core.Entity):
                 # measure how much time to reach selspd time
                 # after reaching cruise speed
                 time_to_reach_spd = timeaccel(bs.traf.selspd[acidx], bs.traf.gs[acidx], 3.5)
-                end_conf_time = time_to_reach_spd
+                end_conf_time = bs.sim.simt + time_to_reach_spd
 
                 # this has a calculate value
                 start_conf_time = self.start_conf_time[acidx]
