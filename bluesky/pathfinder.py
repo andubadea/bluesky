@@ -2,19 +2,47 @@
 import shutil
 import itertools
 from pathlib import Path
+from importlib import import_module
+
 try:
     from importlib.resources import files
     from importlib.readers import MultiplexedPath
 except ImportError:
     # Python < 3.9 only provides deprecated resources API
-    from importlib_resources import files
-    from importlib_resources.readers import MultiplexedPath
+    # Previous alternatives to find resources seem to be difficult
+    # to get right on all platforms and python versions, so instead
+    # this approach based on the search locations from the package spec
+    from importlib.util import find_spec
+    def files(package):
+        res = ''
+        if '.' in package:
+            package, res = package.split('.', 1)
+        s = find_spec(package)
+        if s.submodule_search_locations:
+            p = Path(s.submodule_search_locations[0])
+        else:
+            p = Path(package)
+        return p / res.replace('.', '/')
+
+
+    class MultiplexedPath:
+        def __init__(self, *paths) -> None:
+            self._paths = list(map(Path, paths))
+        def iterdir(self):
+            visited = []
+            for path in self._paths:
+                for file in path.iterdir():
+                    if file.name in visited:
+                        continue
+                    visited.append(file.name)
+                    yield file
+
 
 
 class ResourcePath(MultiplexedPath):
     def __init__(self, *paths):
         base = files('bluesky.resources')
-        paths = list(paths) + base._paths if isinstance(base, MultiplexedPath) else base
+        paths = list(paths) + (base._paths if isinstance(base, MultiplexedPath) else [base])
         super().__init__(*paths)
 
     def appendpath(self, path):
@@ -87,7 +115,7 @@ resource.path = ResourcePath()
 
 
 def init(workdir=None):
-    ''' Initialise BlueSky resource paths. '''
+    ''' Initialise BlueSky search paths for resources and plugins. '''
     if workdir is None:
         if files('bluesky').parent == Path.cwd():
             # Assume BlueSky is running from source, e.g., cloned from GitHub
@@ -113,11 +141,16 @@ def init(workdir=None):
         if not subdir.exists():
             print(f'Creating directory "{subdir}"')
             subdir.mkdir()
+
     # Ensure existence of config file
     cfgfile = workdir.joinpath("settings.cfg")
     if not cfgfile.exists():
         print(f'Copying default configfile to {cfgfile}')
         shutil.copy(resource('default.cfg'), cfgfile)
+
+    # Set correct search paths for plugins
+    plugins = import_module('bluesky.plugins')
+    plugins.__spec__.submodule_search_locations.insert(0, workdir.joinpath('plugins').as_posix())
 
     # Set correct search paths for resource function
     resource.path = ResourcePath(workdir)

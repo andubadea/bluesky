@@ -155,9 +155,9 @@ class Traffic(Entity):
             self.selvs  = np.array([])  # selected vertical speed [m/s]
 
             # Whether to perform LNAV and VNAV
-            self.swlnav    = np.array([], dtype=np.bool)
-            self.swvnav    = np.array([], dtype=np.bool)
-            self.swvnavspd = np.array([], dtype=np.bool)
+            self.swlnav    = np.array([], dtype=bool)
+            self.swvnav    = np.array([], dtype=bool)
+            self.swvnavspd = np.array([], dtype=bool)
 
             # Flight Models
             self.cd       = ConflictDetection()
@@ -173,10 +173,10 @@ class Traffic(Entity):
             self.groups = TrafficGroups()
 
             # Traffic autopilot data
-            self.swhdgsel = np.array([], dtype=np.bool)  # determines whether aircraft is turning
+            self.swhdgsel = np.array([], dtype=bool)  # determines whether aircraft is turning
 
             # Traffic autothrottle settings
-            self.swats    = np.array([], dtype=np.bool)  # Switch indicating whether autothrottle system is on/off
+            self.swats    = np.array([], dtype=bool)  # Switch indicating whether autothrottle system is on/off
             self.thr      = np.array([])        # Thottle seeting (0.0-1.0), negative = non-valid/auto
 
             # Display information on label
@@ -330,6 +330,7 @@ class Traffic(Entity):
             for cmdtxt in self.crecmdlist:
                  bs.stack.stack(self.id[j]+" "+cmdtxt)
 
+        return True
 
     def creconfs(self, acid, actype, targetidx, dpsi, dcpa, tlosh, dH=None, tlosv=None, spd=None):
         ''' Create an aircraft in conflict with target aircraft.
@@ -552,8 +553,11 @@ class Traffic(Entity):
         self.cas = vtas2cas(self.tas, self.alt)
         self.M = vtas2mach(self.tas, self.alt)
 
-        # Turning
-        turnrate = np.degrees(g0 * np.tan(np.where(self.ap.turnphi>self.eps,self.ap.turnphi,self.ap.bankdef) \
+        # Turning bank triangle
+        # tan phi = a centrigugal/a grav = omega^2 * R / g = omega * V /g
+        # => omega = (g tan phi)/V
+        turnrate = np.degrees(g0 * np.tan(np.where(self.ap.turnphi>self.eps*self.eps,
+                                                   self.ap.turnphi,self.ap.bankdef) \
                                           / np.maximum(self.tas, self.eps)))
         delhdg = (self.aporasas.hdg - self.hdg + 180) % 360 - 180  # [deg]
         self.swhdgsel = np.abs(delhdg) > np.abs(bs.sim.simdt * turnrate)
