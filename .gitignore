@@ -6,6 +6,7 @@ bluesky/resources/netcdf
 bluesky/resources/performance/BADA/*
 !bluesky/resources/performance/BADA/README.md
 plugins/scenario_maker/Vienna/pickles
+plugins/streets/path_plan_dills
 
 # Sphinx documentation
 docs/_build/
