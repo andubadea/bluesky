@@ -17,7 +17,8 @@ def init_plugin():
         'plugin_name': 'TRAFFICSPAWNER',
         'plugin_type': 'sim',
     }
-    foo = TrafficSpawner()
+    # Put TrafficSpawner in bs.traf
+    bs.traf.TrafficSpawner = TrafficSpawner()
     return config
 
 class TrafficSpawner(Entity):
@@ -54,7 +55,9 @@ class TrafficSpawner(Entity):
         self.path = f'bluesky/plugins/detection_study/scenario_maker/{self.city}'
         self.load_origins_destinations()
         # Set the origin point of the city
-        self.city_centre_coords = 
+        with open(f'{self.path}/centre.txt', 'r') as f:
+            coords = f.readlines()
+        self.city_centre_coords = [float(coords[0]), float(coords[1])]
         return
     
     @command
