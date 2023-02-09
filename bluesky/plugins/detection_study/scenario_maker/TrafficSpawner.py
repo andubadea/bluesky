@@ -62,7 +62,7 @@ class TrafficSpawner(Entity):
     
     @command
     def trafficnumber(self, target_ntraf = 50):
-        self.target_ntraf = target_ntraf
+        self.target_ntraf = int(target_ntraf)
         bs.scr.echo(f'The target traffic number was set to {target_ntraf}.')
         return
     

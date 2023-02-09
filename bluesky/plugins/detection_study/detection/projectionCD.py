@@ -1,14 +1,15 @@
 import bluesky as bs
-from bluesky.tools.aero import nm
-from bluesky.traffic.asas import ConflictDetection
-
 import numpy as np
 import shapely as sp
 import math
 import pyproj
+import geopandas as gpd
+import matplotlib.pyplot as plt
 
 from shapely.geometry import LineString, Point
 from shapely import STRtree
+from bluesky.tools.aero import nm
+from bluesky.traffic.asas import ConflictDetection
 
 def init_plugin():
     # Configuration parameters
@@ -60,7 +61,13 @@ class ProjectionCD(ConflictDetection):
     
     def detect(self, ownship, intruder):
         # Query the tree for now
-        print(self.geom_tree.query(self.rte_cut_geometries))
+        all_intersections = np.transpose(self.geom_tree.query(self.rte_cut_geometries, predicate = 'intersects'))
+        
+        # Problem is, the query contains self intersections
+        # We want the indices where column 0 is not equal to column 1
+        acidx_int_pairs = all_intersections[all_intersections[:, 0] != all_intersections[:, 1]]
+        
+        print(acidx_int_pairs)
     
     def create_index(self):
         """Function that creates the geometric tree index. 
@@ -75,8 +82,7 @@ class ProjectionCD(ConflictDetection):
                 continue
             
             # Convert the coordinates of the route to UTM
-            rte_utm_lat = self.transform_coords.transform(acrte.wplat)
-            rte_utm_lon = self.transform_coords.transform(acrte.wplon)
+            rte_utm_lat,rte_utm_lon = self.transform_coords.transform(acrte.wplon,acrte.wplat)
             
             # Create the linestring from the UTM coordinates
             rte_linestring = LineString(zip(rte_utm_lon, rte_utm_lat))
@@ -86,9 +92,6 @@ class ProjectionCD(ConflictDetection):
             cut_dist = max(min(cut_dist, self.lookahead_max), self.lookahead_min)
             
             cut_rte = self.cut(rte_linestring, cut_dist)
-            
-            # Add an acidx attribute to the linestring
-            cut_rte.acidx = acidx
             
             # Add the route to the list of geometries
             self.rte_cut_geometries.append(cut_rte)
