@@ -1,5 +1,5 @@
 # My CD study stuff
-bluesky/plugins/scenario_maker/Vienna/pickles
+bluesky/plugins/detection_study/scenario_maker/Vienna/pickles
 
 # Automatically generated directories and files
 output
@@ -11,8 +11,7 @@ bluesky/resources/netcdf
 # Potentially locally-copied BADA installation
 bluesky/resources/performance/BADA/*
 !bluesky/resources/performance/BADA/README.md
-plugins/scenario_maker/Vienna/pickles
-plugins/streets/path_plan_dills
+
 
 # Sphinx documentation
 docs/_build/

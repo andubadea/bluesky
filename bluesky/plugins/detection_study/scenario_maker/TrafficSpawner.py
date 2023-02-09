@@ -45,13 +45,16 @@ class TrafficSpawner(Entity):
     
     @command
     def loadcity(self, city = None):
-        list_of_cities = [x for x in os.listdir(f'bluesky/plugins/scenario_maker/') if '.py' not in x]
+        # Get a list of available cities
+        list_of_cities = [x for x in os.listdir(f'bluesky/plugins/detection_study/scenario_maker/') if '.py' not in x]
         if city == None or city not in list_of_cities:
             bs.scr.echo(f'The following cities are available: {list_of_cities}.')
             return
         self.city = city
-        self.path = f'bluesky/plugins/scenario_maker/{self.city}'
+        self.path = f'bluesky/plugins/detection_study/scenario_maker/{self.city}'
         self.load_origins_destinations()
+        # Set the origin point of the city
+        self.city_centre_coords = 
         return
     
     @command
