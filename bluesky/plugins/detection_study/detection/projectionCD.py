@@ -81,9 +81,16 @@ class ProjectionCD(ConflictDetection):
             if not acrte.wplat or not acrte.wplon:
                 continue
             
+            # Get active waypoint
+            act_wp = acrte.iactwp
+            
+            if act_wp < 0:
+                # Weird thing
+                continue
+            
             # Add the current position of the aircraft to the lon and lat arrays
-            ac_rte_lon = np.concatenate([[bs.traf.lon[acidx]], acrte.wplon])
-            ac_rte_lat = np.concatenate([[bs.traf.lat[acidx]], acrte.wplat])
+            ac_rte_lon = np.concatenate([[bs.traf.lon[acidx]], acrte.wplon[act_wp:]])
+            ac_rte_lat = np.concatenate([[bs.traf.lat[acidx]], acrte.wplat[act_wp:]])
             
             # Convert the coordinates of the route to UTM
             rte_utm_lat,rte_utm_lon = self.transform_coords.transform(ac_rte_lon, ac_rte_lat)
