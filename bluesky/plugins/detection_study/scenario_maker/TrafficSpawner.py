@@ -2,7 +2,7 @@ import bluesky as bs
 from bluesky.core import Entity, timed_function
 from bluesky.stack import command
 from bluesky import stack
-from bluesky.tools.geo import kwikqdrdist
+from bluesky.tools.geo import kwikqdrdist, kwikdist_matrix
 from bluesky.tools.aero import kts, ft
 from bluesky.traffic import Route
 from bluesky.tools.misc import degto180
@@ -10,6 +10,7 @@ import numpy as np
 import os
 import pickle
 import random
+import pyproj
 
 def init_plugin():
     # Configuration parameters
@@ -90,6 +91,14 @@ class TrafficSpawner(Entity):
                 
             # This pickle route has LAT, LON, EDGE, TURN. Unpack em
             lats, lons, edges, turns = list(zip(*pickled_route))
+            
+            # Check if any other aircraft is too close to the origin
+            dist = kwikdist_matrix(np.array([lats[0]]), np.array([lons[0]]), bs.traf.lat, bs.traf.lon)
+    
+            # Second check, if distance is smaller than rpz * 4?
+            if np.any(dist<(bs.settings.asas_pzr*2)):
+                # Try again with another random aircraft
+                continue
             
             # Obtain required data for aircraft
             acid = f'D{self.traf_id}'

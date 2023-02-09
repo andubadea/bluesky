@@ -78,11 +78,15 @@ class ProjectionCD(ConflictDetection):
         # We basically need to loop through all aircraft routes
         for acidx, acrte in enumerate(bs.traf.ap.route):
             # Pass this aircraft if it doesn't have a route
-            if not acrte.wplat:
+            if not acrte.wplat or not acrte.wplon:
                 continue
             
+            # Add the current position of the aircraft to the lon and lat arrays
+            ac_rte_lon = np.concatenate([[bs.traf.lon[acidx]], acrte.wplon])
+            ac_rte_lat = np.concatenate([[bs.traf.lat[acidx]], acrte.wplat])
+            
             # Convert the coordinates of the route to UTM
-            rte_utm_lat,rte_utm_lon = self.transform_coords.transform(acrte.wplon,acrte.wplat)
+            rte_utm_lat,rte_utm_lon = self.transform_coords.transform(ac_rte_lon, ac_rte_lat)
             
             # Create the linestring from the UTM coordinates
             rte_linestring = LineString(zip(rte_utm_lon, rte_utm_lat))
