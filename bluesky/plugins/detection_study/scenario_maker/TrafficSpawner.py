@@ -40,6 +40,8 @@ class TrafficSpawner(Entity):
         bs.traf.loslog.start()
         # Turn ASAS on
         stack.stack('ASAS ON')
+        # Set a default seed
+        stack.stack('SEED 12345')
         return
     
     def reset(self):
