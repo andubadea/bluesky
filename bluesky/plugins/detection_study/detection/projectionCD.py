@@ -136,21 +136,22 @@ class ProjectionCD(ConflictDetection):
             intent_geom[j] = [split1, split2]
             
             # Verification
-            print('----------------------------------------------------------------')
-            print(bs.traf.id[idx1], bs.traf.id[idx2])
-            print(dist1, dist2)
-            print(vel1, vel2)
-            print(num_turns1, num_turns2)
-            print(mean_turn_angle1, mean_turn_angle2)
-            plt.plot(split1.coords.xy[1], split1.coords.xy[0], color = 'red')
-            plt.plot(split2.coords.xy[1], split2.coords.xy[0], color = 'blue')
-            if int_point is not None:
-                plt.scatter(int_point.y, int_point.x, color = 'green')
-            plt.scatter(split1.coords.xy[1][1], split1.coords.xy[0][1], marker = 'x', color = 'red')
-            plt.scatter(split2.coords.xy[1][1], split2.coords.xy[0][1], marker = 'x', color = 'blue')
-            ax = plt.gca()
-            ax.set_aspect('equal', adjustable = 'box')
-            plt.show(block = True)
+            if int_point is None:
+                print('----------------------------------------------------------------')
+                print(bs.traf.id[idx1], bs.traf.id[idx2])
+                print(dist1, dist2)
+                print(vel1, vel2)
+                print(num_turns1, num_turns2)
+                print(mean_turn_angle1, mean_turn_angle2)
+                plt.plot(split1.coords.xy[1], split1.coords.xy[0], color = 'red')
+                plt.plot(split2.coords.xy[1], split2.coords.xy[0], color = 'blue')
+                if int_point is not None:
+                    plt.scatter(int_point.y, int_point.x, color = 'green')
+                plt.scatter(split1.coords.xy[1][1], split1.coords.xy[0][1], marker = 'x', color = 'red')
+                plt.scatter(split2.coords.xy[1][1], split2.coords.xy[0][1], marker = 'x', color = 'blue')
+                ax = plt.gca()
+                ax.set_aspect('equal', adjustable = 'box')
+                plt.show(block = True)
         
         # Change to strings
         acidx_int_pairs = [(bs.traf.id[pair[0]], bs.traf.id[pair[1]]) for pair in acidx_int_pairs]
@@ -186,6 +187,9 @@ class ProjectionCD(ConflictDetection):
             - If intersection is a MultiLineString, do checks for types 3 and 4
             - If intersection is a Geometry Collection, unpack it, and then do checks for all types
         """
+        
+        # TODO: Take case of all geometries
+        # TODO: Check if the current geometries are fine
         # Get the geometries of the aircraft
         intent1 = self.intent_geometries[idx1]
         intent2 = self.intent_geometries[idx2]
@@ -231,7 +235,7 @@ class ProjectionCD(ConflictDetection):
                 dist1 = intent1_split.length - self.rpz_def/2
                 dist2 = intent2_split.length - self.rpz_def/2
 
-        if isinstance(int_point, LineString):
+        if isinstance(intersection, LineString):
             # This can happen if the intersection is a type 3 or 4
             # If it's a type 4, then one of the intents contains the other aircraft
             # Get the aircraft positions, they should always be the second point in the intent
@@ -275,17 +279,17 @@ class ProjectionCD(ConflictDetection):
                 dist1 = 0
                 dist2 = intent2_split.length - self.rpz_def/2
             
-        if isinstance(int_point, MultiLineString):
+        if isinstance(intersection, MultiLineString):
             # I wanna see this case
             print('MULTILINESTRING')
             # Return bogus values and the intents
             return 0, 0, 0, 0, intent1, intent2, None
         
-        if isinstance(int_point, MultiPoint):
+        if isinstance(intersection, MultiPoint):
             print('MULTIPOINT')
             return 0, 0, 0, 0, intent1, intent2, None
 
-        if isinstance(int_point, GeometryCollection):
+        if isinstance(intersection, GeometryCollection):
             print('GEOMETRY COLLECTION')
             return 0, 0, 0, 0, intent1, intent2, None
     
