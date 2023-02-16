@@ -47,6 +47,10 @@ class ProjectionCD(ConflictDetection):
         self.qdr_mat = [] # QDR for all aircraft
         self.dist_mat = [] # Distance for all aircraft
         
+        self.rough_geometries = []
+        self.ac_leg_positions = []
+        self.dlookaheads = []
+        
         # Distance buffer for shapely
         self.precision = 0.01 # metres
         
@@ -67,7 +71,6 @@ class ProjectionCD(ConflictDetection):
         
         # Initialise the index
         self.geom_tree = self.create_index()
-        self.intent_geometries = []
         
     def reset(self):
         self.__init__()
@@ -100,7 +103,7 @@ class ProjectionCD(ConflictDetection):
     
     def detect(self, ownship, intruder):
         # Query the tree for now
-        tree_query = self.geom_tree.query(self.intent_geometries, predicate = 'intersects')
+        tree_query = self.geom_tree.query(self.rough_geometries, predicate = 'intersects')
         all_intersections = np.transpose(tree_query)
         
         # Problem is, the query contains self intersections
@@ -136,23 +139,41 @@ class ProjectionCD(ConflictDetection):
             num_turns[j] = [num_turns1, num_turns2]
             mean_turn_angle[j] = [mean_turn_angle1, mean_turn_angle2]
             intent_geom[j] = [split1, split2]
-            
-            if isinstance(int_point, MultiPoint):
-                print('----------------------------------------------------------------')
-                print(bs.traf.id[idx1], bs.traf.id[idx2])
-                print(dist1, dist2)
-                print(vel1, vel2)
-                print(num_turns1, num_turns2)
-                print(mean_turn_angle1, mean_turn_angle2)
-                plt.plot(split1.coords.xy[1], split1.coords.xy[0], color = 'red')
-                plt.plot(split2.coords.xy[1], split2.coords.xy[0], color = 'blue')
-                for i, p in enumerate(int_point.geoms):
-                    plt.scatter(p.y, p.x, color = 'green')
-                plt.scatter(split1.coords.xy[1][1], split1.coords.xy[0][1], marker = 'x', color = 'red')
-                plt.scatter(split2.coords.xy[1][1], split2.coords.xy[0][1], marker = 'x', color = 'blue')
-                ax = plt.gca()
-                ax.set_aspect('equal', adjustable = 'box')
-                plt.show(block = True)
+
+            # if isinstance(int_point, MultiLineString):
+            #     print('----------------------------------------------------------------')
+            #     print(bs.traf.id[idx1], bs.traf.id[idx2])
+            #     print(dist1, dist2)
+            #     print(vel1, vel2)
+            #     print(num_turns1, num_turns2)
+            #     print(mean_turn_angle1, mean_turn_angle2)
+            #     plt.figure('intersection')
+            #     plt.plot(split1.coords.xy[1], split1.coords.xy[0], color = 'red')
+            #     plt.plot(split2.coords.xy[1], split2.coords.xy[0], color = 'blue')
+            #     for i, p in enumerate(int_point.geoms):
+            #         plt.plot(p.coords.xy[1], p.coords.xy[0], color = self.colors[i])
+            #     plt.scatter(self.ac_leg_positions[idx1].y,self.ac_leg_positions[idx1].x, marker = 'x', color = 'red')
+            #     plt.scatter(self.ac_leg_positions[idx2].y,self.ac_leg_positions[idx2].x, marker = 'x', color = 'blue')
+            #     ax = plt.gca()
+            #     ax.set_aspect('equal', adjustable = 'box')
+                
+            #     plt.figure('intent1')
+            #     plt.plot(split1.coords.xy[1], split1.coords.xy[0], color = 'red')
+            #     plt.scatter(self.ac_leg_positions[idx1].y,self.ac_leg_positions[idx1].x, marker = 'x', color = 'red')
+            #     plt.scatter(split1.coords.xy[1], split1.coords.xy[0], color = 'red')
+            #     int_p_1 = split1.interpolate(self.dlookaheads[idx1])
+            #     plt.scatter(int_p_1.y, int_p_1.x)
+            #     ax = plt.gca()
+            #     ax.set_aspect('equal', adjustable = 'box')
+            #     plt.figure('intent2')
+            #     plt.plot(split2.coords.xy[1], split2.coords.xy[0], color = 'blue')
+            #     plt.scatter(self.ac_leg_positions[idx2].y,self.ac_leg_positions[idx2].x, marker = 'x', color = 'blue')
+            #     plt.scatter(split2.coords.xy[1], split2.coords.xy[0], color = 'blue')
+            #     int_p_2 = split2.interpolate(self.dlookaheads[idx2])
+            #     plt.scatter(int_p_2.y, int_p_2.x)
+            #     ax = plt.gca()
+            #     ax.set_aspect('equal', adjustable = 'box')
+            #     plt.show(block = True)
         
         # Change to strings
         acidx_int_pairs = [(bs.traf.id[pair[0]], bs.traf.id[pair[1]]) for pair in acidx_int_pairs]
@@ -181,111 +202,28 @@ class ProjectionCD(ConflictDetection):
             - Aircraft have the same path, one is behind, one in front
             - The intersection itself is a linestring
             - The intersection contains one of the aircraft
-        5. Type 5: Other things
-            - Some weird cases where the intersection is a multipoint or a geometry collection
-            - These need to be handled differently
-            - If intersection is a MultiPoint, do checks for types 1 and 2
-            - If intersection is a MultiLineString, do checks for types 3 and 4
-            - If intersection is a Geometry Collection, unpack it, and then do checks for all types
         """
         
         # TODO: Take care of all geometries
         # TODO: Check if the current geometries are fine
         # Get the geometries of the aircraft
-        intent1 = self.intent_geometries[idx1]
-        intent2 = self.intent_geometries[idx2]
+        intent1 = self.rough_geometries[idx1]
+        intent2 = self.rough_geometries[idx2]
         
         # Get the intersection point between the two intents
         intersection = intent1.intersection(intent2)
         
+        if isinstance(intersection, MultiLineString):
+            # Merge the line
+            intersection = linemerge(intersection)
+        
         if isinstance(intersection, Point):
-            # This can be either a type 1 or 2
-            # Get the back lines of both intents
-            int_point = intersection # Rename
-            back_line1 = LineString([intent1.coords[0], intent1.coords[1]])
-            back_line2 = LineString([intent2.coords[0], intent2.coords[1]])
-            
-            # Check if intersection point is within any of these two
-            if back_line1.contains(intersection):
-                # This is a type 2 intersection, and aircraft 1 is past the intersection point
-                # Thus, we return negative velocity and distance value for aircraft 1
-                intent1_split = split(intent1, int_point).geoms[0]
-                intent2_split = split(intent2, int_point).geoms[0]
-                vel1 = -bs.traf.gs[idx1]
-                vel2 = bs.traf.gs[idx2]
-                dist1 = -intent1_split.length - self.rpz_def/2
-                dist2 = intent2_split.length - self.rpz_def/2
-                
-            elif back_line2.contains(intersection):
-                # This is a type 2 intersection, and aircraft 2 is past the intersection point
-                # Thus, we return negative velocity and distance value for aircraft 2
-                intent1_split = split(intent1, int_point).geoms[0]
-                intent2_split = split(intent2, int_point).geoms[0]
-                vel1 = bs.traf.gs[idx1]
-                vel2 = -bs.traf.gs[idx2]
-                dist1 = intent1_split.length - self.rpz_def/2
-                dist2 = -intent2_split.length - self.rpz_def/2
-                
-            else:
-                # This is a type 1 intersection
-                # Everyone has positive values                
-                intent1_split = split(intent1, int_point).geoms[0]
-                intent2_split = split(intent2, int_point).geoms[0]
-                vel1 = bs.traf.gs[idx1]
-                vel2 = bs.traf.gs[idx2]
-                dist1 = intent1_split.length - self.rpz_def/2
-                dist2 = intent2_split.length - self.rpz_def/2
+            # Either a type 1 or a type 2 intersection
+            self.handle_point_intersection(idx1, idx2)
 
         if isinstance(intersection, LineString):
-            # This can happen if the intersection is a type 3 or 4
-            # If it's a type 4, then one of the intents contains the other aircraft
-            # Get the aircraft positions, they should always be the second point in the intent
-            ac_point1 = Point(intent1.coords[1])
-            ac_point2 = Point(intent2.coords[1])
-            if intent1.contains(ac_point2):
-                # This means that this is a type 4 intersection, 
-                # and aircraft 2 is the "moving intersection point"
-                int_point = ac_point2
-                intent1_split = split(intent1, int_point).geoms[0]
-                intent2_split = split(intent2, int_point).geoms[0]
-                # With respect to the intersection point, aircraft 2 is not moving
-                # The distance 
-                vel1 = bs.traf.gs[idx1] - bs.traf.gs[idx2]
-                vel2 = 0
-                dist1 = intent1_split.length - self.rpz_def/2
-                dist2 = 0
-                
-            elif intent2.contains(ac_point1):
-                # The other way around, aircraft 1 is the "moving intersection point"
-                int_point = ac_point1
-                intent1_split = split(intent1, int_point).geoms[0]
-                intent2_split = split(intent2, int_point).geoms[0]
-                # With respect to the intersection point, aircraft 2 is not moving
-                # The distance 
-                vel1 = 0
-                vel2 = bs.traf.gs[idx2] - bs.traf.gs[idx1]
-                dist1 = 0
-                dist2 = intent2_split.length - self.rpz_def/2
-                
-            else:
-                # Then this is a type 3 intersection, take the intersection point
-                # as the first point in the linestring
-                int_point = Point(intersection.coords[0])
-                intent1_split = split(intent1, int_point).geoms[0]
-                intent2_split = split(intent2, int_point).geoms[0]
-                # With respect to the intersection point, aircraft 2 is not moving
-                # The distance 
-                vel1 = 0
-                vel2 = bs.traf.gs[idx2]
-                dist1 = 0
-                dist2 = intent2_split.length - self.rpz_def/2
-            
-        if isinstance(intersection, MultiLineString):
-            # I wanna see this case
-            print('MULTILINESTRING')
-            intersection = linemerge(intersection)
-            # Return bogus values and the intents
-            return 0, 0, 0, 0, intent1, intent2, intersection
+            # Either a type 3 or a type 4 intersection
+            self.handle_line_intersection()
         
         if isinstance(intersection, MultiPoint):
             print('MULTIPOINT')
@@ -296,7 +234,96 @@ class ProjectionCD(ConflictDetection):
             return 0, 0, 0, 0, intent1, intent2, intersection
     
         # Return information
-        return dist1, dist2, vel1, vel2, intent1_split, intent2_split, int_point
+        #return dist1, dist2, vel1, vel2, intent1_split, intent2_split, int_point
+    
+    def handle_point_intersection(self, idx1, idx2):
+        # This can be either a type 1 or 2
+        # Pretty easy to process as we don't get weird multipoint stuff
+        # Get the back lines of both intents
+        pass
+        '''
+        int_point = intersection # Rename
+        back_line1 = LineString([intent1.coords[0], intent1.coords[1]])
+        back_line2 = LineString([intent2.coords[0], intent2.coords[1]])
+        
+        # Check if intersection point is within any of these two
+        if back_line1.contains(intersection):
+            # This is a type 2 intersection, and aircraft 1 is past the intersection point
+            # Thus, we return negative velocity and distance value for aircraft 1
+            intent1_split = split(intent1, int_point).geoms[0]
+            intent2_split = split(intent2, int_point).geoms[0]
+            vel1 = -bs.traf.gs[idx1]
+            vel2 = bs.traf.gs[idx2]
+            dist1 = -intent1_split.length - self.rpz_def/2
+            dist2 = intent2_split.length - self.rpz_def/2
+            
+        elif back_line2.contains(intersection):
+            # This is a type 2 intersection, and aircraft 2 is past the intersection point
+            # Thus, we return negative velocity and distance value for aircraft 2
+            intent1_split = split(intent1, int_point).geoms[0]
+            intent2_split = split(intent2, int_point).geoms[0]
+            vel1 = bs.traf.gs[idx1]
+            vel2 = -bs.traf.gs[idx2]
+            dist1 = intent1_split.length - self.rpz_def/2
+            dist2 = -intent2_split.length - self.rpz_def/2
+            
+        else:
+            # This is a type 1 intersection
+            # Everyone has positive values                
+            intent1_split = split(intent1, int_point).geoms[0]
+            intent2_split = split(intent2, int_point).geoms[0]
+            vel1 = bs.traf.gs[idx1]
+            vel2 = bs.traf.gs[idx2]
+            dist1 = intent1_split.length - self.rpz_def/2
+            dist2 = intent2_split.length - self.rpz_def/2
+        '''
+        
+    def handle_line_intersection():
+        # This can happen if the intersection is a type 3 or 4
+        # If it's a type 4, then one of the intents contains the other aircraft
+        # Get the aircraft positions, they should always be the second point in the intent
+        pass
+        '''
+        ac_point1 = Point(intent1.coords[1])
+        ac_point2 = Point(intent2.coords[1])
+        if intent1.contains(ac_point2):
+            # This means that this is a type 4 intersection, 
+            # and aircraft 2 is the "moving intersection point"
+            int_point = ac_point2
+            intent1_split = split(intent1, int_point).geoms[0]
+            intent2_split = split(intent2, int_point).geoms[0]
+            # With respect to the intersection point, aircraft 2 is not moving
+            # The distance 
+            vel1 = bs.traf.gs[idx1] - bs.traf.gs[idx2]
+            vel2 = 0
+            dist1 = intent1_split.length - self.rpz_def/2
+            dist2 = 0
+            
+        elif intent2.contains(ac_point1):
+            # The other way around, aircraft 1 is the "moving intersection point"
+            int_point = ac_point1
+            intent1_split = split(intent1, int_point).geoms[0]
+            intent2_split = split(intent2, int_point).geoms[0]
+            # With respect to the intersection point, aircraft 2 is not moving
+            # The distance 
+            vel1 = 0
+            vel2 = bs.traf.gs[idx2] - bs.traf.gs[idx1]
+            dist1 = 0
+            dist2 = intent2_split.length - self.rpz_def/2
+            
+        else:
+            # Then this is a type 3 intersection, take the intersection point
+            # as the first point in the linestring
+            int_point = Point(intersection.coords[0])
+            intent1_split = split(intent1, int_point).geoms[0]
+            intent2_split = split(intent2, int_point).geoms[0]
+            # With respect to the intersection point, aircraft 2 is not moving
+            # The distance 
+            vel1 = 0
+            vel2 = bs.traf.gs[idx2]
+            dist1 = 0
+            dist2 = intent2_split.length - self.rpz_def/2
+        '''
     
     def turn_info(self, idx1, idx2, split1, split2):
         """Function that calculates the number of turns to the intersection between two aircraft.
@@ -384,13 +411,14 @@ class ProjectionCD(ConflictDetection):
         
         # Return the number of turns
         return num_turns_1, num_turns_2, avg_angle1, avg_angle2
-    
+           
     def create_index(self):
         """Function that creates the geometric tree index. 
         First process the current routes of aircraft, transform them into linestrings,
         add a backwards extension for 0.5 * rpz and create the index."""
-        # Initialise the list of geometries
-        self.intent_geometries = []
+        self.rough_geometries = []
+        self.ac_leg_positions = []
+        self.dlookaheads = []
         # We basically need to loop through all aircraft routes
         for acidx, acrte in enumerate(bs.traf.ap.route):
             # Pass this aircraft if it doesn't have a route
@@ -415,74 +443,51 @@ class ProjectionCD(ConflictDetection):
                 # Create the linestring
                 current_leg = LineString([[leg_lon_0, leg_lat_0], 
                                           [leg_lon_1, leg_lat_1]])
-                # Change the precision of the linestring
-                current_leg = sp.set_precision(current_leg, self.precision)
                 # Get the position of the aircraft on the currrent leg
                 ac_leg_pos, _ = nearest_points(current_leg, Point([ac_lon_utm, ac_lat_utm]))
-                ac_leg_pos = snap(ac_leg_pos, current_leg, 1)
             else:
                 # We're before the first waypoint
                 ac_lon_utm, ac_lat_utm = self.transform_coords.transform(bs.traf.lon[acidx],bs.traf.lat[acidx])
                 ac_leg_pos = Point([ac_lon_utm, ac_lat_utm])
                 
-            print(ac_leg_pos.within(current_leg))
+            # We want to create two linestrings:
+            # 1: LineString with length at least 0.5 * rpz before ac position
+            # 2: LineString with length at least lookaheaddist in front of ac position
                 
             # Convert the route coordinates we need to UTM
             # Convert the coordinates of the route to UTM
-            rte_utm_lon,rte_utm_lat = self.transform_coords.transform(acrte.wplon[act_wp:], acrte.wplat[act_wp:])
+            after_rte_utm_lon, after_rte_utm_lat = self.transform_coords.transform(acrte.wplon[act_wp:], acrte.wplat[act_wp:])
+            b4_rte_utm_lon, b4_rte_utm_lat = self.transform_coords.transform(acrte.wplon[:act_wp], acrte.wplat[:act_wp])
             
-                        # -------------- FROM HERE ONWARDS WE DO LAT/LON -------------------
-            # Create a simplified LineString with these coords
-            rte_simplified = sp.set_precision(LineString(zip(rte_utm_lat, rte_utm_lon)), self.precision)
-            # Get the coords back
-            rte_simplified_lat = rte_simplified.coords.xy[0]
-            rte_simplified_lon = rte_simplified.coords.xy[1]
+            # -------------- FROM HERE ONWARDS WE DO LAT/LON -------------------
+            # We want to create two linestrings:
+            # 1: LineString with length at least 0.5 * rpz before ac position
+            # 2: LineString with length at least lookaheaddist in front of ac position
+            # These two linestrings will be merged to create the rough intent
             
-            # Concatenate the coords
-            rte_lat = np.concatenate(([ac_leg_pos.y], rte_simplified_lat))
-            rte_lon = np.concatenate(([ac_leg_pos.x], rte_simplified_lon))
+            # Linestring number 1, the before
+            # First, create the linestring that includes ac position
+            b4_linestring_w_ac = LineString([[ac_leg_pos.y, ac_leg_pos.x], *zip(b4_rte_utm_lat[::-1], b4_rte_utm_lon[::-1])])
+            # Get the linestring that covers at least 0.5*rpz
+            b4_linestring_w_ac = self.cut_at_coord(b4_linestring_w_ac, 0.5*self.rpz_def)
             
-            # Add the aircraft point to the simplified LineString
-            rte_linestring = LineString(zip(rte_lat, rte_lon))
+            # Now create the linestring that covers the after
+            after_linestring_w_ac = LineString([[ac_leg_pos.y, ac_leg_pos.x], *zip(after_rte_utm_lat, after_rte_utm_lon)])
+            # Cut this one as well
+            dlookahead = bs.traf.gs[acidx] * self.dtlookahead_def
+            dlookahead = max(min(dlookahead, self.lookahead_max), self.lookahead_min)
+            after_linestring_w_ac = self.cut_at_coord(after_linestring_w_ac, dlookahead)
             
-            #print(rte_linestring)
+            # Now combine these two linestrings and exclude the aircraft coordinate
+            rough_intent_LS = LineString([*b4_linestring_w_ac.coords[1:][::-1], *after_linestring_w_ac.coords[1:]])
             
-            # Cut the linestring in function of the lookahead time
-            cut_dist = bs.traf.gs[acidx] + self.dtlookahead[acidx]
-            cut_dist = max(min(cut_dist, self.lookahead_max), self.lookahead_min)
-            
-            cut_rte = self.cut(rte_linestring, cut_dist)
-            
-            # In order to avoid aircraft intruding from behind or the front when route is too short,
-            # we add a line to the back (and if needed to the front).
-            # Get first line segment
-            first_seg = LineString([cut_rte.coords[0], cut_rte.coords[1]])
-            
-            # Buffer the current position of the aircraft with 16m so we get a circle around it
-            ac_rpz_circle = Point(cut_rte.coords[0]).buffer(self.rpz_def / 2)
-            
-            # The nearest point on this circle to the line should be a nice front line to use
-            front_point, _ = nearest_points(ac_rpz_circle.exterior, first_seg)
-            
-            # Rotating this point around the aircraft gives us a good back line
-            back_point = rotate(front_point, 180, origin = cut_rte.coords[0])
-            
-            # We want to add the front point to cut_rte only if cut_rte is too short
-            if cut_rte.length < self.rpz_def / 2:
-                # The cut_rte is now just composed of the back point, aircraft, and front point
-                intent_geom = LineString([[back_point.x, back_point.y], 
-                                      cut_rte.coords[0], 
-                                      [front_point.x, front_point.y]])
-                
-            else:
-                # We simply add the back point to cut_rte
-                intent_geom = LineString([[back_point.x, back_point.y], *cut_rte.coords])
-            
-            # Add the route to the list of geometries
-            self.intent_geometries.append(intent_geom)
+            # Add this as the intent
+            self.rough_geometries.append(rough_intent_LS)
+            self.ac_leg_positions.append(Point(ac_leg_pos.y, ac_leg_pos.x))
+            self.dlookaheads.append(dlookahead)
             
         # Create the index
-        return STRtree(self.intent_geometries)
+        return STRtree(self.rough_geometries)
     
     def los_detect(self, ownship, intruder):
         ''' Intrusion between ownship (traf) and intruder (traf/adsb).'''
@@ -497,7 +502,6 @@ class ProjectionCD(ConflictDetection):
 
         dalt = ownship.alt.reshape((1, ownship.ntraf)) - \
             intruder.alt.reshape((1, ownship.ntraf)).T  + 1e9 * I
-
         swlos = (dist < (np.zeros(len(self.rpz)) + self.rpz)) * (np.abs(dalt) < self.hpz)
         lospairs = [(ownship.id[i], ownship.id[j]) for i, j in zip(*np.where(swlos))]
 
@@ -527,4 +531,15 @@ class ProjectionCD(ConflictDetection):
             if pd > distance:
                 cp = line.interpolate(distance)
                 return LineString(coords[:i] + [(cp.x, cp.y)])
+            
+    def cut_at_coord(self, line, distance):
+        # Cuts a line in two at a point already within the line
+        # that guarantees the length of the new line is greater than distance
+        if distance <= 0.0 or distance >= line.length:
+            return LineString(line)
+        coords = list(line.coords)
+        for i, p in enumerate(coords):
+            pd = line.project(Point(p))
+            if pd >= distance:
+                return LineString(coords[:i+1])
     
