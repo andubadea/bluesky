@@ -8,7 +8,7 @@ import matplotlib.pyplot as plt
 
 from shapely.geometry import LineString, Point, MultiLineString, MultiPoint, GeometryCollection
 from shapely import STRtree
-from shapely.ops import split, nearest_points
+from shapely.ops import split, nearest_points, linemerge, snap
 from shapely.affinity import rotate
 from bluesky.tools.aero import nm
 from bluesky.traffic.asas import ConflictDetection
@@ -48,7 +48,9 @@ class ProjectionCD(ConflictDetection):
         self.dist_mat = [] # Distance for all aircraft
         
         # Distance buffer for shapely
-        self.dist_buffer = 0.01 # metres
+        self.precision = 0.01 # metres
+        
+        self.colors = ['yellow', 'orange', 'green', 'purple', 'pink']
         
         # Get the city centre
         try:
@@ -135,8 +137,7 @@ class ProjectionCD(ConflictDetection):
             mean_turn_angle[j] = [mean_turn_angle1, mean_turn_angle2]
             intent_geom[j] = [split1, split2]
             
-            # Verification
-            if int_point is None:
+            if isinstance(int_point, MultiPoint):
                 print('----------------------------------------------------------------')
                 print(bs.traf.id[idx1], bs.traf.id[idx2])
                 print(dist1, dist2)
@@ -145,8 +146,8 @@ class ProjectionCD(ConflictDetection):
                 print(mean_turn_angle1, mean_turn_angle2)
                 plt.plot(split1.coords.xy[1], split1.coords.xy[0], color = 'red')
                 plt.plot(split2.coords.xy[1], split2.coords.xy[0], color = 'blue')
-                if int_point is not None:
-                    plt.scatter(int_point.y, int_point.x, color = 'green')
+                for i, p in enumerate(int_point.geoms):
+                    plt.scatter(p.y, p.x, color = 'green')
                 plt.scatter(split1.coords.xy[1][1], split1.coords.xy[0][1], marker = 'x', color = 'red')
                 plt.scatter(split2.coords.xy[1][1], split2.coords.xy[0][1], marker = 'x', color = 'blue')
                 ax = plt.gca()
@@ -188,7 +189,7 @@ class ProjectionCD(ConflictDetection):
             - If intersection is a Geometry Collection, unpack it, and then do checks for all types
         """
         
-        # TODO: Take case of all geometries
+        # TODO: Take care of all geometries
         # TODO: Check if the current geometries are fine
         # Get the geometries of the aircraft
         intent1 = self.intent_geometries[idx1]
@@ -205,7 +206,7 @@ class ProjectionCD(ConflictDetection):
             back_line2 = LineString([intent2.coords[0], intent2.coords[1]])
             
             # Check if intersection point is within any of these two
-            if back_line1.distance(intersection) < self.dist_buffer:
+            if back_line1.contains(intersection):
                 # This is a type 2 intersection, and aircraft 1 is past the intersection point
                 # Thus, we return negative velocity and distance value for aircraft 1
                 intent1_split = split(intent1, int_point).geoms[0]
@@ -215,7 +216,7 @@ class ProjectionCD(ConflictDetection):
                 dist1 = -intent1_split.length - self.rpz_def/2
                 dist2 = intent2_split.length - self.rpz_def/2
                 
-            elif back_line2.distance(intersection) < self.dist_buffer:
+            elif back_line2.contains(intersection):
                 # This is a type 2 intersection, and aircraft 2 is past the intersection point
                 # Thus, we return negative velocity and distance value for aircraft 2
                 intent1_split = split(intent1, int_point).geoms[0]
@@ -241,7 +242,7 @@ class ProjectionCD(ConflictDetection):
             # Get the aircraft positions, they should always be the second point in the intent
             ac_point1 = Point(intent1.coords[1])
             ac_point2 = Point(intent2.coords[1])
-            if intent1.distance(ac_point2) < self.dist_buffer:
+            if intent1.contains(ac_point2):
                 # This means that this is a type 4 intersection, 
                 # and aircraft 2 is the "moving intersection point"
                 int_point = ac_point2
@@ -254,7 +255,7 @@ class ProjectionCD(ConflictDetection):
                 dist1 = intent1_split.length - self.rpz_def/2
                 dist2 = 0
                 
-            elif intent2.distance(ac_point1) < self.dist_buffer:
+            elif intent2.contains(ac_point1):
                 # The other way around, aircraft 1 is the "moving intersection point"
                 int_point = ac_point1
                 intent1_split = split(intent1, int_point).geoms[0]
@@ -282,16 +283,17 @@ class ProjectionCD(ConflictDetection):
         if isinstance(intersection, MultiLineString):
             # I wanna see this case
             print('MULTILINESTRING')
+            intersection = linemerge(intersection)
             # Return bogus values and the intents
-            return 0, 0, 0, 0, intent1, intent2, None
+            return 0, 0, 0, 0, intent1, intent2, intersection
         
         if isinstance(intersection, MultiPoint):
             print('MULTIPOINT')
-            return 0, 0, 0, 0, intent1, intent2, None
+            return 0, 0, 0, 0, intent1, intent2, intersection
 
         if isinstance(intersection, GeometryCollection):
             print('GEOMETRY COLLECTION')
-            return 0, 0, 0, 0, intent1, intent2, None
+            return 0, 0, 0, 0, intent1, intent2, intersection
     
         # Return information
         return dist1, dist2, vel1, vel2, intent1_split, intent2_split, int_point
@@ -403,26 +405,47 @@ class ProjectionCD(ConflictDetection):
                 continue
             
             # Find the position of the aircraft on the current leg
-            # We can do this in earth coordinates as it doesn't make a (large) difference
             if act_wp > 0:
                 # Dunno when this wouldn't be the case but oh well
-                current_leg = LineString([[acrte.wplon[act_wp-1], acrte.wplat[act_wp-1]], 
-                                          [acrte.wplon[act_wp], acrte.wplat[act_wp]]])
-                ac_leg_pos, _ = nearest_points(current_leg, Point([bs.traf.lon[acidx],bs.traf.lat[acidx]]))
+                # First, get the transformed coordinates of the current leg
+                leg_lon_0, leg_lat_0 = self.transform_coords.transform(acrte.wplon[act_wp-1], acrte.wplat[act_wp-1])
+                leg_lon_1, leg_lat_1 = self.transform_coords.transform(acrte.wplon[act_wp], acrte.wplat[act_wp])
+                # Get the transformed coordinates of the current position
+                ac_lon_utm, ac_lat_utm = self.transform_coords.transform(bs.traf.lon[acidx],bs.traf.lat[acidx])
+                # Create the linestring
+                current_leg = LineString([[leg_lon_0, leg_lat_0], 
+                                          [leg_lon_1, leg_lat_1]])
+                # Change the precision of the linestring
+                current_leg = sp.set_precision(current_leg, self.precision)
+                # Get the position of the aircraft on the currrent leg
+                ac_leg_pos, _ = nearest_points(current_leg, Point([ac_lon_utm, ac_lat_utm]))
+                ac_leg_pos = snap(ac_leg_pos, current_leg, 1)
             else:
-                # Somehow we're before the first waypoint
-                ac_leg_pos = Point([bs.traf.lon[acidx], bs.traf.lat[acidx]])
-            
-            # Add the current position of the aircraft to the lon and lat arrays
-            ac_rte_lon = np.concatenate([[ac_leg_pos.x], acrte.wplon[act_wp:]])
-            ac_rte_lat = np.concatenate([[ac_leg_pos.y], acrte.wplat[act_wp:]])
-            
+                # We're before the first waypoint
+                ac_lon_utm, ac_lat_utm = self.transform_coords.transform(bs.traf.lon[acidx],bs.traf.lat[acidx])
+                ac_leg_pos = Point([ac_lon_utm, ac_lat_utm])
+                
+            print(ac_leg_pos.within(current_leg))
+                
+            # Convert the route coordinates we need to UTM
             # Convert the coordinates of the route to UTM
-            rte_utm_lon,rte_utm_lat = self.transform_coords.transform(ac_rte_lon, ac_rte_lat)
+            rte_utm_lon,rte_utm_lat = self.transform_coords.transform(acrte.wplon[act_wp:], acrte.wplat[act_wp:])
             
-            # -------------- FROM HERE ONWARDS WE DO LAT/LON -------------------
-            # Create the linestring from the UTM coordinates
-            rte_linestring = LineString(zip(rte_utm_lat, rte_utm_lon))
+                        # -------------- FROM HERE ONWARDS WE DO LAT/LON -------------------
+            # Create a simplified LineString with these coords
+            rte_simplified = sp.set_precision(LineString(zip(rte_utm_lat, rte_utm_lon)), self.precision)
+            # Get the coords back
+            rte_simplified_lat = rte_simplified.coords.xy[0]
+            rte_simplified_lon = rte_simplified.coords.xy[1]
+            
+            # Concatenate the coords
+            rte_lat = np.concatenate(([ac_leg_pos.y], rte_simplified_lat))
+            rte_lon = np.concatenate(([ac_leg_pos.x], rte_simplified_lon))
+            
+            # Add the aircraft point to the simplified LineString
+            rte_linestring = LineString(zip(rte_lat, rte_lon))
+            
+            #print(rte_linestring)
             
             # Cut the linestring in function of the lookahead time
             cut_dist = bs.traf.gs[acidx] + self.dtlookahead[acidx]
