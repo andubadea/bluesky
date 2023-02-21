@@ -144,7 +144,7 @@ class ProjectionCD(ConflictDetection):
             intent_geom.append([intent1, intent2])
             conf_pairs.append((bs.traf.id[pair[0]], bs.traf.id[pair[1]]))
 
-            if False:
+            if True:
                 print('----------------------------------------------------------------')
                 print(bs.traf.id[idx1], bs.traf.id[idx2])
                 print(dist1, dist2)
@@ -158,6 +158,10 @@ class ProjectionCD(ConflictDetection):
                 ax = plt.gca()
                 ax.set_aspect('equal', adjustable = 'box')
                 plt.show(block = True)
+                
+        for los_pair in lospairs:
+            if los_pair not in conf_pairs:
+                print(los_pair)
 
         return conf_pairs, lospairs, inconf, dist_to_int, num_turns, mean_turn_angle, qdr_mat, dist_mat, intent_geom
     
@@ -216,6 +220,10 @@ class ProjectionCD(ConflictDetection):
         else:
             # This is a type 2 intersection. Let's process the information and the intents
             # into accurate ones.
+            # There is no way in which this intersection is not in front of both aircraft.
+            # If one of the aircraft would already be past the intersection, and this is not
+            # caught by the previous if statement, then the intersection should be a linestring.
+            # Thus, handle it as a front intersection.
             # We split the two rough intent lines into two geometries
             intent1_back, intent1_front = self.cut_line_with_point(intent1, self.ac_leg_positions[idx1])
             intent2_back, intent2_front = self.cut_line_with_point(intent2, self.ac_leg_positions[idx2])
@@ -242,16 +250,15 @@ class ProjectionCD(ConflictDetection):
                 # The intent is just the front part of the lines.
                 # Return stuff
                 return dist1, dist2, vel1, vel2, intent1_front_cut, intent2_front_cut, int_point, True
+                
         
     def handle_line_intersection(self, idx1, idx2, intent1, intent2, intersection):
         ''' If we have a linestring intersection, then we can have the following types:
         - Type 1:   The aircraft are merging within the same point. We can check this by 
                     determining whether any of the aircraft is on (or veeeery close) to the
-                    intersection line. If none of them are, and it is not a type 3, and the
-                    intersection is just the first point of the intersection line.
-        - Type 2:   The aircraft are one behind the other. In this case, one of the aircraft is 
-                    contained (or veeery close to) the intersection line. In this case, the intersection
-                    point is just the aircraft itself.
+                    intersection line, and if their back intents do not intersect.
+        - Type 2:   The aircraft are one behind the other. In this case, we can create a linestring from
+                    the  two intents and determine which aircraft is in front.
         - Type 3:   The intersection is between the aircraft. This means that one of the aircraft is 
                     past the intersection point, but their back extension is still within the intersection line.
                     To determine if this is the case, we determine if the back line of an aircraft yields the
@@ -261,13 +268,28 @@ class ProjectionCD(ConflictDetection):
         ac1_pos = self.ac_leg_positions[idx1]
         ac2_pos = self.ac_leg_positions[idx2]
         
-        if intersection.distance(ac1_pos) < self.precision and intersection.distance(ac2_pos) > self.precision:
-            # Aircraft 1 is on the intersection line and aircraft 2 is behind.
+        # Get the back and the front of the intents. Careful with these as the aircraft
+        # points do not lie on the routes themselves because of floating point errors.
+        intent1_back, intent1_front = self.cut_line_with_point(intent1, self.ac_leg_positions[idx1])
+        intent2_back, intent2_front = self.cut_line_with_point(intent2, self.ac_leg_positions[idx2])
+        
+        # Cut the back intents to dimension
+        # Remember these two are reversed, the first waypoint is the actual position of the aircraft
+        intent1_back_cut= self.cut(LineString(intent1_back.coords[::-1]), self.rpz_def)
+        intent2_back_cut= self.cut(LineString(intent2_back.coords[::-1]), self.rpz_def)
+        
+        # We need to cut the front intents to dimension
+        intent1_front_cut= self.cut(intent1_front, self.dlookaheads[idx1])
+        intent2_front_cut= self.cut(intent2_front, self.dlookaheads[idx2])
+        
+        # Now we can check whether an aircraft is in front of another aircraft.
+        ac1_in_front = intent2_front_cut.distance(intent1_back_cut) < self.precision
+        ac2_in_front = intent1_front_cut.distance(intent2_back_cut) < self.precision
+            
+        if ac1_in_front:
+            # Aircraft 1 is in front.
             # The intersection point is aircraft 1 itself. 
             int_point = ac1_pos
-            # First we separate the front intents of the aircraft
-            intent1_back, intent1_front = self.cut_line_with_point(intent1, self.ac_leg_positions[idx1])
-            intent2_back, intent2_front = self.cut_line_with_point(intent2, self.ac_leg_positions[idx2])
             
             # We need to cut the linestring of the aircraft in the back at the intersection point
             intent2_front_cut, _ = self.cut_line_with_point(intent2_front, int_point)
@@ -284,17 +306,14 @@ class ProjectionCD(ConflictDetection):
             vel2 = bs.traf.gs[idx2] - bs.traf.gs[idx1]
             dist1 = 0
             dist2 = intent2_front_cut.length
-            
+        
             # Return info
             return dist1, dist2, vel1, vel2, intent1_front_cut, intent2_front_cut, int_point, True
-            
-        elif intersection.distance(ac2_pos) < self.precision and intersection.distance(ac1_pos) > self.precision:
-            # Aircraft 2 is on the intersection line and aircraft 1 is behind.
+        
+        elif ac2_in_front:
+            # Either they are perfectly equal (very unlikely), or ac2 is in front of ac1.
             # The intersection point is aircraft 2 itself. 
             int_point = ac2_pos
-            # First we separate the front intents of the aircraft
-            intent1_back, intent1_front = self.cut_line_with_point(intent1, self.ac_leg_positions[idx1])
-            intent2_back, intent2_front = self.cut_line_with_point(intent2, self.ac_leg_positions[idx2])
             
             # We need to cut the linestring of the aircraft in the back at the intersection point
             intent1_front_cut, _ = self.cut_line_with_point(intent1_front, int_point)
@@ -314,156 +333,118 @@ class ProjectionCD(ConflictDetection):
             
             # Return info
             return dist1, dist2, vel1, vel2, intent1_front_cut, intent2_front_cut, int_point, True
-        
-        elif intersection.distance(ac1_pos) < self.precision and intersection.distance(ac2_pos) < self.precision:
-            # Both aircraft are on the rought intersection line. This definitely means that they are going in the
-            # same direction. We just need to check who is in the front and set the intersection point there.
-            intent1_back, intent1_front = self.cut_line_with_point(intent1, self.ac_leg_positions[idx1])
-            intent2_back, intent2_front = self.cut_line_with_point(intent2, self.ac_leg_positions[idx2])
-            
-            if intent1_back.intersects(intent2_front):
-                # Aircraft 1 is in the front. 
-                int_point = ac1_pos
-                # First we separate the front intents of the aircraft
-                intent1_back, intent1_front = self.cut_line_with_point(intent1, self.ac_leg_positions[idx1])
-                intent2_back, intent2_front = self.cut_line_with_point(intent2, self.ac_leg_positions[idx2])
-                
-                # We need to cut the linestring of the aircraft in the back at the intersection point
-                intent2_front_cut, _ = self.cut_line_with_point(intent2_front, int_point)
-                
-                # If the length of this guy is greater than the lookahead distance, we don't have a conflict yet
-                if intent2_front_cut.length > self.dlookaheads[idx2]:
-                    return 0, 0, 0, 0, intent1, intent2, intersection, False
-
-                # The intent of aircraft 1 is the front part of the line cut at lookahead distance
-                intent1_front_cut = self.cut(intent1_front, self.dlookaheads[idx1])
-                
-                # The velocity and distance of aircraft 1 is 0
-                vel1 = 0
-                vel2 = bs.traf.gs[idx2] - bs.traf.gs[idx1]
-                dist1 = 0
-                dist2 = intent2_front_cut.length
-                
-                return dist1, dist2, vel1, vel2, intent1_front_cut, intent2_front_cut, int_point, True
-                
-                
-            elif intent2_back.intersects(intent1_front):
-                # Aircraft 2 is in the front.
-                int_point = ac2_pos
-                # First we separate the front intents of the aircraft
-                intent1_back, intent1_front = self.cut_line_with_point(intent1, self.ac_leg_positions[idx1])
-                intent2_back, intent2_front = self.cut_line_with_point(intent2, self.ac_leg_positions[idx2])
-                
-                # We need to cut the linestring of the aircraft in the back at the intersection point
-                intent1_front_cut, _ = self.cut_line_with_point(intent1_front, int_point)
-                
-                # If the length of this guy is greater than the lookahead distance, we don't have a conflict yet
-                if intent1_front_cut.length > self.dlookaheads[idx1]:
-                    return 0, 0, 0, 0, intent1, intent2, intersection, False
-
-                # The intent of aircraft 2 is the front part of the line cut at lookahead distance
-                intent2_front_cut = self.cut(intent2_front, self.dlookaheads[idx2])
-                
-                # The velocity and distance of aircraft 2 is 0
-                vel1 = bs.traf.gs[idx1] - bs.traf.gs[idx2]
-                vel2 = 0
-                dist1 = intent1_front_cut.length
-                dist2 = 0
-                
-                return dist1, dist2, vel1, vel2, intent1_front_cut, intent2_front_cut, int_point, True
-            
-            else:
-                # not a conflict I guess
-                return 0, 0, 0, 0, intent1, intent2, intersection, False
             
         else:
-            # This means that none of the aircraft are on the intersection line.
-            # The intersection is either a type 3 or a type 1. We can check the type 3 first.
-            # Create the front and back intents of both aircraft
-            intent1_back, intent1_front = self.cut_line_with_point(intent1, self.ac_leg_positions[idx1])
-            intent2_back, intent2_front = self.cut_line_with_point(intent2, self.ac_leg_positions[idx2])
+            # Aircraft are either diverging or merging.
+            # We can check this by seeing if the first point of the intersection point is on the front
+            # of the intents or the back of the intents for each aircraft.
+            # We can see if we're diverging if the front of the intents do not intersect.
+            diverging = intent1_front.intersects(intent2_front)
             
-            # What we basically need to check if the back intent of an aircraft intersects the front intent
-            # of the other
-            if intent1_back.intersects(intent2_front):
-                # This means that aircraft 1 is past the intersection point.
-                # We thus take the intersection point as the last point in the linestring
-                int_point = Point(intersection.coords[-1])
-                
-                # Check if aircraft 1 is past the intersection point
-                if int_point.intersects(intent1_back) and int_point.intersects(intent2_front):
-                    
-                    intent1_front_cut = self.cut(intent1_front, self.dlookaheads[idx1])
-                    intent2_front_cut, _ = self.cut_line_with_point(intent2_front, int_point)
-                    
-                    # Check if the length of intent 2 is smaller than the lookahead distance
-                    if intent2_front_cut.length > self.dlookaheads[idx2]:
-                        # Not a conflict (et)
-                        return 0, 0, 0, 0, intent1, intent2, intersection, False
-                    
-                    # This is also a confict if the real back line of intent 1 doesn't contain the
-                    # intersection point
-                    intent1_back_cut = self.cut(LineString(intent1_back.coords[::-1]), self.rpz_def/2)
-                    
-                    if not intent1_back_cut.intersects(int_point):
-                        # Not a conflict
-                        return 0, 0, 0, 0, intent1, intent2, intersection, False
-
-                    # We can assemble our information
-                    vel1 = -bs.traf.gs[idx1]
-                    vel2 = bs.traf.gs[idx2]
-                    dist1 = -intent1_back_cut.length
-                    dist2 = intent2_front_cut.length
-                    
-                    # Create the front back intent of aircraft 1
-                    intent1_back_front = linemerge([LineString(intent1_back_cut.coords[::-1]), intent1_front_cut])
-                    
-                    # Return info
-                    return dist1, dist2, vel1, vel2, intent1_back_front, intent2_front_cut, int_point, True
-                
-            elif intent2_back.intersects(intent1_front):
-                # Means that aircraft 2 is part the intersection point.
-                # We thus take the intersection point as the first point in the linestring
-                int_point = Point(intersection.coords[0])
-                
-                # Check if aircraft 2 is part the intersection point
-                if int_point.intersects(intent2_back) and int_point.intersects(intent1_front):
-                    
-                    intent2_front_cut = self.cut(intent2_front, self.dlookaheads[idx2])
-                    intent1_front_cut, _ = self.cut_line_with_point(intent1_front, int_point)
-                    
-                    # Check if the length of intent 1 is smaller than the lookahead distance
-                    if intent1_front_cut.length > self.dlookaheads[idx1]:
-                        # Not a conflict (et)
-                        return 0, 0, 0, 0, intent1, intent2, intersection, False
-                    
-                    # This is also a confict if the real front line of intent 2 doesn't contain the
-                    # intersection point
-                    intent2_back_cut = self.cut(LineString(intent2_back.coords[::-1]), self.rpz_def/2)
-                    
-                    if not intent2_back_cut.intersects(int_point):
-                        # Not a conflict
-                        return 0, 0, 0, 0, intent1, intent2, intersection, False
-                    
-                    # We can assemble our information
-                    vel1 = bs.traf.gs[idx1]
-                    vel2 = -bs.traf.gs[idx2]
-                    dist1 = intent1_front_cut.length
-                    dist2 = -intent2_back_cut.length
-                    
-                    # Create the intent 2 backfront
-                    intent2_back_front = linemerge([LineString(intent2_back_cut.coords[::-1]), intent2_front_cut])
-                    
-                    # Return info
-                    return dist1, dist2, vel1, vel2, intent1_front_cut, intent2_back_front, int_point, True
-                
-            else:
-                # This means that this is a type 1 intersection, both aircraft are going towards
-                # the same point. Take the first point of the intersection as the intersection point.
+            # We can also check if 
+            int_in_front1 = intersection.coords[0] in list(intent1_front.coords)
+            int_in_front2 = intersection.coords[0] in list(intent2_front.coords)
+            int_in_back1 = intersection.coords[0] in list(intent1_back.coords)
+            int_in_back2 = intersection.coords[0] in list(intent2_back.coords)
+            
+            if int_in_front1 and int_in_front2:
+                # Intersection is just a point in front of both these aircraft, we can use the other function to
+                # compute it.
                 int_point = Point(intersection.coords[0])
                 # Just run the point intersection function
                 return self.handle_point_intersection(idx1, idx2, intent1, intent2, int_point)
+            
+            elif int_in_back1 and int_in_back2:
+                # We are past the intersection point, so no conflict here
+                return 0, 0, 0, 0, intent1, intent2, intersection, False
+            
+            elif diverging:
+                # We are past the intersection point, so no conflict here
+                return 0, 0, 0, 0, intent1, intent2, intersection, False
+            
+            elif int_in_front1 and int_in_back2:
+                # This can happen if one aircraft (ac2) is past the intersection point and turned already, however
+                # the rpz back extension is still intersecting with the intent of the previous aircraft (ac1). 
+                # In this case, we can set the intersection point at the divergence point itself (thus, the last)
+                # point in the intersection linetring.
+                int_point = Point(intersection.coords[-1])
+                # Now we calculate things as normal, with the inclusion of the clipped back line in the
+                # intent of the second aircraft that is past the intersection point.
+                intent1_front_cut, _ = self.cut_line_with_point(intent1_front, int_point)
                 
+                # If the length of this is greater than the lookahead distance, we don't have a conflict
+                if intent1_front_cut.length > self.dlookaheads[idx1]:
+                    return 0, 0, 0, 0, intent1, intent2, intersection, False
+
+                # From the second aircraft we need both back intent and front intent
+                # First invert the back line
+                intent2_back_inverted = LineString(intent2_back.coords[::-1])
+                # Then cut it
+                intent2_back_cut_inverted, _ = self.cut_line_with_point(intent2_back_inverted, int_point)
+                # Then reverse it back
+                intent2_back_cut = LineString(intent2_back_cut_inverted.coords[::-1])
+                
+                # Check if this is shorter than rpz/2, if so, we don't have a conflict
+                if intent2_back_cut.length < self.rpz_def:
+                    return 0, 0, 0, 0, intent1, intent2, intersection, False
+                
+                # Get the front intent of aircraft 2
+                intent2_front_cut = self.cut(intent2_front, self.dlookaheads[idx2])
+                
+                # Merge the two intents
+                intent2_cut = linemerge([intent2_back_cut, intent2_front_cut])
+                
+                # AC1 is going towards intersection, AC2 is going away from intersection
+                vel1 = bs.traf.gs[idx1]
+                vel2 = -bs.traf.gs[idx2]
+                dist1 = intent1_front_cut.length
+                dist2 = -intent2_back_cut.length
+                
+                # Return info
+                return dist1, dist2, vel1, vel2, intent1_front_cut, intent2_cut, int_point, True
+            
+            elif int_in_front2 and int_in_back1:
+                # Previous situation but the other way around. Aircraft 1 is past the intersection point already.
+                int_point = Point(intersection.coords[-1])
+                # Now we calculate things as normal, with the inclusion of the clipped back line in the
+                # intent of the second aircraft that is past the intersection point.
+                intent2_front_cut, _ = self.cut_line_with_point(intent2_front, int_point)
+                
+                # If the length of this is greater than the lookahead distance, we don't have a conflict
+                if intent2_front_cut.length > self.dlookaheads[idx2]:
+                    return 0, 0, 0, 0, intent1, intent2, intersection, False
+
+                # From the second aircraft we need both back intent and front intent
+                # First invert the back line
+                intent1_back_inverted = LineString(intent1_back.coords[::-1])
+                # Then cut it
+                intent1_back_cut_inverted, _ = self.cut_line_with_point(intent1_back_inverted, int_point)
+                # Then reverse it back
+                intent1_back_cut = LineString(intent1_back_cut_inverted.coords[::-1])
+                
+                # Check if this is shorter than rpz, if so, we don't have a conflit
+                if intent1_back_cut.length < self.rpz_def:
+                    return 0, 0, 0, 0, intent1, intent2, intersection, False
+                
+                # Get the front intent of aircraft 2
+                intent1_front_cut = self.cut(intent1_front, self.dlookaheads[idx1])
+                
+                # Merge the two intents
+                intent1_cut = linemerge([intent1_back_cut, intent1_front_cut])
+                
+                # AC2 is going towards intersection, AC1 is going away from intersection
+                vel1 = -bs.traf.gs[idx1]
+                vel2 = bs.traf.gs[idx2]
+                dist1 = -intent1_back_cut.length
+                dist2 = intent2_front_cut.length
+                
+                # Return info
+                return dist1, dist2, vel1, vel2, intent1_cut, intent2_front_cut, int_point, True
+            
+            else:
+                # Something is wrong.
+                print('AAAAAAAAAAAAAA')
+                return 0, 0, 0, 0, intent1, intent2, intersection, False
     
     
     def turn_info(self, idx1, idx2, intent1, intent2):
@@ -610,7 +591,7 @@ class ProjectionCD(ConflictDetection):
             # First, create the linestring that includes ac position
             b4_linestring_w_ac = LineString([[ac_leg_pos.y, ac_leg_pos.x], *zip(b4_rte_utm_lat[::-1], b4_rte_utm_lon[::-1])])
             # Get the linestring that covers at least 0.5*rpz
-            b4_linestring_w_ac = self.cut_at_coord(b4_linestring_w_ac, 0.5*self.rpz_def)
+            b4_linestring_w_ac = self.cut_at_coord(b4_linestring_w_ac, self.rpz_def)
             
             # Now create the linestring that covers the after
             after_linestring_w_ac = LineString([[ac_leg_pos.y, ac_leg_pos.x], *zip(after_rte_utm_lat, after_rte_utm_lon)])
@@ -658,8 +639,8 @@ class ProjectionCD(ConflictDetection):
             epsg_code = '326' + utm_band
             return epsg_code
         epsg_code = '327' + utm_band
-        return epsg_code
-    
+        return epsg_code   
+        
     def cut(self, line, distance):
         # Cuts a line in two at a distance from its starting point
         if distance <= 0.0 or distance >= line.length:
