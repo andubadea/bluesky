@@ -76,7 +76,8 @@ class ProjectionCD(ConflictDetection):
         
     def reset(self):
         self.__init__()
-        pass
+        super.reset()
+        return
     
     def clearconfdb(self):
         return super().clearconfdb()
@@ -87,7 +88,7 @@ class ProjectionCD(ConflictDetection):
         
         # Detect intersections
         self.confpairs, self.lospairs, self.inconf, self.dist_to_int, self.num_turns, \
-        self. mean_turn_angle, self.qdr_mat, \
+        self.mean_turn_angle, self.qdr_mat, \
         self.dist_mat, self.intent_geom = self.detect(ownship, intruder)
                 
         # confpairs has conflicts observed from both sides (a, b) and (b, a)
@@ -113,7 +114,9 @@ class ProjectionCD(ConflictDetection):
         acidx_int_pairs = all_intersections[all_intersections[:, 0] != all_intersections[:, 1]]
         
         # Get lospairs and inconf bools
-        lospairs, qdr_mat, dist_mat = self.los_detect(ownship, intruder)
+        confpairs_s, lospairs, inconf_s, tcpamax_s, qdr_s, \
+            dist_s, dcpa_s, tcpa_s, tLOS_s, qdr_mat, dist_mat = \
+                self.sb_detect(ownship, intruder, self.rpz, self.hpz, self.dtlookahead)
         self.los_detected = lospairs
         inconf = np.array([False]*ownship.ntraf)
         
@@ -133,11 +136,33 @@ class ProjectionCD(ConflictDetection):
             idx1, idx2 = pair[0], pair[1]
             # Get info from the functions
             dist1, dist2, vel1, vel2, intent1, intent2, int_point, is_conf = self.intersection_info(idx1, idx2)
+            if not is_conf and pair in confpairs_s:
+                print(pair)
             if not is_conf:
-                continue
+                # Check if state-based detects a conflict
+                if pair in confpairs_s:
+                    # This is a statebased conflict, we can store normal statebased information
+                    # We take the CPA as the intersection point
+                    # Distance to intersection is just tcpa times the velocity of the aircraft
+                    dist_to_int.append([tcpa_s[j] * bs.traf.gs[idx1], tcpa_s[j] * bs.traf.gs[idx2]])
+                    # Number of turns is just 0
+                    num_turns[j] = [0,0]
+                    mean_turn_angle[j] = [0,0]
+                    # Append the intent geometry why not
+                    intent_geom.append([intent1, intent2])
+                    # We still set inconf as true
+                    inconf[idx1] = True
+                    inconf[idx2] = True
+                    # We also append the conf_pair
+                    conf_pairs.append((bs.traf.id[pair[0]], bs.traf.id[pair[1]]))
+                    continue
+                else:
+                    # Not a statebased conflict alltogether, skip this pair.
+                    continue
             inconf[idx1] = True
             inconf[idx2] = True
-            # num_turns1, num_turns2, mean_turn_angle1, mean_turn_angle2 = self.turn_info(idx1, idx2, intent1, intent2)
+            
+            #num_turns1, num_turns2, mean_turn_angle1, mean_turn_angle2 = self.turn_info(idx1, idx2, intent1, intent2, int_point, state_conf)
             
             # Assign the values
             dist_to_int.append([dist1, dist2])
@@ -145,25 +170,6 @@ class ProjectionCD(ConflictDetection):
             #mean_turn_angle[j] = [mean_turn_angle1, mean_turn_angle2]
             intent_geom.append([intent1, intent2])
             conf_pairs.append((bs.traf.id[pair[0]], bs.traf.id[pair[1]]))
-
-            if False:
-                print('----------------------------------------------------------------')
-                print(bs.traf.id[idx1], bs.traf.id[idx2])
-                print(dist1, dist2)
-                print(vel1, vel2)
-                plt.figure('intersection')
-                plt.plot(intent1.coords.xy[1], intent1.coords.xy[0], color = 'red')
-                plt.plot(intent2.coords.xy[1], intent2.coords.xy[0], color = 'blue')
-                plt.scatter(int_point.y, int_point.x, color = 'green')
-                plt.scatter(self.ac_leg_positions[idx1].y,self.ac_leg_positions[idx1].x, marker = 'x', color = 'red')
-                plt.scatter(self.ac_leg_positions[idx2].y,self.ac_leg_positions[idx2].x, marker = 'x', color = 'blue')
-                ax = plt.gca()
-                ax.set_aspect('equal', adjustable = 'box')
-                plt.show(block = True)
-                
-        # for los_pair in lospairs:
-        #     if los_pair not in conf_pairs:
-        #         print(los_pair)
 
         return conf_pairs, lospairs, inconf, dist_to_int, num_turns, mean_turn_angle, qdr_mat, dist_mat, intent_geom
     
@@ -196,7 +202,24 @@ class ProjectionCD(ConflictDetection):
             return self.handle_line_intersection(idx1, idx2, intent1, intent2, intersection)
         
         if isinstance(intersection, MultiPoint):
-            print('MULTIPOINT')
+            # When this happens
+            # 1. The intents actually intersect in two points, for example in a roundabout where the back intents of
+            # each aircraft intersect with the front intents of each aircraft - solvable by checkcing if the points
+            # in the multipoint are either the first or last points of the intent lines.
+            # 2. There is a proper intersection but also the back legs of the aircraft intersect.
+            
+            # Thus, check if the points are either the first or last points of the intent lines.
+            for p in intersection.geoms:
+                if (p.x, p.y) == intent1.coords[0] or \
+                    (p.x, p.y) == intent2.coords[0] or \
+                    (p.x, p.y) == intent1.coords[-1] or \
+                    (p.x, p.y) == intent2.coords[-1]:
+                    # Ignore this point
+                    continue
+                else:
+                    # We found a proper intersection, handle it as point
+                    return self.handle_point_intersection(idx1, idx2, intent1, intent2, intersection)
+            # If we are out of the for loop, that means that this multipoint is not a conflict
             return 0, 0, 0, 0, intent1, intent2, intersection, False
 
         if isinstance(intersection, GeometryCollection):
@@ -217,25 +240,6 @@ class ProjectionCD(ConflictDetection):
             (int_point.x, int_point.y) == intent2.coords[0] or \
             (int_point.x, int_point.y) == intent1.coords[-1] or \
             (int_point.x, int_point.y) == intent2.coords[-1]:
-                # This is a type 1 intersection, ignore it, not a conflict (yet).
-                # However, due to weird intersection geometry, a LOS can still happen here, especially if
-                # we are checking for the back. Might need to use state-based here.
-                if (bs.traf.id[idx1], bs.traf.id[idx2]) in self.los_detected:
-                    print(f'1 {bs.traf.id[idx1]} and {bs.traf.id[idx2]}')
-                    plt.figure('intersection')
-                    plt.plot(intent1.coords.xy[1], intent1.coords.xy[0], color = 'red')
-                    plt.plot(intent2.coords.xy[1], intent2.coords.xy[0], color = 'blue')
-                    plt.scatter(int_point.y, int_point.x, color = 'green')
-                    plt.scatter(self.ac_leg_positions[idx1].y,self.ac_leg_positions[idx1].x, marker = 'x', color = 'red')
-                    plt.scatter(self.ac_leg_positions[idx2].y,self.ac_leg_positions[idx2].x, marker = 'x', color = 'blue')
-                    rpz_circle_1 = self.ac_leg_positions[idx1].buffer(16).exterior
-                    rpz_circle_2 = self.ac_leg_positions[idx2].buffer(16).exterior
-                    plt.plot(rpz_circle_1.xy[1], rpz_circle_1.xy[0], color = 'red')
-                    plt.plot(rpz_circle_2.xy[1], rpz_circle_2.xy[0], color = 'blue')
-                    print(self.rpz_def)
-                    ax = plt.gca()
-                    ax.set_aspect('equal', adjustable = 'box')
-                    plt.show(block = True)
                 return 0, 0, 0, 0, intent1, intent2, intersection, False
         else:
             # This is a type 2 intersection. Let's process the information and the intents
@@ -253,22 +257,6 @@ class ProjectionCD(ConflictDetection):
             if intent1_front.project(int_point) > self.dlookaheads[idx1] or \
                 intent2_front.project(int_point) > self.dlookaheads[idx2]:
                 # The intersection is too far away, not a conflict (yet)
-                if (bs.traf.id[idx1], bs.traf.id[idx2]) in self.los_detected:
-                    print(f'2 {bs.traf.id[idx1]} and {bs.traf.id[idx2]}')
-                    plt.figure('intersection')
-                    plt.plot(intent1_front.coords.xy[1], intent1_front.coords.xy[0], color = 'red')
-                    plt.plot(intent2_front.coords.xy[1], intent2_front.coords.xy[0], color = 'blue')
-                    plt.scatter(int_point.y, int_point.x, color = 'green')
-                    plt.scatter(self.ac_leg_positions[idx1].y,self.ac_leg_positions[idx1].x, marker = 'x', color = 'red')
-                    plt.scatter(self.ac_leg_positions[idx2].y,self.ac_leg_positions[idx2].x, marker = 'x', color = 'blue')
-                    rpz_circle_1 = self.ac_leg_positions[idx1].buffer(16).exterior
-                    rpz_circle_2 = self.ac_leg_positions[idx2].buffer(16).exterior
-                    plt.plot(rpz_circle_1.xy[1], rpz_circle_1.xy[0], color = 'red')
-                    plt.plot(rpz_circle_2.xy[1], rpz_circle_2.xy[0], color = 'blue')
-                    print(self.rpz_def)
-                    ax = plt.gca()
-                    ax.set_aspect('equal', adjustable = 'box')
-                    plt.show(block = True)
                 return 0, 0, 0, 0, intent1, intent2, intersection, False
             else:
                 # We need to cut the linestrings at the intersection points
@@ -332,23 +320,6 @@ class ProjectionCD(ConflictDetection):
             
             # If the length of this guy is greater than the lookahead distance, we don't have a conflict yet
             if intent2_front_cut.length > self.dlookaheads[idx2]:
-                if (bs.traf.id[idx1], bs.traf.id[idx2]) in self.los_detected:
-                    # There can still be a LOS here if the intersection geometry is super weird.
-                    print(f'3 {bs.traf.id[idx1]} and {bs.traf.id[idx2]}')
-                    plt.figure('intersection')
-                    plt.plot(intent1_front_cut.coords.xy[1], intent1_front_cut.coords.xy[0], color = 'red')
-                    plt.plot(intent2_front_cut.coords.xy[1], intent2_front_cut.coords.xy[0], color = 'blue')
-                    plt.scatter(int_point.y, int_point.x, color = 'green')
-                    plt.scatter(self.ac_leg_positions[idx1].y,self.ac_leg_positions[idx1].x, marker = 'x', color = 'red')
-                    plt.scatter(self.ac_leg_positions[idx2].y,self.ac_leg_positions[idx2].x, marker = 'x', color = 'blue')
-                    rpz_circle_1 = self.ac_leg_positions[idx1].buffer(16).exterior
-                    rpz_circle_2 = self.ac_leg_positions[idx2].buffer(16).exterior
-                    plt.plot(rpz_circle_1.xy[1], rpz_circle_1.xy[0], color = 'red')
-                    plt.plot(rpz_circle_2.xy[1], rpz_circle_2.xy[0], color = 'blue')
-                    print(self.rpz_def)
-                    ax = plt.gca()
-                    ax.set_aspect('equal', adjustable = 'box')
-                    plt.show(block = True)
                 return 0, 0, 0, 0, intent1, intent2, intersection, False
 
             # The intent of aircraft 1 is the front part of the line cut at lookahead distance
@@ -374,22 +345,6 @@ class ProjectionCD(ConflictDetection):
             # If the length of this guy is greater than the lookahead distance, we don't have a conflict yet
             if intent1_front_cut.length > self.dlookaheads[idx1]:
                 # There can still be a LOS here if the intersection geometry is super weird.
-                if (bs.traf.id[idx1], bs.traf.id[idx2]) in self.los_detected:
-                    print(f'4 {bs.traf.id[idx1]} and {bs.traf.id[idx2]}')
-                    plt.figure('intersection')
-                    plt.plot(intent1_front_cut.coords.xy[1], intent1_front_cut.coords.xy[0], color = 'red')
-                    plt.plot(intent2_front_cut.coords.xy[1], intent2_front_cut.coords.xy[0], color = 'blue')
-                    plt.scatter(int_point.y, int_point.x, color = 'green')
-                    plt.scatter(self.ac_leg_positions[idx1].y,self.ac_leg_positions[idx1].x, marker = 'x', color = 'red')
-                    plt.scatter(self.ac_leg_positions[idx2].y,self.ac_leg_positions[idx2].x, marker = 'x', color = 'blue')
-                    rpz_circle_1 = self.ac_leg_positions[idx1].buffer(16).exterior
-                    rpz_circle_2 = self.ac_leg_positions[idx2].buffer(16).exterior
-                    plt.plot(rpz_circle_1.xy[1], rpz_circle_1.xy[0], color = 'red')
-                    plt.plot(rpz_circle_2.xy[1], rpz_circle_2.xy[0], color = 'blue')
-                    print(self.rpz_def)
-                    ax = plt.gca()
-                    ax.set_aspect('equal', adjustable = 'box')
-                    plt.show(block = True)
                 return 0, 0, 0, 0, intent1, intent2, intersection, False
 
             # The intent of aircraft 2 is the front part of the line cut at lookahead distance
@@ -427,44 +382,10 @@ class ProjectionCD(ConflictDetection):
             elif int_in_back1 and int_in_back2:
                 # We are past the intersection point, so no conflict here
                 # However, a LOS can still exist, we might need to apply state-based here.
-                if (bs.traf.id[idx1], bs.traf.id[idx2]) in self.los_detected:
-                    print(f'5 {bs.traf.id[idx1]} and {bs.traf.id[idx2]}')
-                    # int_point = Point(intersection.coords[-1])
-                    # plt.figure('intersection')
-                    # plt.plot(intent1.coords.xy[1], intent1.coords.xy[0], color = 'red')
-                    # plt.plot(intent2.coords.xy[1], intent2.coords.xy[0], color = 'blue')
-                    # plt.scatter(int_point.y, int_point.x, color = 'green')
-                    # plt.scatter(self.ac_leg_positions[idx1].y,self.ac_leg_positions[idx1].x, marker = 'x', color = 'red')
-                    # plt.scatter(self.ac_leg_positions[idx2].y,self.ac_leg_positions[idx2].x, marker = 'x', color = 'blue')
-                    # rpz_circle_1 = self.ac_leg_positions[idx1].buffer(16).exterior
-                    # rpz_circle_2 = self.ac_leg_positions[idx2].buffer(16).exterior
-                    # plt.plot(rpz_circle_1.xy[1], rpz_circle_1.xy[0], color = 'red')
-                    # plt.plot(rpz_circle_2.xy[1], rpz_circle_2.xy[0], color = 'blue')
-                    # print(self.rpz_def)
-                    # ax = plt.gca()
-                    # ax.set_aspect('equal', adjustable = 'box')
-                    # plt.show(block = True)
                 return 0, 0, 0, 0, intent1, intent2, intersection, False
             
             elif diverging:
                 # We are past the intersection point, so no conflict here
-                if (bs.traf.id[idx1], bs.traf.id[idx2]) in self.los_detected:
-                    print(f'6 {bs.traf.id[idx1]} and {bs.traf.id[idx2]}')
-                    int_point = Point(intersection.coords[-1])
-                    plt.figure('intersection')
-                    plt.plot(intent1.coords.xy[1], intent1.coords.xy[0], color = 'red')
-                    plt.plot(intent2.coords.xy[1], intent2.coords.xy[0], color = 'blue')
-                    plt.scatter(int_point.y, int_point.x, color = 'green')
-                    plt.scatter(self.ac_leg_positions[idx1].y,self.ac_leg_positions[idx1].x, marker = 'x', color = 'red')
-                    plt.scatter(self.ac_leg_positions[idx2].y,self.ac_leg_positions[idx2].x, marker = 'x', color = 'blue')
-                    rpz_circle_1 = self.ac_leg_positions[idx1].buffer(16).exterior
-                    rpz_circle_2 = self.ac_leg_positions[idx2].buffer(16).exterior
-                    plt.plot(rpz_circle_1.xy[1], rpz_circle_1.xy[0], color = 'red')
-                    plt.plot(rpz_circle_2.xy[1], rpz_circle_2.xy[0], color = 'blue')
-                    print(self.rpz_def)
-                    ax = plt.gca()
-                    ax.set_aspect('equal', adjustable = 'box')
-                    plt.show(block = True)
                 return 0, 0, 0, 0, intent1, intent2, intersection, False
             
             elif int_in_front1 and int_in_back2:
@@ -479,22 +400,6 @@ class ProjectionCD(ConflictDetection):
                 
                 # If the length of this is greater than the lookahead distance, we don't have a conflict
                 if intent1_front_cut.length > self.dlookaheads[idx1]:
-                    if (bs.traf.id[idx1], bs.traf.id[idx2]) in self.los_detected:
-                        print(f'7 {bs.traf.id[idx1]} and {bs.traf.id[idx2]}')
-                        plt.figure('intersection')
-                        plt.plot(intent1_front_cut.coords.xy[1], intent1_front_cut.coords.xy[0], color = 'red')
-                        plt.plot(intent2.coords.xy[1], intent2.coords.xy[0], color = 'blue')
-                        plt.scatter(int_point.y, int_point.x, color = 'green')
-                        plt.scatter(self.ac_leg_positions[idx1].y,self.ac_leg_positions[idx1].x, marker = 'x', color = 'red')
-                        plt.scatter(self.ac_leg_positions[idx2].y,self.ac_leg_positions[idx2].x, marker = 'x', color = 'blue')
-                        rpz_circle_1 = self.ac_leg_positions[idx1].buffer(16).exterior
-                        rpz_circle_2 = self.ac_leg_positions[idx2].buffer(16).exterior
-                        plt.plot(rpz_circle_1.xy[1], rpz_circle_1.xy[0], color = 'red')
-                        plt.plot(rpz_circle_2.xy[1], rpz_circle_2.xy[0], color = 'blue')
-                        print(self.rpz_def)
-                        ax = plt.gca()
-                        ax.set_aspect('equal', adjustable = 'box')
-                        plt.show(block = True)
                     return 0, 0, 0, 0, intent1, intent2, intersection, False
 
                 # From the second aircraft we need both back intent and front intent
@@ -507,22 +412,6 @@ class ProjectionCD(ConflictDetection):
                 
                 # Check if this is shorter than rpz/2, if so, we don't have a conflict
                 if intent2_back_cut.length < self.rpz_def:
-                    if (bs.traf.id[idx1], bs.traf.id[idx2]) in self.los_detected:
-                        print(f'8 {bs.traf.id[idx1]} and {bs.traf.id[idx2]}')
-                        plt.figure('intersection')
-                        plt.plot(intent1.coords.xy[1], intent1.coords.xy[0], color = 'red')
-                        plt.plot(intent2.coords.xy[1], intent2.coords.xy[0], color = 'blue')
-                        plt.scatter(int_point.y, int_point.x, color = 'green')
-                        plt.scatter(self.ac_leg_positions[idx1].y,self.ac_leg_positions[idx1].x, marker = 'x', color = 'red')
-                        plt.scatter(self.ac_leg_positions[idx2].y,self.ac_leg_positions[idx2].x, marker = 'x', color = 'blue')
-                        rpz_circle_1 = self.ac_leg_positions[idx1].buffer(16).exterior
-                        rpz_circle_2 = self.ac_leg_positions[idx2].buffer(16).exterior
-                        plt.plot(rpz_circle_1.xy[1], rpz_circle_1.xy[0], color = 'red')
-                        plt.plot(rpz_circle_2.xy[1], rpz_circle_2.xy[0], color = 'blue')
-                        print(self.rpz_def)
-                        ax = plt.gca()
-                        ax.set_aspect('equal', adjustable = 'box')
-                        plt.show(block = True)
                     return 0, 0, 0, 0, intent1, intent2, intersection, False
                 
                 # Get the front intent of aircraft 2
@@ -549,22 +438,6 @@ class ProjectionCD(ConflictDetection):
                 
                 # If the length of this is greater than the lookahead distance, we don't have a conflict
                 if intent2_front_cut.length > self.dlookaheads[idx2]:
-                    if (bs.traf.id[idx1], bs.traf.id[idx2]) in self.los_detected:
-                        print(f'9 {bs.traf.id[idx1]} and {bs.traf.id[idx2]}')
-                        plt.figure('intersection')
-                        plt.plot(intent1.coords.xy[1], intent1.coords.xy[0], color = 'red')
-                        plt.plot(intent2_front_cut.coords.xy[1], intent2_front_cut.coords.xy[0], color = 'blue')
-                        plt.scatter(int_point.y, int_point.x, color = 'green')
-                        plt.scatter(self.ac_leg_positions[idx1].y,self.ac_leg_positions[idx1].x, marker = 'x', color = 'red')
-                        plt.scatter(self.ac_leg_positions[idx2].y,self.ac_leg_positions[idx2].x, marker = 'x', color = 'blue')
-                        rpz_circle_1 = self.ac_leg_positions[idx1].buffer(16).exterior
-                        rpz_circle_2 = self.ac_leg_positions[idx2].buffer(16).exterior
-                        plt.plot(rpz_circle_1.xy[1], rpz_circle_1.xy[0], color = 'red')
-                        plt.plot(rpz_circle_2.xy[1], rpz_circle_2.xy[0], color = 'blue')
-                        print(self.rpz_def)
-                        ax = plt.gca()
-                        ax.set_aspect('equal', adjustable = 'box')
-                        plt.show(block = True)
                     return 0, 0, 0, 0, intent1, intent2, intersection, False
 
                 # From the second aircraft we need both back intent and front intent
@@ -577,22 +450,6 @@ class ProjectionCD(ConflictDetection):
                 
                 # Check if this is shorter than rpz, if so, we don't have a conflit
                 if intent1_back_cut.length < self.rpz_def:
-                    if (bs.traf.id[idx1], bs.traf.id[idx2]) in self.los_detected:
-                        print(f'10 {bs.traf.id[idx1]} and {bs.traf.id[idx2]}')
-                        plt.figure('intersection')
-                        plt.plot(intent1.coords.xy[1], intent1.coords.xy[0], color = 'red')
-                        plt.plot(intent2.coords.xy[1], intent2.coords.xy[0], color = 'blue')
-                        plt.scatter(int_point.y, int_point.x, color = 'green')
-                        plt.scatter(self.ac_leg_positions[idx1].y,self.ac_leg_positions[idx1].x, marker = 'x', color = 'red')
-                        plt.scatter(self.ac_leg_positions[idx2].y,self.ac_leg_positions[idx2].x, marker = 'x', color = 'blue')
-                        rpz_circle_1 = self.ac_leg_positions[idx1].buffer(16).exterior
-                        rpz_circle_2 = self.ac_leg_positions[idx2].buffer(16).exterior
-                        plt.plot(rpz_circle_1.xy[1], rpz_circle_1.xy[0], color = 'red')
-                        plt.plot(rpz_circle_2.xy[1], rpz_circle_2.xy[0], color = 'blue')
-                        print(self.rpz_def)
-                        ax = plt.gca()
-                        ax.set_aspect('equal', adjustable = 'box')
-                        plt.show(block = True)
                     return 0, 0, 0, 0, intent1, intent2, intersection, False
                 
                 # Get the front intent of aircraft 2
@@ -613,24 +470,10 @@ class ProjectionCD(ConflictDetection):
             else:
                 # Something is wrong.
                 print('AAAAAAAAAAAAAA')
-                plt.figure('intersection')
-                plt.plot(intent1.coords.xy[1], intent1.coords.xy[0], color = 'red')
-                plt.plot(intent2.coords.xy[1], intent2.coords.xy[0], color = 'blue')
-                plt.scatter(intersection.coords[-1][1], intersection.coords[-1][0], color = 'green')
-                plt.scatter(self.ac_leg_positions[idx1].y,self.ac_leg_positions[idx1].x, marker = 'x', color = 'red')
-                plt.scatter(self.ac_leg_positions[idx2].y,self.ac_leg_positions[idx2].x, marker = 'x', color = 'blue')
-                rpz_circle_1 = self.ac_leg_positions[idx1].buffer(16).exterior
-                rpz_circle_2 = self.ac_leg_positions[idx2].buffer(16).exterior
-                plt.plot(rpz_circle_1.xy[1], rpz_circle_1.xy[0], color = 'red')
-                plt.plot(rpz_circle_2.xy[1], rpz_circle_2.xy[0], color = 'blue')
-                print(self.rpz_def)
-                ax = plt.gca()
-                ax.set_aspect('equal', adjustable = 'box')
-                plt.show(block = True)
                 return 0, 0, 0, 0, intent1, intent2, intersection, False
     
     
-    def turn_info(self, idx1, idx2, intent1, intent2):
+    def turn_info(self, idx1, idx2, intent1, intent2, int_point, statebased_conflict):
         """Function that calculates the number of turns to the intersection between two aircraft.
         """
         # Not all points within the linestring are turns, only if the angle is greater than 25 degrees.
@@ -638,6 +481,10 @@ class ProjectionCD(ConflictDetection):
         # We can determine this stuff by checking the turn waypoints of aircraft 
         # and whether they belong to the line segment between the aircraft and the 
         # intersection.
+        
+        if statebased_conflict:
+            # We don't have turns and angles
+            return 0,0,0,0
         
         # Get the routes
         acrte1 = bs.traf.ap.route[idx1]
@@ -794,23 +641,102 @@ class ProjectionCD(ConflictDetection):
         # Create the index
         return STRtree(self.rough_geometries)
     
-    def los_detect(self, ownship, intruder):
-        ''' Intrusion between ownship (traf) and intruder (traf/adsb).'''
+    def sb_detect(self, ownship, intruder, rpz, hpz, dtlookahead):
+        ''' State-based detection.'''
         # Identity matrix of order ntraf: avoid ownship-ownship detected conflicts
         I = np.eye(ownship.ntraf)
 
+        # Horizontal conflict ------------------------------------------------------
+
+        # qdrlst is for [i,j] qdr from i to j, from perception of ADSB and own coordinates
         qdr, dist = geo.kwikqdrdist_matrix(np.asmatrix(ownship.lat), np.asmatrix(ownship.lon),
                                     np.asmatrix(intruder.lat), np.asmatrix(intruder.lon))
 
+        # Convert back to array to allow element-wise array multiplications later on
+        # Convert to meters and add large value to own/own pairs
         qdr = np.asarray(qdr)
         dist = np.asarray(dist) * nm + 1e9 * I
 
+        # Calculate horizontal closest point of approach (CPA)
+        qdrrad = np.radians(qdr)
+        dx = dist * np.sin(qdrrad)  # is pos j rel to i
+        dy = dist * np.cos(qdrrad)  # is pos j rel to i
+
+        # Ownship track angle and speed
+        owntrkrad = np.radians(ownship.trk)
+        ownu = ownship.gs * np.sin(owntrkrad).reshape((1, ownship.ntraf))  # m/s
+        ownv = ownship.gs * np.cos(owntrkrad).reshape((1, ownship.ntraf))  # m/s
+
+        # Intruder track angle and speed
+        inttrkrad = np.radians(intruder.trk)
+        intu = intruder.gs * np.sin(inttrkrad).reshape((1, ownship.ntraf))  # m/s
+        intv = intruder.gs * np.cos(inttrkrad).reshape((1, ownship.ntraf))  # m/s
+
+        du = ownu - intu.T  # Speed du[i,j] is perceived eastern speed of i to j
+        dv = ownv - intv.T  # Speed dv[i,j] is perceived northern speed of i to j
+
+        dv2 = du * du + dv * dv
+        dv2 = np.where(np.abs(dv2) < 1e-6, 1e-6, dv2)  # limit lower absolute value
+        vrel = np.sqrt(dv2)
+
+        tcpa = -(du * dx + dv * dy) / dv2 + 1e9 * I
+
+        # Calculate distance^2 at CPA (minimum distance^2)
+        dcpa2 = np.abs(dist * dist - tcpa * tcpa * dv2)
+
+        # Check for horizontal conflict
+        # RPZ can differ per aircraft, get the largest value per aircraft pair
+        rpz = np.asarray(np.maximum(np.asmatrix(rpz), np.asmatrix(rpz).transpose()))
+        R2 = rpz * rpz
+        swhorconf = dcpa2 < R2  # conflict or not
+
+        # Calculate times of entering and leaving horizontal conflict
+        dxinhor = np.sqrt(np.maximum(0., R2 - dcpa2))  # half the distance travelled inzide zone
+        dtinhor = dxinhor / vrel
+
+        tinhor = np.where(swhorconf, tcpa - dtinhor, 1e8)  # Set very large if no conf
+        touthor = np.where(swhorconf, tcpa + dtinhor, -1e8)  # set very large if no conf
+
+        # Vertical conflict --------------------------------------------------------
+
+        # Vertical crossing of disk (-dh,+dh)
         dalt = ownship.alt.reshape((1, ownship.ntraf)) - \
             intruder.alt.reshape((1, ownship.ntraf)).T  + 1e9 * I
-        swlos = (dist < (np.zeros(len(self.rpz)) + self.rpz)) * (np.abs(dalt) < self.hpz)
+
+        dvs = ownship.vs.reshape(1, ownship.ntraf) - \
+            intruder.vs.reshape(1, ownship.ntraf).T
+        dvs = np.where(np.abs(dvs) < 1e-6, 1e-6, dvs)  # prevent division by zero
+
+        # Check for passing through each others zone
+        # hPZ can differ per aircraft, get the largest value per aircraft pair
+        hpz = np.asarray(np.maximum(np.asmatrix(hpz), np.asmatrix(hpz).transpose()))
+        tcrosshi = (dalt + hpz) / -dvs
+        tcrosslo = (dalt - hpz) / -dvs
+        tinver = np.minimum(tcrosshi, tcrosslo)
+        toutver = np.maximum(tcrosshi, tcrosslo)
+
+        # Combine vertical and horizontal conflict----------------------------------
+        tinconf = np.maximum(tinver, tinhor)
+        toutconf = np.minimum(toutver, touthor)
+
+        swconfl = np.array(swhorconf * (tinconf <= toutconf) * (toutconf > 0.0) *
+                           np.asarray(tinconf < np.asmatrix(dtlookahead).T) * (1.0 - I), dtype=bool)
+
+        # --------------------------------------------------------------------------
+        # Update conflict lists
+        # --------------------------------------------------------------------------
+        # Ownship conflict flag and max tCPA
+        inconf = np.any(swconfl, 1)
+        tcpamax = np.max(tcpa * swconfl, 1)
+
+        # Select conflicting pairs: each a/c gets their own record
+        confpairs = [(ownship.id[i], ownship.id[j]) for i, j in zip(*np.where(swconfl))]
+        swlos = (dist < rpz) * (np.abs(dalt) < hpz)
         lospairs = [(ownship.id[i], ownship.id[j]) for i, j in zip(*np.where(swlos))]
 
-        return lospairs, qdr, dist
+        return confpairs, lospairs, inconf, tcpamax, \
+            qdr[swconfl], dist[swconfl], np.sqrt(dcpa2[swconfl]), \
+                tcpa[swconfl], tinconf[swconfl], qdr, dist
         
     
     def convert_wgs_to_utm(self, lat: float, lon: float):
