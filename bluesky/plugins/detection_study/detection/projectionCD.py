@@ -162,7 +162,7 @@ class ProjectionCD(ConflictDetection):
             inconf[idx1] = True
             inconf[idx2] = True
             
-            #num_turns1, num_turns2, mean_turn_angle1, mean_turn_angle2 = self.turn_info(idx1, idx2, intent1, intent2, int_point, state_conf)
+            num_turns1, num_turns2, mean_turn_angle1, mean_turn_angle2 = self.turn_info(idx1, idx2, intent1, intent2, int_point)
             
             # Assign the values
             dist_to_int.append([dist1, dist2])
@@ -473,18 +473,13 @@ class ProjectionCD(ConflictDetection):
                 return 0, 0, 0, 0, intent1, intent2, intersection, False
     
     
-    def turn_info(self, idx1, idx2, intent1, intent2, int_point, statebased_conflict):
+    def turn_info(self, idx1, idx2, intent1, intent2, int_point):
         """Function that calculates the number of turns to the intersection between two aircraft.
         """
-        # Not all points within the linestring are turns, only if the angle is greater than 25 degrees.
-        # Thus, get all the angles above an absolute value of 25 degrees.
-        # We can determine this stuff by checking the turn waypoints of aircraft 
-        # and whether they belong to the line segment between the aircraft and the 
-        # intersection.
-        
-        if statebased_conflict:
-            # We don't have turns and angles
-            return 0,0,0,0
+        # We get two intents and an intersection point. We need to determine how many turns
+        # Each aircraft has until the intersection point. This intersection point can be:
+        # - a point along the routes of each aircraft
+        # - the exact position of one of the aircraft
         
         # Get the routes
         acrte1 = bs.traf.ap.route[idx1]
