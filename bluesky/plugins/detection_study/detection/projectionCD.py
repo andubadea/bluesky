@@ -218,7 +218,7 @@ class ProjectionCD(ConflictDetection):
                     continue
                 else:
                     # We found a proper intersection, handle it as point
-                    return self.handle_point_intersection(idx1, idx2, intent1, intent2, intersection)
+                    return self.handle_point_intersection(idx1, idx2, intent1, intent2, p)
             # If we are out of the for loop, that means that this multipoint is not a conflict
             return 0, 0, 0, 0, intent1, intent2, intersection, False
 
