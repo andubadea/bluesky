@@ -53,6 +53,8 @@ class ProjectionCD(ConflictDetection):
         self.ac_leg_positions = []
         self.dlookaheads = []
         
+        self.fo = []
+        
         # Distance buffer for shapely
         self.precision = 0.001 # metres
         
@@ -136,8 +138,9 @@ class ProjectionCD(ConflictDetection):
             idx1, idx2 = pair[0], pair[1]
             # Get info from the functions
             dist1, dist2, vel1, vel2, intent1, intent2, int_point, is_conf = self.intersection_info(idx1, idx2)
-            if not is_conf and pair in confpairs_s:
-                print(pair)
+            
+            # if not is_conf and pair in confpairs_s:
+            #     print(pair)
             if not is_conf:
                 # Check if state-based detects a conflict
                 if pair in confpairs_s:
@@ -157,17 +160,19 @@ class ProjectionCD(ConflictDetection):
                     conf_pairs.append((bs.traf.id[pair[0]], bs.traf.id[pair[1]]))
                     continue
                 else:
-                    # Not a statebased conflict alltogether, skip this pair.
+                    # Not a statebased conflict either, skip this pair.
                     continue
+                
+            # If we are here, then there is am intent-based conflict
             inconf[idx1] = True
             inconf[idx2] = True
             
-            num_turns1, num_turns2, mean_turn_angle1, mean_turn_angle2 = self.turn_info(idx1, idx2, intent1, intent2, int_point)
+            num_turns1, num_turns2, mean_turn_angle1, mean_turn_angle2 = self.turn_info(idx1, idx2, intent1, intent2, dist1, dist2)
             
             # Assign the values
             dist_to_int.append([dist1, dist2])
-            #num_turns[j] = [num_turns1, num_turns2]
-            #mean_turn_angle[j] = [mean_turn_angle1, mean_turn_angle2]
+            num_turns.append([num_turns1, num_turns2])
+            mean_turn_angle.append([mean_turn_angle1, mean_turn_angle2])
             intent_geom.append([intent1, intent2])
             conf_pairs.append((bs.traf.id[pair[0]], bs.traf.id[pair[1]]))
 
@@ -235,12 +240,26 @@ class ProjectionCD(ConflictDetection):
         '''
 
         int_point = intersection # Rename to int_point to make it clearer
+        
+        # We split the two rough intent lines into two geometries
+        intent1_back, intent1_front = self.cut_line_with_point(intent1, self.ac_leg_positions[idx1])
+        intent2_back, intent2_front = self.cut_line_with_point(intent2, self.ac_leg_positions[idx2])
+        
+        # Check if the intersection is in the back
+        int_in_back1 = int_point.distance(intent1_back) < self.precision
+        int_in_back2 = int_point.distance(intent2_back) < self.precision
+        
         # Check if it's a type 1:
         if (int_point.x, int_point.y) == intent1.coords[0] or \
             (int_point.x, int_point.y) == intent2.coords[0] or \
             (int_point.x, int_point.y) == intent1.coords[-1] or \
             (int_point.x, int_point.y) == intent2.coords[-1]:
                 return 0, 0, 0, 0, intent1, intent2, intersection, False
+            
+        elif int_in_back1 or int_in_back2:
+            # We're already past the intersection point
+            return 0, 0, 0, 0, intent1, intent2, intersection, False
+        
         else:
             # This is a type 2 intersection. Let's process the information and the intents
             # into accurate ones.
@@ -248,9 +267,6 @@ class ProjectionCD(ConflictDetection):
             # If one of the aircraft would already be past the intersection, and this is not
             # caught by the previous if statement, then the intersection should be a linestring.
             # Thus, handle it as a front intersection.
-            # We split the two rough intent lines into two geometries
-            intent1_back, intent1_front = self.cut_line_with_point(intent1, self.ac_leg_positions[idx1])
-            intent2_back, intent2_front = self.cut_line_with_point(intent2, self.ac_leg_positions[idx2])
             
             # These two lines are probably too long, so we need to clip them
             # First, the front lines. Check if they intersection is too far away
@@ -369,8 +385,8 @@ class ProjectionCD(ConflictDetection):
             # We can also check if the first point of the intersection line is in the back
             int_in_front1 = intersection.coords[0] in list(intent1_front.coords)
             int_in_front2 = intersection.coords[0] in list(intent2_front.coords)
-            int_in_back1 = intersection.coords[-1] in list(intent1_back.coords)
-            int_in_back2 = intersection.coords[-1] in list(intent2_back.coords)
+            int_in_back1 = intersection.coords[0] in list(intent1_back.coords)
+            int_in_back2 = intersection.coords[0] in list(intent2_back.coords)         
             
             if int_in_front1 and int_in_front2:
                 # Intersection is just a point in front of both these aircraft, we can use the other function to
@@ -473,48 +489,81 @@ class ProjectionCD(ConflictDetection):
                 return 0, 0, 0, 0, intent1, intent2, intersection, False
     
     
-    def turn_info(self, idx1, idx2, intent1, intent2, int_point):
+    def turn_info(self, idx1, idx2, intent1, intent2, dist1, dist2):
         """Function that calculates the number of turns to the intersection between two aircraft.
         """
         # We get two intents and an intersection point. We need to determine how many turns
         # Each aircraft has until the intersection point. This intersection point can be:
         # - a point along the routes of each aircraft
         # - the exact position of one of the aircraft
+        # - One aircraft is already past the intersection point.
+        # We can determine this from the sign of the distance to the intersection point.
+        # If both distances are positive, then we can get the number of turns for both.
+        # If one of the distances is 0, then that aircraft itself is the intersection point and thus it has 0
+        # turns to the intersection point, we only get the number of turns for the other aircraft.
+        # Same if an aircraft has a negatie distance, it means it is already past the intersection point. 
         
-        # Get the routes
-        acrte1 = bs.traf.ap.route[idx1]
-        acrte2 = bs.traf.ap.route[idx2]
+        if dist1 > 0 and dist2 > 0:
+            # Intersection point is in front of both aircraft.
+            num_turns_1, avg_angle_1 = self.get_ac_turn_info(idx1, intent1)
+            num_turns_2, avg_angle_2 = self.get_ac_turn_info(idx2, intent2)
+            
+        elif dist1 <= 0 and dist2 > 0:
+            # Set stuff to 0 for aircraft 1 and get the correct stuff for aircraft 2
+            num_turns_1 = 0
+            avg_angle_1 = 0
+            num_turns_2, avg_angle_2 = self.get_ac_turn_info(idx2, intent2)
+        elif dist1 > 0 and dist2 <= 0:
+            # Set stuff to 0 for aircraft 2 and get the correct stuff for aircraft 1
+            num_turns_1, avg_angle_1 = self.get_ac_turn_info(idx1, intent1)
+            num_turns_2 = 0
+            avg_angle_2 = 0
+        else:
+            # We probably shouldn't be in this function at all then? Probably not a conflict.
+            print('BBBBBBBBBBBB')
+            print(dist1, dist2)
+            num_turns_1 = 0
+            avg_angle_1 = 0
+            num_turns_2 = 0
+            avg_angle_2 = 0
         
-        # Active waypoints
-        act_wp1 = acrte1.iactwp
-        act_wp2 = acrte2.iactwp
-        
+        # Return the info
+        return num_turns_1, num_turns_2, avg_angle_1, avg_angle_2
+    
+    def get_ac_turn_info(self, acidx, intent):
+        '''The intent this function uses needs to be clipped at the intersection point. It also assumes
+        that the intersection point is in front of the aircraft.'''
+        # Get route
+        acrte = bs.traf.ap.route[acidx]
+        # Get active waypoint
+        act_wp = acrte.iactwp
         # Turn waypoints
-        turnidx1 = np.where(acrte1.wpflyturn)[0]
-        turnidx2 = np.where(acrte2.wpflyturn)[0]
+        turnidx = np.where(acrte.wpflyturn)[0]
+        # Get the index the waypoints that are part of the intent
+        intent_wpts_idx = [i for i, wpt_coords in enumerate(intent.coords) \
+            if i > act_wp and wpt_coords in list(zip(acrte.wplat, acrte.wplon))]
         
-        # We can determine if there are any turn waypoints between the aircraft and the intersection
-        # by simply finding out the index of the waypoint right before the intersection and seeing
-        # if any waypoints in betweeen are turn waypoints.
+        # If the intex  of this waypoint is smaller or equal to the active waypoint index,
+        # then there are no turns.
+        if not intent_wpts_idx or not turnidx:
+            return 0, 0
+        # Get the number of turns
+        intent_turn_idx = set(intent_wpts_idx).intersection(turnidx)
+        num_turns= len(intent_turn_idx)
         
-        # Get the index of the waypoint right before the intersection
-        wptidx_b4_int1 = act_wp1 + (len(split1.coords) - 2)
-        wptidx_b4_int2 = act_wp2 + (len(split2.coords) - 2)
-        
-        # Calculate the number of turns
-        num_turns_1 = np.sum(np.logical_and(turnidx1 > act_wp1, turnidx1 < wptidx_b4_int1))
-        num_turns_2 = np.sum(np.logical_and(turnidx2 > act_wp2, turnidx2 < wptidx_b4_int2))
+        if num_turns == 0:
+            return 0, 0
         
         # Now that we know the number of turns, calculate the mean turn angle
-        # We need to for loop through all the turn waypoints for each aircraft
-        angles1 = []
-        for i_turn in turnidx1[np.logical_and(turnidx1 > act_wp1, turnidx1 < wptidx_b4_int1)]:
-            if not (i_turn < len(acrte1.wplon)-1):
+        # We need to for loop through all the turn waypoints we found
+        angles = []
+        for i_turn in intent_turn_idx:
+            if not (i_turn < len(acrte.wplon)-1):
                 continue
             # Get the needed stuff
-            lat_cur, lon_cur   = acrte1.wplat[i_turn], acrte1.wplon[i_turn]
-            lat_prev, lon_prev = acrte1.wplat[i_turn-1], acrte1.wplon[i_turn-1]
-            lat_next, lon_next = acrte1.wplat[i_turn+1], acrte1.wplon[i_turn+1]
+            lat_cur, lon_cur   = acrte.wplat[i_turn], acrte.wplon[i_turn]
+            lat_prev, lon_prev = acrte.wplat[i_turn-1], acrte.wplon[i_turn-1]
+            lat_next, lon_next = acrte.wplat[i_turn+1], acrte.wplon[i_turn+1]
             
             # Get the angle
             d1=geo.kwikqdrdist(lat_prev,lon_prev,lat_cur,lon_cur)
@@ -526,38 +575,14 @@ class ProjectionCD(ConflictDetection):
                 
             # This is a turn if angle is greater than 25
             if angle > 25:
-                angles1.append(angle)
+                angles.append(angle)
             else:
+                # Not a turn
                 continue
             
-        angles2 = []
-        for i_turn in turnidx2[np.logical_and(turnidx2 > act_wp2, turnidx2 < wptidx_b4_int2)]:
-            if not (i_turn < len(acrte2.wplon)-1):
-                continue
-            # Get the needed stuff
-            lat_cur, lon_cur   = acrte2.wplat[i_turn], acrte2.wplon[i_turn]
-            lat_prev, lon_prev = acrte2.wplat[i_turn-1], acrte2.wplon[i_turn-1]
-            lat_next, lon_next = acrte2.wplat[i_turn+1], acrte2.wplon[i_turn+1]
-            
-            # Get the angle
-            d1=geo.kwikqdrdist(lat_prev,lon_prev,lat_cur,lon_cur)
-            d2=geo.kwikqdrdist(lat_cur,lon_cur,lat_next,lon_next)
-            angle=abs(d2[0]-d1[0])
-
-            if angle>180:
-                angle=360-angle
-                
-            # This is a turn if angle is greater than 25
-            if angle > 25:
-                angles2.append(angle)
-            else:
-                continue
-            
-        avg_angle1 = np.average(angles1) if len(angles1) > 0 else 0
-        avg_angle2 = np.average(angles2) if len(angles2) > 0 else 0
+        avg_angle = np.average(angles) if len(angles) > 0 else 0
+        return num_turns, avg_angle
         
-        # Return the number of turns
-        return num_turns_1, num_turns_2, avg_angle1, avg_angle2
            
     def create_index(self):
         """Function that creates the geometric tree index. 
