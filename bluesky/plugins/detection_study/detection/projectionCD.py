@@ -385,8 +385,8 @@ class ProjectionCD(ConflictDetection):
             # We can also check if the first point of the intersection line is in the back
             int_in_front1 = intersection.coords[0] in list(intent1_front.coords)
             int_in_front2 = intersection.coords[0] in list(intent2_front.coords)
-            int_in_back1 = intersection.coords[0] in list(intent1_back.coords)
-            int_in_back2 = intersection.coords[0] in list(intent2_back.coords)         
+            int_in_back1 = intersection.coords[-1] in list(intent1_back.coords)
+            int_in_back2 = intersection.coords[-1] in list(intent2_back.coords)         
             
             if int_in_front1 and int_in_front2:
                 # Intersection is just a point in front of both these aircraft, we can use the other function to
