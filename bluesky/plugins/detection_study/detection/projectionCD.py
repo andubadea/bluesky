@@ -19,6 +19,7 @@ from bluesky.tools import geo
 This detection plugin only detects intersections in paths between aircraft, and
 returns a list of LineStrings representing the intersections to be used in 
 training a supervised learning detection and resolution model. 
+This plugin also logs the data.
 """
 
 def init_plugin():
@@ -56,7 +57,7 @@ class ProjectionCD(ConflictDetection):
         self.fo = []
         
         # Distance buffer for shapely
-        self.precision = 0.001 # metres
+        self.precision = 0.0001 # metres
         
         self.colors = ['yellow', 'orange', 'green', 'purple', 'pink']
         
@@ -130,6 +131,7 @@ class ProjectionCD(ConflictDetection):
         # First, initialize the arrays
         conf_pairs = []
         dist_to_int = []
+        velocity_wrt_int = []
         num_turns = []
         mean_turn_angle = []
         intent_geom = []
@@ -139,8 +141,8 @@ class ProjectionCD(ConflictDetection):
             # Get info from the functions
             dist1, dist2, vel1, vel2, intent1, intent2, int_point, is_conf = self.intersection_info(idx1, idx2)
             
-            # if not is_conf and pair in confpairs_s:
-            #     print(pair)
+            if not is_conf and pair in confpairs_s:
+                print(pair)
             if not is_conf:
                 # Check if state-based detects a conflict
                 if pair in confpairs_s:
@@ -163,18 +165,54 @@ class ProjectionCD(ConflictDetection):
                     # Not a statebased conflict either, skip this pair.
                     continue
                 
-            # If we are here, then there is am intent-based conflict
-            inconf[idx1] = True
-            inconf[idx2] = True
-            
-            num_turns1, num_turns2, mean_turn_angle1, mean_turn_angle2 = self.turn_info(idx1, idx2, intent1, intent2, dist1, dist2)
-            
-            # Assign the values
-            dist_to_int.append([dist1, dist2])
-            num_turns.append([num_turns1, num_turns2])
-            mean_turn_angle.append([mean_turn_angle1, mean_turn_angle2])
-            intent_geom.append([intent1, intent2])
-            conf_pairs.append((bs.traf.id[pair[0]], bs.traf.id[pair[1]]))
+            else:
+                # If we are here, then there is am intent-based conflict
+                inconf[idx1] = True
+                inconf[idx2] = True
+                
+                # There is a rare situation in which the aircraft are right on top of each other. Handle it here:
+                ac1_pos = self.ac_leg_positions[idx1]
+                ac2_pos = self.ac_leg_positions[idx2]
+                if (ac1_pos.x, ac1_pos.y) == (ac2_pos.x, ac2_pos.y):
+                    num_turns1, num_turns2, mean_turn_angle1, mean_turn_angle2 = 0, 0, 0, 0
+                else:
+                    num_turns1, num_turns2, mean_turn_angle1, mean_turn_angle2 = self.turn_info(idx1, idx2, intent1, intent2, dist1, dist2)
+
+                # Check everything manually
+                print('---------------------------------------------------------------')
+                print(f'{bs.traf.id[idx1]} and {bs.traf.id[idx2]}')
+                print('')
+                print(f'Dist {bs.traf.id[idx1]}: {dist1}')
+                print(f'Velo {bs.traf.id[idx1]}: {vel1}')
+                print(f'Numt {bs.traf.id[idx1]}: {num_turns1}')
+                print(f'Mang {bs.traf.id[idx1]}: {mean_turn_angle1}')
+                print('')
+                print(f'Dist {bs.traf.id[idx2]}: {dist2}')
+                print(f'Velo {bs.traf.id[idx2]}: {vel2}')
+                print(f'Numt {bs.traf.id[idx2]}: {num_turns2}')
+                print(f'Mang {bs.traf.id[idx2]}: {mean_turn_angle2}')
+                plt.figure('intersection', figsize=(8, 8))
+                plt.plot(intent1.coords.xy[1], intent1.coords.xy[0], color = 'blue')
+                plt.plot(intent2.coords.xy[1], intent2.coords.xy[0], color = 'red')
+                plt.scatter(int_point.y, int_point.x, color = 'green', label = 'int')
+                plt.scatter(self.ac_leg_positions[idx1].y,self.ac_leg_positions[idx1].x, marker = 'x', color = 'blue', label = bs.traf.id[idx1])
+                plt.scatter(self.ac_leg_positions[idx2].y,self.ac_leg_positions[idx2].x, marker = 'x', color = 'red', label = bs.traf.id[idx2])
+                rpz_circle_1 = self.ac_leg_positions[idx1].buffer(16).exterior
+                rpz_circle_2 = self.ac_leg_positions[idx2].buffer(16).exterior
+                plt.plot(rpz_circle_1.xy[1], rpz_circle_1.xy[0], color = 'blue')
+                plt.plot(rpz_circle_2.xy[1], rpz_circle_2.xy[0], color = 'red')
+                plt.legend()
+                ax = plt.gca()
+                ax.set_aspect('equal', adjustable = 'box')
+                plt.show(block = True)
+                
+                # Assign the values
+                dist_to_int.append([dist1, dist2])
+                velocity_wrt_int.append([vel1, vel2])
+                num_turns.append([num_turns1, num_turns2])
+                mean_turn_angle.append([mean_turn_angle1, mean_turn_angle2])
+                intent_geom.append([intent1, intent2])
+                conf_pairs.append((bs.traf.id[pair[0]], bs.traf.id[pair[1]]))
 
         return conf_pairs, lospairs, inconf, dist_to_int, num_turns, mean_turn_angle, qdr_mat, dist_mat, intent_geom
     
@@ -308,6 +346,14 @@ class ProjectionCD(ConflictDetection):
         ac1_pos = self.ac_leg_positions[idx1]
         ac2_pos = self.ac_leg_positions[idx2]
         
+        # In very rare cases, the aircraft are on the same point. We can tackle this here:
+        if (ac1_pos.x, ac1_pos.y) == (ac2_pos.x, ac2_pos.y):
+            # The aircraft are on the exact same point. Still a conflict, but nobody is in
+            # front or in back. This is one of the rare cases where we return 0 for everything
+            # but it is still a conflict.
+            int_point = ac1_pos
+            return 0, 0, 0, 0, intent1, intent2, int_point, True
+        
         # Get the back and the front of the intents. Careful with these as the aircraft
         # points do not lie on the routes themselves because of floating point errors.
         intent1_back, intent1_front = self.cut_line_with_point(intent1, self.ac_leg_positions[idx1])
@@ -323,8 +369,8 @@ class ProjectionCD(ConflictDetection):
         intent2_front_cut= self.cut(intent2_front, self.dlookaheads[idx2])
         
         # Now we can check whether an aircraft is in front of another aircraft.
-        ac1_in_front = intent2_front.distance(intent1_back) < self.precision
-        ac2_in_front = intent1_front.distance(intent2_back) < self.precision
+        ac1_in_front = intent2_front.distance(self.ac_leg_positions[idx1]) < self.precision
+        ac2_in_front = intent1_front.distance(self.ac_leg_positions[idx2]) < self.precision
             
         if ac1_in_front:
             # Aircraft 1 is in front.
@@ -346,8 +392,7 @@ class ProjectionCD(ConflictDetection):
             vel2 = bs.traf.gs[idx2] - bs.traf.gs[idx1]
             dist1 = 0
             dist2 = intent2_front_cut.length
-        
-            # Return info
+    
             return dist1, dist2, vel1, vel2, intent1_front_cut, intent2_front_cut, int_point, True
         
         elif ac2_in_front:
@@ -539,16 +584,21 @@ class ProjectionCD(ConflictDetection):
         act_wp = acrte.iactwp
         # Turn waypoints
         turnidx = np.where(acrte.wpflyturn)[0]
-        # Get the index the waypoints that are part of the intent
-        intent_wpts_idx = [i for i, wpt_coords in enumerate(intent.coords) \
-            if i > act_wp and wpt_coords in list(zip(acrte.wplat, acrte.wplon))]
+        # Get the route in UTM coordinate
+        rte_lon_utm, rte_lat_utm = self.transform_coords.transform(acrte.wplon, acrte.wplat)
+        rte_utm = list(zip(rte_lat_utm, rte_lon_utm))
+        # Get the indices of the waypoints within the intent
+        intent_turn_idx = []
+        for intent_wp in intent.coords[1:-1]:
+            if intent_wp in rte_utm and rte_utm.index(intent_wp) in turnidx:
+                intent_turn_idx.append(rte_utm.index(intent_wp))
+        
         
         # If the intex  of this waypoint is smaller or equal to the active waypoint index,
         # then there are no turns.
-        if not intent_wpts_idx or not turnidx:
+        if not intent_turn_idx:
             return 0, 0
         # Get the number of turns
-        intent_turn_idx = set(intent_wpts_idx).intersection(turnidx)
         num_turns= len(intent_turn_idx)
         
         if num_turns == 0:
@@ -835,4 +885,21 @@ class ProjectionCD(ConflictDetection):
                 # is between two vertices
                 return LineString(coords[:i+1] + [splitter.coords[0]]).simplify(0), LineString([splitter.coords[0]] + coords[i+1:]).simplify(0)
 
-    
+# Plot set
+# print(f'{bs.traf.id[idx1]} and {bs.traf.id[idx2]}')
+# print(self.ac_leg_positions[idx1], self.ac_leg_positions[idx2])
+# plt.figure('intersection')
+# plt.plot(intent1_front.coords.xy[1], intent1_front.coords.xy[0], color = 'red')
+# plt.plot(intent2_front.coords.xy[1], intent2_front.coords.xy[0], color = 'blue')
+# plt.plot(intent1_back.coords.xy[1], intent1_back.coords.xy[0], color = 'red')
+# plt.plot(intent2_back.coords.xy[1], intent2_back.coords.xy[0], color = 'blue')
+# plt.scatter(int_point.y, int_point.x, color = 'green')
+# plt.scatter(self.ac_leg_positions[idx1].y,self.ac_leg_positions[idx1].x, marker = 'x', color = 'red')
+# plt.scatter(self.ac_leg_positions[idx2].y,self.ac_leg_positions[idx2].x, marker = 'x', color = 'blue')
+# rpz_circle_1 = self.ac_leg_positions[idx1].buffer(16).exterior
+# rpz_circle_2 = self.ac_leg_positions[idx2].buffer(16).exterior
+# plt.plot(rpz_circle_1.xy[1], rpz_circle_1.xy[0], color = 'red')
+# plt.plot(rpz_circle_2.xy[1], rpz_circle_2.xy[0], color = 'blue')
+# ax = plt.gca()
+# ax.set_aspect('equal', adjustable = 'box')
+# plt.show(block = True)
