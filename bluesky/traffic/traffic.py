@@ -34,44 +34,6 @@ from .performance.perfbase import PerfBase
 # Register settings defaults
 bs.settings.set_variable_defaults(performance_model='openap', asas_dt=1.0)
 
-confheader = \
-    '#######################################################\n' + \
-    'CONF LOG\n' + \
-    'Conflict Statistics\n' + \
-    '#######################################################\n\n' + \
-    'Parameters [Units]:\n' + \
-    'Simulation time [s], ' + \
-    'ACID1 [-],' + \
-    'ACID2 [-],' + \
-    'LAT1 [deg],' + \
-    'LON1 [deg],' + \
-    'ALT1 [ft],' + \
-    'LAT2 [deg],' + \
-    'LON2 [deg],' + \
-    'ALT2 [ft],' + \
-    'CPALAT [lat],' + \
-    'CPALON [lon],' + \
-    'TCPA [s]\n'
-
-losheader = \
-    '#######################################################\n' + \
-    'LOS LOG\n' + \
-    'LOS Statistics\n' + \
-    '#######################################################\n\n' + \
-    'Parameters [Units]:\n' + \
-    'LOS exit time [s], ' + \
-    'LOS start time [s],' + \
-    'Time of min distance [s],' + \
-    'ACID1 [-],' + \
-    'ACID2 [-],' + \
-    'LAT1 [deg],' + \
-    'LON1 [deg],' + \
-    'ALT1 [ft],' + \
-    'LAT2 [deg],' + \
-    'LON2 [deg],' + \
-    'ALT2 [ft],' + \
-    'DIST [m]\n'
-
 class Traffic(Entity):
     """
     Traffic class definition    : Traffic data
@@ -96,14 +58,6 @@ class Traffic(Entity):
         self.setroot(self)
 
         self.ntraf = 0
-        
-        self.conflog = datalog.crelog('CONFLOG', None, confheader)
-        self.loslog = datalog.crelog('LOSLOG', None, losheader)
-        self.prevconfpairs = set()
-        self.prevlospairs = set()
-        self.confinside_all = 0
-        self.deleted_aircraft = 0
-        self.losmindist = dict()
 
         self.cond = Condition()  # Conditional commands list
         self.wind = WindSim()

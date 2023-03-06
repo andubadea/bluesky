@@ -35,9 +35,6 @@ class TrafficSpawner(Entity):
         self.spd = 20 * kts
         # When to stop simulating
         self.stop_time = 7*24*60*60
-        # Start the logs
-        bs.traf.conflog.start()
-        bs.traf.loslog.start()
         # Turn ASAS on
         stack.stack('ASAS ON')
         # Set a default seed

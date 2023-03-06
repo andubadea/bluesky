@@ -1,11 +1,9 @@
 import bluesky as bs
 import numpy as np
-import shapely as sp
 import math
 import pyproj
-import geopandas as gpd
+import pandas as pd
 import matplotlib.pyplot as plt
-import copy
 
 from shapely.geometry import LineString, Point, MultiLineString, MultiPoint, GeometryCollection
 from shapely import STRtree
@@ -13,7 +11,7 @@ from shapely.ops import split, nearest_points, linemerge, snap
 from shapely.affinity import rotate
 from bluesky.tools.aero import nm
 from bluesky.traffic.asas import ConflictDetection
-from bluesky.tools import geo
+from bluesky.tools import geo, datalog
 
 """
 This detection plugin only detects intersections in paths between aircraft, and
@@ -34,6 +32,40 @@ def init_plugin():
 
     return config
 
+confheader = \
+    '#######################################################\n' + \
+    'CONF LOG\n' + \
+    'Conflict Statistics\n' + \
+    '#######################################################\n\n' + \
+    'Parameters [Units]:\n' + \
+    'Simulation time [s], ' + \
+    'Unique CONF ID [-]' + \
+    'ACID1 [-],' + \
+    'ACID2 [-],' + \
+    'LAT1 [deg],' + \
+    'LON1 [deg],' + \
+    'ALT1 [ft],' + \
+    'DIST1 [m],' + \
+    'VEL1 [m/s],' + \
+    'TURNS1 [-],' + \
+    'AVGANGLE1 [deg],' + \
+    'LAT2 [deg],' + \
+    'LON2 [deg],' + \
+    'ALT2 [ft],' + \
+    'DIST2 [m],' + \
+    'VEL2 [m/s],' + \
+    'TURNS2 [-],' + \
+    'AVGANGLE2 [deg]\n'
+
+uniqueconflosheader = \
+    '#######################################################\n' + \
+    'Unique CONF LOS LOG\n' + \
+    'Shows whether unique conflicts results in a LOS\n' + \
+    '#######################################################\n\n' + \
+    'Parameters [Units]:\n' + \
+    'Unique CONF ID, ' + \
+    'Resulted in LOS\n'
+
 class ProjectionCD(ConflictDetection):
     def __init__(self):
         super().__init__()
@@ -44,6 +76,7 @@ class ProjectionCD(ConflictDetection):
         # New detection parameters
         self.intent_geom = [] # Linestring of aircraft intent per pair
         self.dist_to_int = [] # Distance to intent intersections per pair
+        self.vel_rel_int = [] # Velocity relative to intent intersection per pair
         self.num_turns = [] # Number of turns per pair
         self.mean_turn_angle = [] # Mean turn angle per pair
         self.qdr_mat = [] # QDR for all aircraft
@@ -59,7 +92,23 @@ class ProjectionCD(ConflictDetection):
         # Distance buffer for shapely
         self.precision = 0.0001 # metres
         
-        self.colors = ['yellow', 'orange', 'green', 'purple', 'pink']
+        # Logging
+        self.conflog = datalog.crelog('CONFLOG', None, confheader)
+        self.uniqueconfloslog = datalog.crelog('WASLOSLOG', None, uniqueconflosheader)
+        
+        # Start the logs
+        self.conflog.start()
+        self.uniqueconfloslog.start()
+        
+        # Conflict related
+        self.prevconfpairs = set()
+        self.prevlospairs = set()
+        self.unique_conf_dict = dict()
+        self.counter2id = dict() # Keep track of the other way around
+        self.unique_conf_id_counter = 0 # Start from 0, go up
+        self.confhold =  [] # array to keep track of the conflicts we are
+        # keeping for an extra few seconds
+        self.hold_time = 10 #seconds
         
         # Get the city centre
         try:
@@ -90,7 +139,7 @@ class ProjectionCD(ConflictDetection):
         self.geom_tree = self.create_index()
         
         # Detect intersections
-        self.confpairs, self.lospairs, self.inconf, self.dist_to_int, self.num_turns, \
+        self.confpairs, self.lospairs, self.inconf, self.dist_to_int, self.vel_rel_int, self.num_turns, \
         self.mean_turn_angle, self.qdr_mat, \
         self.dist_mat, self.intent_geom = self.detect(ownship, intruder)
                 
@@ -105,6 +154,9 @@ class ProjectionCD(ConflictDetection):
         # Update confpairs_unique and lospairs_unique
         self.confpairs_unique = confpairs_unique
         self.lospairs_unique = lospairs_unique   
+        
+        # Update the logging
+        self.update_log()
         return
     
     def detect(self, ownship, intruder):
@@ -124,7 +176,7 @@ class ProjectionCD(ConflictDetection):
         inconf = np.array([False]*ownship.ntraf)
         
         if len(acidx_int_pairs) == 0:
-            return [], [], inconf, [], [], [], qdr_mat, dist_mat, []
+            return [], [], inconf, [], [], [], [], qdr_mat, dist_mat, []
         
         # For each confpair, we need to get the distance of each aircraft to the intersection,
         # the number of turns until the intersection, and the mean turn angle until the intersection
@@ -138,11 +190,28 @@ class ProjectionCD(ConflictDetection):
         
         for j, pair in enumerate(acidx_int_pairs):
             idx1, idx2 = pair[0], pair[1]
+            # We can check if the two aircraft are already in confpairs. If this is the case, then just give the reverse data.
+            if (bs.traf.id[pair[1]], bs.traf.id[pair[0]]) in conf_pairs:
+                pair_id = conf_pairs.index((bs.traf.id[pair[1]], bs.traf.id[pair[0]]))
+                dist_to_int.append([dist_to_int[pair_id][1], dist_to_int[pair_id][0]])
+                velocity_wrt_int.append([velocity_wrt_int[pair_id][1], velocity_wrt_int[pair_id][0]])
+                num_turns.append([num_turns[pair_id][1], num_turns[pair_id][0]])
+                mean_turn_angle.append([mean_turn_angle[pair_id][1], mean_turn_angle[pair_id][0]])
+                intent_geom.append([intent_geom[pair_id][1], intent_geom[pair_id][0]])
+                conf_pairs.append((bs.traf.id[pair[1]], bs.traf.id[pair[0]]))
+                continue
+
             # Get info from the functions
             dist1, dist2, vel1, vel2, intent1, intent2, int_point, is_conf = self.intersection_info(idx1, idx2)
             
             if not is_conf and pair in confpairs_s:
-                print(pair)
+                print(f'This is a conflict that statebased detects: {pair}.')
+            
+            if vel1 < 0 or vel2 < 0:
+                # One of the aircraft is moving away from the intersection point, so this is obviously not
+                # a conflict anymore. 
+                continue    
+            
             if not is_conf:
                 # Check if state-based detects a conflict
                 if pair in confpairs_s:
@@ -179,33 +248,33 @@ class ProjectionCD(ConflictDetection):
                     num_turns1, num_turns2, mean_turn_angle1, mean_turn_angle2 = self.turn_info(idx1, idx2, intent1, intent2, dist1, dist2)
 
                 # Check everything manually
-                print('---------------------------------------------------------------')
-                print(f'{bs.traf.id[idx1]} and {bs.traf.id[idx2]}')
-                print('')
-                print(f'Dist {bs.traf.id[idx1]}: {dist1}')
-                print(f'Velo {bs.traf.id[idx1]}: {vel1}')
-                print(f'Numt {bs.traf.id[idx1]}: {num_turns1}')
-                print(f'Mang {bs.traf.id[idx1]}: {mean_turn_angle1}')
-                print('')
-                print(f'Dist {bs.traf.id[idx2]}: {dist2}')
-                print(f'Velo {bs.traf.id[idx2]}: {vel2}')
-                print(f'Numt {bs.traf.id[idx2]}: {num_turns2}')
-                print(f'Mang {bs.traf.id[idx2]}: {mean_turn_angle2}')
-                plt.figure('intersection', figsize=(8, 8))
-                plt.plot(intent1.coords.xy[1], intent1.coords.xy[0], color = 'blue')
-                plt.plot(intent2.coords.xy[1], intent2.coords.xy[0], color = 'red')
-                plt.scatter(int_point.y, int_point.x, color = 'green', label = 'int')
-                plt.scatter(self.ac_leg_positions[idx1].y,self.ac_leg_positions[idx1].x, marker = 'x', color = 'blue', label = bs.traf.id[idx1])
-                plt.scatter(self.ac_leg_positions[idx2].y,self.ac_leg_positions[idx2].x, marker = 'x', color = 'red', label = bs.traf.id[idx2])
-                rpz_circle_1 = self.ac_leg_positions[idx1].buffer(16).exterior
-                rpz_circle_2 = self.ac_leg_positions[idx2].buffer(16).exterior
-                plt.plot(rpz_circle_1.xy[1], rpz_circle_1.xy[0], color = 'blue')
-                plt.plot(rpz_circle_2.xy[1], rpz_circle_2.xy[0], color = 'red')
-                plt.legend()
-                ax = plt.gca()
-                ax.set_aspect('equal', adjustable = 'box')
-                plt.show(block = True)
-                
+                # print('---------------------------------------------------------------')
+                # print(f'{bs.traf.id[idx1]} and {bs.traf.id[idx2]}')
+                # print('')
+                # print(f'Dist {bs.traf.id[idx1]}: {dist1}')
+                # print(f'Velo {bs.traf.id[idx1]}: {vel1}')
+                # print(f'Numt {bs.traf.id[idx1]}: {num_turns1}')
+                # print(f'Mang {bs.traf.id[idx1]}: {mean_turn_angle1}')
+                # print('')
+                # print(f'Dist {bs.traf.id[idx2]}: {dist2}')
+                # print(f'Velo {bs.traf.id[idx2]}: {vel2}')
+                # print(f'Numt {bs.traf.id[idx2]}: {num_turns2}')
+                # print(f'Mang {bs.traf.id[idx2]}: {mean_turn_angle2}')
+                # plt.figure('intersection', figsize=(8, 8))
+                # plt.plot(intent1.coords.xy[1], intent1.coords.xy[0], color = 'blue')
+                # plt.plot(intent2.coords.xy[1], intent2.coords.xy[0], color = 'red')
+                # plt.scatter(int_point.y, int_point.x, color = 'green', label = 'int')
+                # plt.scatter(self.ac_leg_positions[idx1].y,self.ac_leg_positions[idx1].x, marker = 'x', color = 'blue', label = bs.traf.id[idx1])
+                # plt.scatter(self.ac_leg_positions[idx2].y,self.ac_leg_positions[idx2].x, marker = 'x', color = 'red', label = bs.traf.id[idx2])
+                # rpz_circle_1 = self.ac_leg_positions[idx1].buffer(16).exterior
+                # rpz_circle_2 = self.ac_leg_positions[idx2].buffer(16).exterior
+                # plt.plot(rpz_circle_1.xy[1], rpz_circle_1.xy[0], color = 'blue')
+                # plt.plot(rpz_circle_2.xy[1], rpz_circle_2.xy[0], color = 'red')
+                # plt.legend()
+                # ax = plt.gca()
+                # ax.set_aspect('equal', adjustable = 'box')
+                # plt.show(block = True)
+                     
                 # Assign the values
                 dist_to_int.append([dist1, dist2])
                 velocity_wrt_int.append([vel1, vel2])
@@ -214,7 +283,7 @@ class ProjectionCD(ConflictDetection):
                 intent_geom.append([intent1, intent2])
                 conf_pairs.append((bs.traf.id[pair[0]], bs.traf.id[pair[1]]))
 
-        return conf_pairs, lospairs, inconf, dist_to_int, num_turns, mean_turn_angle, qdr_mat, dist_mat, intent_geom
+        return conf_pairs, lospairs, inconf, dist_to_int,velocity_wrt_int, num_turns, mean_turn_angle, qdr_mat, dist_mat, intent_geom
     
     def intersection_info(self, idx1, idx2):
         """Function that outputs information about the intersection between the intents of two
@@ -885,6 +954,145 @@ class ProjectionCD(ConflictDetection):
                 # is between two vertices
                 return LineString(coords[:i+1] + [splitter.coords[0]]).simplify(0), LineString([splitter.coords[0]] + coords[i+1:]).simplify(0)
 
+    def update_log(self):
+        '''Here, we are logging the information for current conflicts as well as
+        whether these conflicts resulted in a LOS or not.'''
+        confpairs_new = list(set(self.confpairs) - self.prevconfpairs) # New confpairs
+        confpairs_out = list(self.prevconfpairs - set(self.confpairs)) # Pairs that are no longer in conflict
+        lospairs_new = list(set(self.lospairs) - self.prevlospairs) # New lospairs
+        
+        # First of all, add the new conflicts to the unique dict tracker
+        for confpair in confpairs_new:
+            # The dict is of the following format:
+            # lower_number_acidx_newer_number_acidx : [unique_id, was it a LOS or not]
+            # First, get the aircraft IDX
+            idx1 = bs.traf.id.index(confpair[0])
+            idx2 = bs.traf.id.index(confpair[1])
+            # Create dictionary entry
+            if idx1 < idx2:
+                dictkey = confpair[0] + confpair[1]
+            else:
+                dictkey = confpair[1] + confpair[0]
+                
+            if dictkey in self.unique_conf_dict:
+                # Pair already in there
+                continue
+            else:
+                self.unique_conf_dict[dictkey] = [self.unique_conf_id_counter, False]
+                self.counter2id[self.unique_conf_id_counter] = dictkey 
+                self.unique_conf_id_counter += 1
+                
+        # Log data in the conflog for all existing conflicts
+        done_pairs = []
+        for confpair in self.confpairs:
+            idx1 = bs.traf.id.index(confpair[0])
+            idx2 = bs.traf.id.index(confpair[1])
+            if idx1 < idx2:
+                dictkey = confpair[0] + confpair[1]
+            else:
+                dictkey = confpair[1] + confpair[0]
+                
+            if dictkey in done_pairs:
+                # Already done, continue
+                continue
+                
+            pair_idx = self.confpairs.index(confpair)
+            
+            self.conflog.log(
+                self.unique_conf_dict[dictkey][0],
+                confpair[0],
+                confpair[1],
+                bs.traf.lat[idx1],
+                bs.traf.lon[idx1],
+                bs.traf.alt[idx1],
+                self.dist_to_int[pair_idx][0],
+                self.vel_rel_int[pair_idx][0],
+                self.num_turns[pair_idx][0],
+                self.mean_turn_angle[pair_idx][0],
+                bs.traf.lat[idx2],
+                bs.traf.lon[idx2],
+                bs.traf.alt[idx2],
+                self.dist_to_int[pair_idx][1],
+                self.vel_rel_int[pair_idx][1],
+                self.num_turns[pair_idx][1],
+                self.mean_turn_angle[pair_idx][1]
+            )
+            
+        # Now check the new LOS
+        done_pairs = []
+        for lospair in lospairs_new:
+            # Set the los flag of these in the unique dict tracker
+            idx1 = bs.traf.id.index(lospair[0])
+            idx2 = bs.traf.id.index(lospair[1])
+            if idx1 < idx2:
+                dictkey = lospair[0] + lospair[1]
+            else:
+                dictkey = lospair[1] + lospair[0]
+                
+            if dictkey in done_pairs:
+                # Already done, continue
+                continue
+            
+            done_pairs.append(dictkey)
+                
+            # Set the bool as true
+            if dictkey in self.unique_conf_dict:
+                self.unique_conf_dict[dictkey][1] = True
+            else:
+                # This LOS was not detected, but it is usually because of weird geometry
+                #print(dictkey)
+                continue
+                
+            
+        # Now handle aircraft that are no longer in confpairs
+        done_pairs = []
+        for confpair in confpairs_out:
+            # Log these in the uniqueconfloslog
+            if confpair[0] not in bs.traf.id or confpair[1] not in bs.traf.id:
+                # One of these aircraft was deleted, so just log them and done.
+                if confpair[0] + confpair[1] in self.unique_conf_dict:
+                    dictkey = confpair[0] + confpair[1]
+                elif confpair[1] + confpair[0] in self.unique_conf_dict:
+                    dictkey = confpair[1] + confpair[0]
+                else:
+                    # Absolutely no clue, continue I guess
+                    print('huh')
+                    continue
+                
+                self.uniqueconfloslog.log(
+                self.unique_conf_dict[dictkey][0],
+                str(self.unique_conf_dict[dictkey][1])
+                )
+                self.unique_conf_dict.pop(dictkey)
+                continue
+                    
+                
+            idx1 = bs.traf.id.index(confpair[0])
+            idx2 = bs.traf.id.index(confpair[1])
+            
+            if idx1 < idx2:
+                dictkey = confpair[0] + confpair[1]
+            else:
+                dictkey = confpair[1] + confpair[0]
+                
+            if dictkey in done_pairs:
+                # Already done, continue
+                continue
+            
+            done_pairs.append(dictkey)
+            
+            # We want to keep this entry for a few extra seconds and see what happens
+            # Get the conflict info and log it, then delete the entry
+            self.uniqueconfloslog.log(
+                self.unique_conf_dict[dictkey][0],
+                str(self.unique_conf_dict[dictkey][1])
+            )
+            self.unique_conf_dict.pop(dictkey)
+        
+        self.prevconfpairs = set(self.confpairs)
+        self.prevlospairs = set(self.lospairs)
+        
+        
 # Plot set
 # print(f'{bs.traf.id[idx1]} and {bs.traf.id[idx2]}')
 # print(self.ac_leg_positions[idx1], self.ac_leg_positions[idx2])
