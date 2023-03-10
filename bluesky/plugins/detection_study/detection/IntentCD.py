@@ -24,7 +24,7 @@ def init_plugin():
     # Configuration parameters
     config = {
         # The name of your plugin
-        'plugin_name':     'PROJECTIONCD',
+        'plugin_name':     'INTENTCD',
 
         # The type of this plugin. For now, only simulation plugins are possible.
         'plugin_type':     'sim'
@@ -66,7 +66,7 @@ uniqueconflosheader = \
     'Unique CONF ID, ' + \
     'Resulted in LOS\n'
 
-class ProjectionCD(ConflictDetection):
+class IntentCD(ConflictDetection):
     def __init__(self):
         super().__init__()
         # Lookahead parameters
