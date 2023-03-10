@@ -26,7 +26,7 @@ def kwikqdrdist(lata, lona, latb, lonb):
 
 # City we are using
 city = 'Vienna'
-path = f'plugins/scenario_maker/{city}'
+path = f'{city}'
 
 # Path requirements
 min_dist = 1000 # Metres
@@ -144,8 +144,8 @@ def main():
         traceback.print_exc()
     pool.close()
     
-# if __name__ == '__main__':
-#     main()
+if __name__ == '__main__':
+    main()
 
 orig_dest_dict = dict()
 files_that_exist = os.listdir(f'{path}/pickles')

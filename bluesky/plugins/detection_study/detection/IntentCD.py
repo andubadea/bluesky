@@ -2,7 +2,6 @@ import bluesky as bs
 import numpy as np
 import math
 import pyproj
-import pandas as pd
 import matplotlib.pyplot as plt
 
 from shapely.geometry import LineString, Point, MultiLineString, MultiPoint, GeometryCollection
