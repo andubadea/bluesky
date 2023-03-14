@@ -10,21 +10,23 @@ import numpy as np
 import os
 import pickle
 import random
-import pyproj
 
 def init_plugin():
     # Configuration parameters
     config = {
         'plugin_name': 'TRAFFICSPAWNER',
         'plugin_type': 'sim',
+        'reset': reset
     }
     # Put TrafficSpawner in bs.traf
     bs.traf.TrafficSpawner = TrafficSpawner()
     return config
 
+def reset():
+    bs.traf.TrafficSpawner.reset()
+
 class TrafficSpawner(Entity):
     def __init__(self):
-        super().__init__()
         self.target_ntraf = 50
         # Load default city
         self.loadcity('Vienna')
@@ -35,6 +37,10 @@ class TrafficSpawner(Entity):
         self.spd = 20 * kts
         # When to stop simulating
         self.stop_time = 7*24*60*60
+        self.stop_time_enable = True
+        # Number of conflicts when to stop simulating
+        self.stop_conf = 10000
+        self.stop_conf_enable = False
         # Turn ASAS on
         stack.stack('ASAS ON')
         # Set a default seed
@@ -42,7 +48,24 @@ class TrafficSpawner(Entity):
         return
     
     def reset(self):
-        self.__init__()
+        self.target_ntraf = 50
+        # Load default city
+        self.loadcity('Vienna')
+        # Traffic ID increment
+        self.traf_id = 1
+        #default alt and speed
+        self.alt = 100 * ft
+        self.spd = 20 * kts
+        # When to stop simulating
+        self.stop_time = 7*24*60*60
+        self.stop_time_enable = True
+        # Number of conflicts when to stop simulating
+        self.stop_conf = 10000
+        self.stop_conf_enable = False
+        # Turn ASAS on
+        stack.stack('ASAS ON')
+        # Set a default seed
+        stack.stack('SEED 12345')
     
     @command
     def loadcity(self, city = None):
@@ -70,6 +93,15 @@ class TrafficSpawner(Entity):
     def stopsimt(self, time):
         # This will be the time at which we stop and quit.
         self.stop_time = int(time)
+        self.stop_time_enable = True
+        self.stop_conf_enable = False
+        
+    @command
+    def stopconf(self, confno):
+        # This will be the number of conflicts at which we stop and quit.
+        self.stop_conf = int(confno)
+        self.stop_conf_enable = True
+        self.stop_time_enable = False
     
     def load_origins_destinations(self):
         with open(f'{self.path}/orig_dest_dict.pickle', 'rb') as f:
@@ -147,10 +179,12 @@ class TrafficSpawner(Entity):
             for acid in acids_to_delete:
                 stack.stack(f'DEL {acid}')
                 
-        if bs.sim.simt > self.stop_time:
+        if (self.stop_time_enable and bs.sim.simt > self.stop_time) or \
+            (self.stop_conf_enable and len(bs.traf.cd.confpairs_all) > self.stop_conf):
             stack.stack(f'HOLD')
             stack.stack(f'DELETEALL')
-            stack.stack(f'QUIT')
+            stack.stack(f'RESET')
+            
             
     @command
     def deleteall(self):

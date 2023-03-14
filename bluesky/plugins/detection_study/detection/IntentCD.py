@@ -85,19 +85,13 @@ class IntentCD(ConflictDetection):
         self.rough_geometries = []
         self.ac_leg_positions = []
         self.dlookaheads = []
-        
-        self.fo = []
-        
+    
         # Distance buffer for shapely
         self.precision = 0.0001 # metres
         
         # Logging
-        self.conflog = datalog.crelog('CONFLOG', None, confheader)
+        self.conflictlog = datalog.crelog('CONFLICTLOG', None, confheader)
         self.uniqueconfloslog = datalog.crelog('WASLOSLOG', None, uniqueconflosheader)
-        
-        # Start the logs
-        self.conflog.start()
-        self.uniqueconfloslog.start()
         
         # Conflict related
         self.prevconfpairs = set()
@@ -126,8 +120,44 @@ class IntentCD(ConflictDetection):
         self.geom_tree = self.create_index()
         
     def reset(self):
-        self.__init__()
-        super.reset()
+        super().reset()
+        # New detection parameters
+        self.intent_geom = [] # Linestring of aircraft intent per pair
+        self.dist_to_int = [] # Distance to intent intersections per pair
+        self.vel_rel_int = [] # Velocity relative to intent intersection per pair
+        self.num_turns = [] # Number of turns per pair
+        self.mean_turn_angle = [] # Mean turn angle per pair
+        self.qdr_mat = [] # QDR for all aircraft
+        self.dist_mat = [] # Distance for all aircraft
+        self.los_detected = []
+        
+        self.rough_geometries = []
+        self.ac_leg_positions = []
+        self.dlookaheads = []
+        
+        # Conflict related
+        self.prevconfpairs = set()
+        self.prevlospairs = set()
+        self.unique_conf_dict = dict()
+        self.counter2id = dict() # Keep track of the other way around
+        self.unique_conf_id_counter = 0 # Start from 0, go up
+        self.confhold =  [] # array to keep track of the conflicts we are
+        
+        # Get the city centre
+        try:
+            self.city_centre_coords = bs.traf.TrafficSpawner.city_centre_coords
+        except:
+            print('City centre cannot be set, defaulting to Vienna.')
+            self.city_centre_coords = [48.208758, 16.372449]
+            
+        # Get the UTM coordinate system
+        utm_crs = self.convert_wgs_to_utm(*self.city_centre_coords)
+        
+        # Initialise the coordinate transformer
+        self.transform_coords = pyproj.Transformer.from_crs(crs_from=4326, crs_to=utm_crs, always_xy = True)
+        
+        # Initialise the index
+        self.geom_tree = self.create_index()
         return
     
     def clearconfdb(self):
@@ -997,7 +1027,7 @@ class IntentCD(ConflictDetection):
                 
             pair_idx = self.confpairs.index(confpair)
             
-            self.conflog.log(
+            self.conflictlog.log(
                 self.unique_conf_dict[dictkey][0],
                 confpair[0],
                 confpair[1],
@@ -1090,6 +1120,13 @@ class IntentCD(ConflictDetection):
         
         self.prevconfpairs = set(self.confpairs)
         self.prevlospairs = set(self.lospairs)
+        
+    @bs.stack.command
+    def startCDlog(self):
+        # Start the logs
+        self.conflictlog.start()
+        self.uniqueconfloslog.start()
+        
         
         
 # Plot set

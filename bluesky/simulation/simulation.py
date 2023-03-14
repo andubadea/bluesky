@@ -210,8 +210,10 @@ class Simulation:
         # send to server and clear stack
         self.reset()
         try:
+            print('asd1')
             scentime, scencmd = zip(*[tc for tc in simstack.readscn(fname)])
             bs.net.send_event(b'BATCH', (scentime, scencmd))
+            print('asd2')
         except FileNotFoundError:
             return False, f'BATCH: File not found: {fname}'
 
