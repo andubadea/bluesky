@@ -80,7 +80,7 @@ class IntentCD(ConflictDetection):
         self.mean_turn_angle = [] # Mean turn angle per pair
         self.qdr_mat = [] # QDR for all aircraft
         self.dist_mat = [] # Distance for all aircraft
-        self.los_detected = []
+        self.los_detected = [] # If a LOS was detected or not
         
         self.rough_geometries = []
         self.ac_leg_positions = []
@@ -220,8 +220,8 @@ class IntentCD(ConflictDetection):
         for j, pair in enumerate(acidx_int_pairs):
             idx1, idx2 = pair[0], pair[1]
             # We can check if the two aircraft are already in confpairs. If this is the case, then just give the reverse data.
-            if (bs.traf.id[pair[1]], bs.traf.id[pair[0]]) in conf_pairs:
-                pair_id = conf_pairs.index((bs.traf.id[pair[1]], bs.traf.id[pair[0]]))
+            if (bs.traf.id[pair[0]], bs.traf.id[pair[1]]) in conf_pairs:
+                pair_id = conf_pairs.index((bs.traf.id[pair[0]], bs.traf.id[pair[1]]))
                 dist_to_int.append([dist_to_int[pair_id][1], dist_to_int[pair_id][0]])
                 velocity_wrt_int.append([velocity_wrt_int[pair_id][1], velocity_wrt_int[pair_id][0]])
                 num_turns.append([num_turns[pair_id][1], num_turns[pair_id][0]])
@@ -244,6 +244,7 @@ class IntentCD(ConflictDetection):
             if not is_conf:
                 # Check if state-based detects a conflict
                 if pair in confpairs_s:
+                    continue
                     # This is a statebased conflict, we can store normal statebased information
                     # We take the CPA as the intersection point
                     # Distance to intersection is just tcpa times the velocity of the aircraft
