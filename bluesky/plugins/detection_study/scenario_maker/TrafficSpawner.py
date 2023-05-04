@@ -81,6 +81,9 @@ class TrafficSpawner(Entity):
         with open(f'{self.path}/centre.txt', 'r') as f:
             coords = f.readlines()
         self.city_centre_coords = [float(coords[0]), float(coords[1])]
+        bs.stack.stack(f'SCHEDULE 00:00:01 PAN {self.city_centre_coords[0]},{self.city_centre_coords[1]}')
+        bs.stack.stack(f'SCHEDULE 00:00:01 ZOOM 100')
+        bs.stack.stack(f'HOLD')
         return
     
     @command
