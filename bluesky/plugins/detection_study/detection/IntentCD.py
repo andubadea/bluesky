@@ -197,7 +197,7 @@ class IntentCD(ConflictDetection):
         # We want the indices where column 0 is not equal to column 1
         acidx_int_pairs = all_intersections[all_intersections[:, 0] != all_intersections[:, 1]]
         
-        # Get lospairs and inconf bools
+        # Do state-based detection for good measure
         confpairs_s, lospairs, inconf_s, tcpamax_s, qdr_s, \
             dist_s, dcpa_s, tcpa_s, tLOS_s, qdr_mat, dist_mat = \
                 self.sb_detect(ownship, intruder, self.rpz, self.hpz, self.dtlookahead)
@@ -217,11 +217,12 @@ class IntentCD(ConflictDetection):
         mean_turn_angle = []
         intent_geom = []
         
-        for j, pair in enumerate(acidx_int_pairs):
+        for pair in acidx_int_pairs:
             idx1, idx2 = pair[0], pair[1]
             # We can check if the two aircraft are already in confpairs. If this is the case, then just give the reverse data.
             if (bs.traf.id[pair[0]], bs.traf.id[pair[1]]) in conf_pairs:
                 pair_id = conf_pairs.index((bs.traf.id[pair[0]], bs.traf.id[pair[1]]))
+                # Append values
                 dist_to_int.append([dist_to_int[pair_id][1], dist_to_int[pair_id][0]])
                 velocity_wrt_int.append([velocity_wrt_int[pair_id][1], velocity_wrt_int[pair_id][0]])
                 num_turns.append([num_turns[pair_id][1], num_turns[pair_id][0]])
@@ -239,32 +240,9 @@ class IntentCD(ConflictDetection):
             if vel1 < 0 or vel2 < 0:
                 # One of the aircraft is moving away from the intersection point, so this is obviously not
                 # a conflict anymore. 
-                continue    
+                continue 
             
-            if not is_conf:
-                # Check if state-based detects a conflict
-                if pair in confpairs_s:
-                    continue
-                    # This is a statebased conflict, we can store normal statebased information
-                    # We take the CPA as the intersection point
-                    # Distance to intersection is just tcpa times the velocity of the aircraft
-                    dist_to_int.append([tcpa_s[j] * bs.traf.gs[idx1], tcpa_s[j] * bs.traf.gs[idx2]])
-                    # Number of turns is just 0
-                    num_turns[j] = [0,0]
-                    mean_turn_angle[j] = [0,0]
-                    # Append the intent geometry why not
-                    intent_geom.append([intent1, intent2])
-                    # We still set inconf as true
-                    inconf[idx1] = True
-                    inconf[idx2] = True
-                    # We also append the conf_pair
-                    conf_pairs.append((bs.traf.id[pair[0]], bs.traf.id[pair[1]]))
-                    continue
-                else:
-                    # Not a statebased conflict either, skip this pair.
-                    continue
-                
-            else:
+            if is_conf:
                 # If we are here, then there is am intent-based conflict
                 inconf[idx1] = True
                 inconf[idx2] = True
@@ -277,7 +255,7 @@ class IntentCD(ConflictDetection):
                 else:
                     num_turns1, num_turns2, mean_turn_angle1, mean_turn_angle2 = self.turn_info(idx1, idx2, intent1, intent2, dist1, dist2)
 
-                # Check everything manually
+                # Check this conflict graphically
                 # print('---------------------------------------------------------------')
                 # print(f'{bs.traf.id[idx1]} and {bs.traf.id[idx2]}')
                 # print('')
@@ -304,7 +282,7 @@ class IntentCD(ConflictDetection):
                 # ax = plt.gca()
                 # ax.set_aspect('equal', adjustable = 'box')
                 # plt.show(block = True)
-                     
+                        
                 # Assign the values
                 dist_to_int.append([dist1, dist2])
                 velocity_wrt_int.append([vel1, vel2])
@@ -312,6 +290,35 @@ class IntentCD(ConflictDetection):
                 mean_turn_angle.append([mean_turn_angle1, mean_turn_angle2])
                 intent_geom.append([intent1, intent2])
                 conf_pairs.append((bs.traf.id[pair[0]], bs.traf.id[pair[1]]))
+                
+        # Also check the pairs that are in statebased pairs but not in the intersection pairs
+        for j, pair in enumerate(confpairs_s):
+            # First, skip the pair if it's already in confpairs
+            if pair in conf_pairs:
+                # They are going to solve it intent-based
+                continue
+            
+            # If it isn't in confpairs, then check the distance between the intents of the two aircraft
+            idx1 = bs.traf.id.index(pair[0])
+            idx2 = bs.traf.id.index(pair[1])
+            # Get their intent lines
+            intent1 = self.rough_geometries[idx1]
+            intent2 = self.rough_geometries[idx2]
+            
+            # Get the minimum distance between these lines
+            p1,p2 = nearest_points(intent1, intent2) 
+            dist_between_points = ((p1.x-p2.x)**2 + (p1.y-p2.y)**2)**0.5
+            # Skip this conflict if the distance between the intents is greater than rpz
+            if dist_between_points > self.rpz_def:
+                continue
+            else:
+                # The distance is smaller, we can append stuff
+                dist_to_int.append([tcpa_s[j] * bs.traf.gs[idx1], tcpa_s[j] * bs.traf.gs[idx2]])
+                velocity_wrt_int.append([bs.traf.gs[idx1], bs.traf.gs[idx2]])
+                num_turns.append([0,0])
+                mean_turn_angle.append([0,0])
+                intent_geom.append([None, None]) # Intent is none is a sign of state-based conflict for CR
+                conf_pairs.append(pair)
 
         return conf_pairs, lospairs, inconf, dist_to_int,velocity_wrt_int, num_turns, mean_turn_angle, qdr_mat, dist_mat, intent_geom
     

@@ -82,7 +82,7 @@ class TrafficSpawner(Entity):
             coords = f.readlines()
         self.city_centre_coords = [float(coords[0]), float(coords[1])]
         bs.stack.stack(f'SCHEDULE 00:00:01 PAN {self.city_centre_coords[0]},{self.city_centre_coords[1]}')
-        bs.stack.stack(f'SCHEDULE 00:00:01 ZOOM 100')
+        bs.stack.stack(f'SCHEDULE 00:00:01 ZOOM 15')
         bs.stack.stack(f'HOLD')
         return
     
@@ -141,7 +141,7 @@ class TrafficSpawner(Entity):
             achdg, _ = kwikqdrdist(lats[0], lons[0], lats[1], lons[1])
             
             # Let's create the aircraft
-            bs.traf.cre(acid, actype, lats[0], lons[0], achdg, 0, 5)
+            bs.traf.cre(acid, actype, lats[0], lons[0], achdg, self.alt, 5)
             
             # Get more info
             acrte = Route._routes.get(acid)

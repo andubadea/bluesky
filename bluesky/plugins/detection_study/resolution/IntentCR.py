@@ -27,6 +27,7 @@ class IntentCR(ConflictResolution):
         # Some constants
         turn_time  = 3 #seconds
         time_margin = 5 #seconds
+        frnt_tol = 20
         # Get all the values from CD that we would need
         confpairs = conf.confpairs # Pair IDs in conflict
         intent_geom = conf.intent_geom # Linestring of aircraft intent per pair
@@ -44,9 +45,8 @@ class IntentCR(ConflictResolution):
         newalt      = np.copy(ownship.ap.alt)
         newtrack    = np.copy(ownship.ap.trk)
         
-        print(confpairs)
-        
         for pair_idx, pair in enumerate(confpairs):
+            #print(f'--------- {pair} ---------')
             # Get the aircraft IDs
             ownship_id = pair[0]
             intruder_id = pair[1]
@@ -56,20 +56,53 @@ class IntentCR(ConflictResolution):
             intruder_idx = bs.traf.id.index(pair[1])
             
             # We first need to determine what type of conflict this is, as in whether this is a normal
-            # intersection or a back-to-front conflict. As this is non-cooperative, either the aircraft
-            # in the back solves, or the aircraft with a lower priority. Aircraft with lower ACID numbers
-            # have higher priority as they have been flying for longer. 
+            # intersection or a back-to-front conflict or a state-based one. As this is non-cooperative, 
+            # either the aircraft in the back solves, or the aircraft with a lower priority. Aircraft with 
+            # lower ACID numbers have higher priority as they have been flying for longer. 
+            
+            # First, check and handle state-based conflicts
+            if intent_geom[pair_idx][0] is None and intent_geom[pair_idx][1] is None:
+                # This is a state-based conflict, so we need to do some special things
+                # First, check if the intruder is in the front
+                qdr = qdr_mat[ownship_idx, intruder_idx]
+                qdr_intruder = ((qdr - ownship.trk[intruder_idx]) + 180) % 360 - 180
+                intruder_in_front = frnt_tol < qdr_intruder < frnt_tol
+                intruder_in_back = (qdr_intruder < -180 + frnt_tol or 180 - frnt_tol < qdr_intruder)
+                
+                if intruder_in_front:
+                    # Match the speed of the intruder
+                    # First, the speed we want to set is equal to the speed of the intruder
+                    gs_to_set = bs.traf.gs[intruder_idx]
+                    if gs_to_set < bs.traf.gs[ownship_idx]:
+                        # Speed we want to set is smaller, so set it
+                        newgs[ownship_idx] = gs_to_set
+                    # We're done with this pair, just return
+                    #print('Intruder is in front.')
+                    continue
+                elif intruder_in_back:
+                    # We do nothing
+                    continue
+                elif dist_to_int[pair_idx][0] < dist_to_int[pair_idx][1]:
+                    # We slow down
+                    print('Going slow state-based.')
+                    newgs[ownship_idx] = 0
+                    continue
+                else:
+                    # The other aircraft will slow down
+                    continue
+            # Now for the intent based problems.        
             # We can determine whether the ownship is in the back or not from the velocity relative to the
             # intersection. For this, the velocity and distance of the intruder needs to be 0 and veloity of 
             # the ownship is greater than 0.
-            ownship_in_back =  (dist_to_int[pair_idx][0] != 0) and (vel_rel_int[pair_idx][0] != 0) and \
-                               (dist_to_int[pair_idx][1] == 0) and (vel_rel_int[pair_idx][1] == 0)
+            ownship_in_back =  (dist_to_int[pair_idx][0] != 0) and \
+                               (dist_to_int[pair_idx][1] == 0)
                                
-            intruder_in_back = (dist_to_int[pair_idx][1] != 0) and (vel_rel_int[pair_idx][1] != 0) and \
-                               (dist_to_int[pair_idx][0] == 0) and (vel_rel_int[pair_idx][0] == 0)
+            intruder_in_back = (dist_to_int[pair_idx][1] != 0) and \
+                               (dist_to_int[pair_idx][0] == 0) 
             
             if intruder_in_back:
                 # Then we must do nothing, as we have priority
+                #print('Intruder in the back.')
                 continue
                                
             if ownship_in_back:
@@ -83,6 +116,7 @@ class IntentCR(ConflictResolution):
                     # Speed we want to set is smaller, so set it
                     newgs[ownship_idx] = gs_to_set
                 # We're done with this pair, just return
+                #print('Intruder is in front.')
                 continue
                 
             # If we're here, then we must have a classical intersection conflict, and we should solve it
@@ -93,6 +127,7 @@ class IntentCR(ConflictResolution):
             
             if ownship_has_prio:
                 # This aircraft doesn't need to do anything for this intruder as it has priority
+                #print('Intruder has lower priority.')
                 continue
             
             # Okay time to make the ownship slow down by an appropriate amount. For this, we need to
@@ -118,10 +153,13 @@ class IntentCR(ConflictResolution):
             
             # Now, if we get to the intersection faster than 3 seconds, we just continue.
             if time_to_int_intruder - time_to_int_ownship > time_margin:
+                #print('Faster to intersection.')
                 continue
             else:
                 # Let's just wait for the aircraft to pass
+                #print('Going slow.')
                 newgs[ownship_idx] = 0
+                continue
         
         return newtrack, newgs, newvs, newalt
     
