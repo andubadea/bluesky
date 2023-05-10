@@ -6,6 +6,7 @@ from shapely.ops import linemerge
 from multiprocessing import Pool
 import random
 import os
+from os.path import exists
 import tqdm
 
 #Steal kiwkqdrdist function from Bluesky
@@ -92,6 +93,10 @@ def make_route_pickle(inp):
     # Parse input
     orig_node, dest_node = inp
     
+    # Check if file already exists
+    if exists(f'{path}/pickles/{orig_node}-{dest_node}.pkl'):
+        return
+    
     # Compute distance between the two waypoints
     _, dist = kwikqdrdist(G.nodes[orig_node]['y'], G.nodes[orig_node]['x'], 
                     G.nodes[dest_node]['y'], G.nodes[dest_node]['x'])
@@ -160,7 +165,7 @@ def make_route_pickle(inp):
 
 def main():
     print(f'Found {len(nodes_already_added)} spawn points.')
-    with Pool(16) as p:
+    with Pool(8) as p:
         _ = list(tqdm.tqdm(p.imap(make_route_pickle, input_arr), total = len(input_arr)))
         p.close()
     pass
