@@ -16,6 +16,7 @@ nodes['x'] = nodes['geometry'].apply(lambda x: x.x)
 nodes['y'] = nodes['geometry'].apply(lambda x: x.y)
 
 G = ox.graph_from_gdfs(nodes, edges)
-
-# save grapml
-ox.save_graphml(G, 'streets.graphml')
+if nx.is_strongly_connected(G):
+    print(f'Graph is fully connected.')
+    # save grapml
+    ox.save_graphml(G, 'streets.graphml')
