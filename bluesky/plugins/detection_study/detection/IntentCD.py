@@ -202,6 +202,8 @@ class IntentCD(ConflictDetection):
             dist_s, dcpa_s, tcpa_s, tLOS_s, qdr_mat, dist_mat = \
                 self.sb_detect(ownship, intruder, self.rpz, self.hpz, self.dtlookahead)
         self.los_detected = lospairs
+        if self.los_detected:
+            print(self.los_detected)
         inconf = np.array([False]*ownship.ntraf)
         
         if len(acidx_int_pairs) == 0:
@@ -238,8 +240,7 @@ class IntentCD(ConflictDetection):
                 print(f'This is a conflict that statebased detects: {pair}.')
             
             if vel1 < 0 or vel2 < 0:
-                # One of the aircraft is moving away from the intersection point, so this is obviously not
-                # a conflict anymore. 
+                # One aircraft is moving away from the intersection point, so no longer a conflict                                
                 continue 
             
             if is_conf:

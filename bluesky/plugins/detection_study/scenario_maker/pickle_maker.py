@@ -4,6 +4,7 @@ import numpy as np
 import networkx as nx
 from shapely.ops import linemerge
 from multiprocessing import Pool as ThreadPool
+import random
 import traceback
 import os
 
@@ -35,6 +36,29 @@ min_dist = 1000 # Metres
 G = ox.load_graphml(f'{path}/streets.graphml')
 nodes, edges = ox.graph_to_gdfs(G)
 
+# Let's make some origin and destinations from this graph
+nodes_already_added = []
+attempts = 0
+random.seed(0)
+while attempts < 100 and len(nodes_already_added)<100:
+    node = random.choice(list(G.nodes))
+    node_lat = G.nodes[node]['y']
+    node_lon = G.nodes[node]['x']
+    node_too_close = False
+    for existing_node in nodes_already_added:
+        existing_node_lat = G.nodes[existing_node]['y']
+        existing_node_lon = G.nodes[existing_node]['x']
+        _, dist = kwikqdrdist(node_lat, node_lon, existing_node_lat, existing_node_lon)
+        if dist < 300:
+            # Node too close
+            node_too_close = True
+            break
+    if not node_too_close:
+        nodes_already_added.append(node)
+        attempts = 0
+    else:
+        attempts += 1
+print(f'Found {len(nodes_already_added)} spawn points.')
 
 # Load some helper dictionaries to convert node IDs to OSMIDs and back
 with open(f'{path}/id2osm.pickle', 'rb') as f:         
@@ -45,7 +69,7 @@ with open(f'{path}/osm2id.pickle', 'rb') as f:
 
 # Load the spawning points for that city, convert em to simple IDs
 spawn_nodes_osm = np.genfromtxt(f'{path}/spawn_points.txt', dtype = np.int64)
-orig_nodes = [osm2id[x] for x in spawn_nodes_osm]
+orig_nodes = nodes_already_added
 orig_nodes_new = []
 
 # Compile the list of destination nodes
@@ -143,6 +167,7 @@ def main():
         pool.close()
         traceback.print_exc()
     pool.close()
+    pass
     
 if __name__ == '__main__':
     main()

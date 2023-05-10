@@ -115,6 +115,7 @@ class IntentCR(ConflictResolution):
                 if gs_to_set < bs.traf.gs[ownship_idx]:
                     # Speed we want to set is smaller, so set it
                     newgs[ownship_idx] = gs_to_set
+                    
                 # We're done with this pair, just return
                 #print('Intruder is in front.')
                 continue
