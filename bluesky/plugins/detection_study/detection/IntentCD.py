@@ -296,6 +296,8 @@ class IntentCD(ConflictDetection):
         for j, pair in enumerate(confpairs_s):
             # First, skip the pair if it's already in confpairs
             if pair in conf_pairs:
+                if pair[0] == 'D84':
+                    print('Skipped.')
                 # They are going to solve it intent-based
                 continue
             
@@ -309,11 +311,16 @@ class IntentCD(ConflictDetection):
             # Get the minimum distance between these lines
             p1,p2 = nearest_points(intent1, intent2) 
             dist_between_points = ((p1.x-p2.x)**2 + (p1.y-p2.y)**2)**0.5
+            
+            if pair[0] == 'D84':
+                print(f'Dist {dist_between_points}.')
             # Skip this conflict if the distance between the intents is greater than rpz
             if dist_between_points > self.rpz_def:
                 continue
             else:
                 # The distance is smaller, we can append stuff
+                inconf[idx1] = True
+                inconf[idx2] = True
                 dist_to_int.append([tcpa_s[j] * bs.traf.gs[idx1], tcpa_s[j] * bs.traf.gs[idx2]])
                 velocity_wrt_int.append([bs.traf.gs[idx1], bs.traf.gs[idx2]])
                 num_turns.append([0,0])
@@ -701,7 +708,7 @@ class IntentCD(ConflictDetection):
                 intent_turn_idx.append(rte_utm.index(intent_wp))
         
         
-        # If the intex  of this waypoint is smaller or equal to the active waypoint index,
+        # If the index of this waypoint is smaller or equal to the active waypoint index,
         # then there are no turns.
         if not intent_turn_idx:
             return 0, 0
