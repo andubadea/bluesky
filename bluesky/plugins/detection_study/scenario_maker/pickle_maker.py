@@ -3,10 +3,10 @@ import pickle
 import numpy as np
 import networkx as nx
 from shapely.ops import linemerge
-from multiprocessing import Pool as ThreadPool
+from multiprocessing import Pool
 import random
-import traceback
 import os
+import tqdm
 
 #Steal kiwkqdrdist function from Bluesky
 def kwikqdrdist(lata, lona, latb, lonb):
@@ -40,7 +40,7 @@ nodes, edges = ox.graph_to_gdfs(G)
 nodes_already_added = []
 attempts = 0
 random.seed(0)
-while attempts < 100 and len(nodes_already_added)<100:
+while attempts < 100 and len(nodes_already_added)<200:
     node = random.choice(list(G.nodes))
     node_lat = G.nodes[node]['y']
     node_lon = G.nodes[node]['x']
@@ -58,7 +58,6 @@ while attempts < 100 and len(nodes_already_added)<100:
         attempts = 0
     else:
         attempts += 1
-print(f'Found {len(nodes_already_added)} spawn points.')
 
 # Load some helper dictionaries to convert node IDs to OSMIDs and back
 with open(f'{path}/id2osm.pickle', 'rb') as f:         
@@ -160,13 +159,10 @@ def make_route_pickle(inp):
     return route_pickle
 
 def main():
-    pool = ThreadPool(8)
-    try:
-        _ = pool.map(make_route_pickle, input_arr)
-    except:
-        pool.close()
-        traceback.print_exc()
-    pool.close()
+    print(f'Found {len(nodes_already_added)} spawn points.')
+    with Pool(16) as p:
+        _ = list(tqdm.tqdm(p.imap(make_route_pickle, input_arr), total = len(input_arr)))
+        p.close()
     pass
     
 if __name__ == '__main__':
