@@ -124,8 +124,11 @@ class IntentCR(ConflictResolution):
             # If we're here, then we must have a classical intersection conflict, and we should solve it
             # by making the aircraft that has less priority slow down such that the other aircraft
             # has time to clear the intersection.
-            ownship_has_prio = int(''.join(filter(str.isdigit, ownship_id))) < \
-                               int(''.join(filter(str.isdigit, intruder_id)))
+            # ownship_has_prio = int(''.join(filter(str.isdigit, ownship_id))) < \
+            #                    int(''.join(filter(str.isdigit, intruder_id)))
+                               
+            # Different prio: closest to intersection gets priority
+            ownship_has_prio = dist_to_int[pair_idx][0] < dist_to_int[pair_idx][1]
             
             if ownship_has_prio:
                 # This aircraft doesn't need to do anything for this intruder as it has priority
@@ -152,9 +155,6 @@ class IntentCR(ConflictResolution):
             # We might also want to add some time to these for every single turn
             time_to_int_ownship += turn_time * num_turns[pair_idx][0]
             time_to_int_intruder+= turn_time * num_turns[pair_idx][1]
-            
-            if pair[0] == 'D54':
-                print(num_turns[pair_idx])
             
             # Now, if we get to the intersection faster than 3 seconds, we just continue.
             if time_to_int_intruder - time_to_int_ownship > time_margin:

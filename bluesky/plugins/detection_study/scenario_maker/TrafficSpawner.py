@@ -7,6 +7,8 @@ from bluesky.tools.aero import kts, ft
 from bluesky.traffic import Route
 from bluesky.tools.misc import degto180
 import numpy as np
+import geopandas as gpd
+import osmnx as ox
 import os
 import pickle
 import random
@@ -27,9 +29,9 @@ def reset():
 
 class TrafficSpawner(Entity):
     def __init__(self):
-        self.target_ntraf = 50
+        self.target_ntraf = 100
         # Load default city
-        self.loadcity('Vienna')
+        self.graph, self.edges, self.nodes = self.loadcity('Vienna')
         # Traffic ID increment
         self.traf_id = 1
         #default alt and speed
@@ -48,9 +50,9 @@ class TrafficSpawner(Entity):
         return
     
     def reset(self):
-        self.target_ntraf = 50
+        self.target_ntraf = 100
         # Load default city
-        self.loadcity('Vienna')
+        self.graph = self.loadcity('Vienna')
         # Traffic ID increment
         self.traf_id = 1
         #default alt and speed
@@ -81,10 +83,27 @@ class TrafficSpawner(Entity):
         with open(f'{self.path}/centre.txt', 'r') as f:
             coords = f.readlines()
         self.city_centre_coords = [float(coords[0]), float(coords[1])]
+        # Load the graph for the city
+        # read gpkgs that are
+        nodes = gpd.read_file('streets.gpkg', layer='nodes')
+        edges = gpd.read_file('streets.gpkg', layer='edges')
+
+        # set the indices 
+        edges.set_index(['u', 'v', 'key'], inplace=True)
+        nodes.set_index(['osmid'], inplace=True)
+
+        # ensure that it has the correct value
+        nodes['x'] = nodes['geometry'].apply(lambda x: x.x)
+        nodes['y'] = nodes['geometry'].apply(lambda x: x.y)
+
+        G = ox.graph_from_gdfs(nodes, edges)
+        
         bs.stack.stack(f'SCHEDULE 00:00:01 PAN {self.city_centre_coords[0]},{self.city_centre_coords[1]}')
         bs.stack.stack(f'SCHEDULE 00:00:01 ZOOM 15')
+        bs.stack.stack(f'SCHEDULE 00:00:01 CDMETHOD INTENTCD')
+        bs.stack.stack(f'SCHEDULE 00:00:01 RESO INTENTCR')
         bs.stack.stack(f'HOLD')
-        return
+        return G, edges, nodes
     
     @command
     def trafficnumber(self, target_ntraf = 50):
@@ -114,7 +133,8 @@ class TrafficSpawner(Entity):
     @timed_function(dt = 1)
     def spawn_traffic(self):
         '''Function to spawn traffic to maintain a traffic level equal to ntraf.'''
-        while bs.traf.ntraf < self.target_ntraf:
+        attempts = 0
+        while bs.traf.ntraf < self.target_ntraf and attempts < 20:
             # Choose a random origin and destination
             origin = random.choice(list(self.orig_dest_dict.keys()))
             destination = random.choice(self.orig_dest_dict[origin])
@@ -132,7 +152,11 @@ class TrafficSpawner(Entity):
             # Second check, if distance is smaller than rpz * 4?
             if np.any(dist<(bs.settings.asas_pzr*2)):
                 # Try again with another random aircraft
+                attempts += 1
                 continue
+            
+            # We are successful
+            attempts = 0
             
             # Obtain required data for aircraft
             acid = f'D{self.traf_id}'
