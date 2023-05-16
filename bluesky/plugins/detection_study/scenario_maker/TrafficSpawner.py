@@ -29,6 +29,7 @@ def reset():
 
 class TrafficSpawner(Entity):
     def __init__(self):
+        super().__init__()
         self.target_ntraf = 100
         # Load default city
         self.graph, self.edges, self.nodes = self.loadcity('Vienna')
@@ -47,12 +48,20 @@ class TrafficSpawner(Entity):
         stack.stack('ASAS ON')
         # Set a default seed
         stack.stack('SEED 12345')
+        
+        with self.settrafarrays():
+            self.route_edges = []
         return
+    
+    def create(self, n=1):
+        super().create(n)
+        # Store creation time of new aircraft
+        self.route_edges[-n:] = [0]*n # Default edge
     
     def reset(self):
         self.target_ntraf = 100
         # Load default city
-        self.graph = self.loadcity('Vienna')
+        self.graph, self.edges, self.nodes = self.loadcity('Vienna')
         # Traffic ID increment
         self.traf_id = 1
         #default alt and speed
@@ -85,8 +94,8 @@ class TrafficSpawner(Entity):
         self.city_centre_coords = [float(coords[0]), float(coords[1])]
         # Load the graph for the city
         # read gpkgs that are
-        nodes = gpd.read_file('streets.gpkg', layer='nodes')
-        edges = gpd.read_file('streets.gpkg', layer='edges')
+        nodes = gpd.read_file(f'{self.path}/streets.gpkg', layer='nodes')
+        edges = gpd.read_file(f'{self.path}/streets.gpkg', layer='edges')
 
         # set the indices 
         edges.set_index(['u', 'v', 'key'], inplace=True)
@@ -100,8 +109,8 @@ class TrafficSpawner(Entity):
         
         bs.stack.stack(f'SCHEDULE 00:00:01 PAN {self.city_centre_coords[0]},{self.city_centre_coords[1]}')
         bs.stack.stack(f'SCHEDULE 00:00:01 ZOOM 15')
-        bs.stack.stack(f'SCHEDULE 00:00:01 CDMETHOD INTENTCD')
-        bs.stack.stack(f'SCHEDULE 00:00:01 RESO INTENTCR')
+        bs.stack.stack(f'SCHEDULE 00:00:01 CDMETHOD DEFENSIVECD')
+        #bs.stack.stack(f'SCHEDULE 00:00:01 RESO INTENTCR')
         bs.stack.stack(f'HOLD')
         return G, edges, nodes
     
@@ -170,6 +179,9 @@ class TrafficSpawner(Entity):
             # Get more info
             acrte = Route._routes.get(acid)
             acidx = bs.traf.id.index(acid)
+            
+            # Add the edges to this guy
+            self.route_edges[acidx] = edges
             
             # Start adding waypoints
             for lat, lon, turn in zip(lats, lons, turns):
