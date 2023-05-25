@@ -196,8 +196,8 @@ class DefensiveCD(ConflictDetection):
                 self.sb_detect(ownship, intruder, self.rpz, self.hpz, self.dtlookahead)
                 
         self.los_detected = lospairs
-        if self.los_detected:
-            print(self.los_detected)
+        # if self.los_detected:
+        #     print(self.los_detected)
             
         inconf = np.array([False]*ownship.ntraf)
         
@@ -380,48 +380,33 @@ class DefensiveCD(ConflictDetection):
                     inconf[idx1] = True
                     inconf[idx2] = True
                 
-        # # Also check the pairs that are in statebased pairs but not in the intersection pairs
-        # for j, pair in enumerate(confpairs_s):
-        #     # First, skip the pair if it's already in confpairs
-        #     if pair in conf_pairs:
-        #         # They are going to solve it intent-based
-        #         continue
+        # Also check the pairs that are in statebased pairs but not in the intersection pairs
+        for j, pair in enumerate(confpairs_s):
+            # First, skip the pair if it's already in confpairs
+            if pair in conf_pairs:
+                # They are going to solve it defensively
+                continue
             
-        #     # If it isn't in confpairs, then check the distance between the intents of the two aircraft
-        #     idx1 = bs.traf.id.index(pair[0])
-        #     idx2 = bs.traf.id.index(pair[1])
-        #     # Get their intent lines
-        #     intent1 = self.rough_geometries[idx1]
-        #     intent2 = self.rough_geometries[idx2]
+            # Append state-based stuff
+            inconf[idx1] = True
+            inconf[idx2] = True
+            dist_to_int.append([tcpa_s[j] * bs.traf.gs[idx1], tcpa_s[j] * bs.traf.gs[idx2]])
+            velocity_wrt_int.append([bs.traf.gs[idx1], bs.traf.gs[idx2]])
+            num_turns.append([0,0])
+            mean_turn_angle.append([0,0])
+            conf_pairs.append(pair)
+            intent_geom.append(['statebased'])
             
-        #     # Get the minimum distance between these lines
-        #     p1,p2 = nearest_points(intent1, intent2) 
-        #     dist_between_points = ((p1.x-p2.x)**2 + (p1.y-p2.y)**2)**0.5
-            
-        #     if pair[0] == 'D84':
-        #         print(f'Dist {dist_between_points}.')
-        #     # Skip this conflict if the distance between the intents is greater than rpz
-        #     if dist_between_points > self.rpz_def:
-        #         continue
-        #     else:
-        #         # The distance is smaller, we can append stuff
-        #         inconf[idx1] = True
-        #         inconf[idx2] = True
-        #         dist_to_int.append([tcpa_s[j] * bs.traf.gs[idx1], tcpa_s[j] * bs.traf.gs[idx2]])
-        #         velocity_wrt_int.append([bs.traf.gs[idx1], bs.traf.gs[idx2]])
-        #         num_turns.append([0,0])
-        #         mean_turn_angle.append([0,0])
-        #         conf_pairs.append(pair)
-        #         intent_geom.append([None, None])
+        if conf_pairs:
+            print('####################################################')
+        for i, pair in enumerate(conf_pairs):
+            print(f'------------ {pair} ------------')
+            print(dist_to_int[i])
+            print(velocity_wrt_int[i])
+            print(num_turns[i])
+            print(mean_turn_angle[i])
+            print(intent_geom[i])
         
-        # Print some stuff
-        print(conf_pairs)
-        print(dist_to_int)
-        print(velocity_wrt_int)
-        print(num_turns)
-        print(mean_turn_angle)
-        print([(p.x, p.y) if isinstance(p, Point) else p for p in intent_geom])
-
         return conf_pairs, lospairs, inconf, dist_to_int,velocity_wrt_int, num_turns, mean_turn_angle, qdr_mat, dist_mat,intent_geom
     
     def get_current_edges(self):
@@ -514,26 +499,34 @@ class DefensiveCD(ConflictDetection):
             dlookahead2 = max(min(dlookahead2, self.lookahead_max), self.lookahead_min)
             # Get the current node of the ownship and intruder
             ac_edge1 = current_edge[acidx1]
-            ac_node1 = ac_edge1[1]
             ac_edge2 = current_edge[acidx2]
             ac_node2 = ac_edge2[1]
             # Get the future nodes of the ownship
-            # We do this by first finding all nodes it can reach, and then checking the
-            # nodes in the route.
-            #_, nodes_can_be_reached1 = self.get_graph_points_within_distance(ac_node1, dlookahead1)
-            # Get the nodes in its route
-            nodes_in_route1 = [x[1] for x in bs.traf.TrafficSpawner.route_edges[acidx1]]
-            # The nodes to check are the common nodes between these two
-            nodes_to_check_1 = nodes_in_route1 #[node for node in nodes_can_be_reached1 if node in nodes_in_route1]
-            
+            current_wpt_id_1 = bs.traf.ap.route[acidx1].iactwp
+            # Get the nodes in its route within the lookahead distance
+            nodes_to_check_1 = []
+            total_length = 0
+            i = current_wpt_id_1
+            prev_u, prev_v = -999,-999
+            while total_length < dlookahead1:
+                u,v = bs.traf.TrafficSpawner.route_edges[acidx1][i]
+                if u==prev_u and v==prev_v:
+                    # Next waypoint belongs to the same edge, skip
+                    i += 1
+                    continue
+                total_length += bs.traf.TrafficSpawner.edges.loc[(u,v,0), 'length']
+                nodes_to_check_1.append(v)
+                prev_u = u
+                prev_v = v
+                i += 1
+                
             # Now get the nodes for intruder
             _, nodes_can_be_reached2 = self.get_graph_points_within_distance(ac_node2, dlookahead2)
             # Now get the possible conflict nodes, basically the nodes that are common between these two
-            conflict_nodes = [node for node in nodes_to_check_1 if node in nodes_can_be_reached2]
+            conflict_nodes = set([node for node in nodes_to_check_1 if node in nodes_can_be_reached2])
             if conflict_nodes:
                 acidx_int_pairs.append(pair)
-                problem_nodes.append(conflict_nodes)
-                
+                problem_nodes.append(list(conflict_nodes))             
         return acidx_int_pairs, problem_nodes
     
     def get_graph_points_within_distance(self, source_id, lookahead_distance):

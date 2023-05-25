@@ -30,7 +30,7 @@ def reset():
 class TrafficSpawner(Entity):
     def __init__(self):
         super().__init__()
-        self.target_ntraf = 100
+        self.target_ntraf = 50
         # Load default city
         self.graph, self.edges, self.nodes = self.loadcity('Vienna')
         # Traffic ID increment
@@ -59,7 +59,7 @@ class TrafficSpawner(Entity):
         self.route_edges[-n:] = [0]*n # Default edge
     
     def reset(self):
-        self.target_ntraf = 100
+        self.target_ntraf = 50
         # Load default city
         self.graph, self.edges, self.nodes = self.loadcity('Vienna')
         # Traffic ID increment
@@ -109,8 +109,10 @@ class TrafficSpawner(Entity):
         
         bs.stack.stack(f'SCHEDULE 00:00:01 PAN {self.city_centre_coords[0]},{self.city_centre_coords[1]}')
         bs.stack.stack(f'SCHEDULE 00:00:01 ZOOM 15')
-        bs.stack.stack(f'SCHEDULE 00:00:01 CDMETHOD DEFENSIVECD')
-        #bs.stack.stack(f'SCHEDULE 00:00:01 RESO INTENTCR')
+        bs.stack.stack(f'SCHEDULE 00:00:01 CDMETHOD INTENTCD')
+        bs.stack.stack(f'SCHEDULE 00:00:01 RESO INTENTCR')
+        # bs.stack.stack(f'SCHEDULE 00:00:01 CDMETHOD DEFENSIVECD')
+        # bs.stack.stack(f'SCHEDULE 00:00:01 RESO DEFENSIVECR')
         bs.stack.stack(f'HOLD')
         return G, edges, nodes
     
