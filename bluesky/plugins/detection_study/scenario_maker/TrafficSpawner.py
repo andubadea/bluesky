@@ -109,10 +109,10 @@ class TrafficSpawner(Entity):
         
         bs.stack.stack(f'SCHEDULE 00:00:01 PAN {self.city_centre_coords[0]},{self.city_centre_coords[1]}')
         bs.stack.stack(f'SCHEDULE 00:00:01 ZOOM 15')
-        bs.stack.stack(f'SCHEDULE 00:00:01 CDMETHOD INTENTCD')
-        bs.stack.stack(f'SCHEDULE 00:00:01 RESO INTENTCR')
-        # bs.stack.stack(f'SCHEDULE 00:00:01 CDMETHOD DEFENSIVECD')
-        # bs.stack.stack(f'SCHEDULE 00:00:01 RESO DEFENSIVECR')
+        # bs.stack.stack(f'SCHEDULE 00:00:01 CDMETHOD INTENTCD')
+        # bs.stack.stack(f'SCHEDULE 00:00:01 RESO INTENTCR')
+        bs.stack.stack(f'SCHEDULE 00:00:01 CDMETHOD DEFENSIVECD')
+        bs.stack.stack(f'SCHEDULE 00:00:01 RESO DEFENSIVECR')
         bs.stack.stack(f'HOLD')
         return G, edges, nodes
     

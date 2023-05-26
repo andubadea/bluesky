@@ -265,7 +265,7 @@ class DefensiveCD(ConflictDetection):
                     # not a conflict yet
                     continue
                     
-                conf_pairs.append([bs.traf.id[pair[0]], bs.traf.id[pair[1]]])
+                conf_pairs.append((bs.traf.id[pair[0]], bs.traf.id[pair[1]]))
                 dist_to_int.append([dist1, dist2])
                 velocity_wrt_int.append([vel1, vel2])
                  # In back-to-front conflicts these don't matter
@@ -370,7 +370,7 @@ class DefensiveCD(ConflictDetection):
                 
                 if len(dist_to_int)> 0:    
                     # Append the values to the big lists
-                    conf_pairs.append([bs.traf.id[pair[0]], bs.traf.id[pair[1]]])
+                    conf_pairs.append((bs.traf.id[pair[0]], bs.traf.id[pair[1]]))
                     dist_to_int.append(dist_to_int_list)
                     velocity_wrt_int.append([bs.traf.gs[idx1],bs.traf.gs[idx2]])
                     # In back-to-front conflicts these don't matter
@@ -394,18 +394,18 @@ class DefensiveCD(ConflictDetection):
             velocity_wrt_int.append([bs.traf.gs[idx1], bs.traf.gs[idx2]])
             num_turns.append([0,0])
             mean_turn_angle.append([0,0])
-            conf_pairs.append(pair)
+            conf_pairs.append((pair[0], pair[1]))
             intent_geom.append(['statebased'])
             
-        if conf_pairs:
-            print('####################################################')
-        for i, pair in enumerate(conf_pairs):
-            print(f'------------ {pair} ------------')
-            print(dist_to_int[i])
-            print(velocity_wrt_int[i])
-            print(num_turns[i])
-            print(mean_turn_angle[i])
-            print(intent_geom[i])
+        # if conf_pairs:
+        #     print('####################################################')
+        # for i, pair in enumerate(conf_pairs):
+        #     print(f'------------ {pair} ------------')
+        #     print(dist_to_int[i])
+        #     print(velocity_wrt_int[i])
+        #     print(num_turns[i])
+        #     print(mean_turn_angle[i])
+        #     print(intent_geom[i])
         
         return conf_pairs, lospairs, inconf, dist_to_int,velocity_wrt_int, num_turns, mean_turn_angle, qdr_mat, dist_mat,intent_geom
     

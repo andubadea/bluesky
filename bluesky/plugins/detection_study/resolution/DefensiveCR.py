@@ -4,6 +4,7 @@ import copy
 from bluesky.traffic.asas import ConflictResolution
 from bluesky.core import Entity
 from bluesky.tools.aero import kts
+from shapely.geometry import Point
 
 
 def init_plugin():
@@ -61,7 +62,7 @@ class DefensiveCR(ConflictResolution):
             # lower ACID numbers have higher priority as they have been flying for longer. 
             
             # First, check and handle state-based conflicts
-            if intent_geom[pair_idx][0] is None and intent_geom[pair_idx][1] is None:
+            if intent_geom[pair_idx][0] == 'statebased':
                 # This is a state-based conflict, so we need to do some special things
                 # First, check if the intruder is in the front
                 qdr = qdr_mat[ownship_idx, intruder_idx]
@@ -91,80 +92,84 @@ class DefensiveCR(ConflictResolution):
                 else:
                     # The other aircraft will slow down
                     continue
-            # Now for the intent based problems.        
-            # We can determine whether the ownship is in the back or not from the velocity relative to the
-            # intersection. For this, the velocity and distance of the intruder needs to be 0 and veloity of 
-            # the ownship is greater than 0.
-            ownship_in_back =  (dist_to_int[pair_idx][0] != 0) and \
-                               (dist_to_int[pair_idx][1] == 0)
-                               
-            intruder_in_back = (dist_to_int[pair_idx][1] != 0) and \
-                               (dist_to_int[pair_idx][0] == 0) 
-            
-            if intruder_in_back:
-                # Then we must do nothing, as we have priority
-                #print('Intruder in the back.')
-                continue
-                               
-            if ownship_in_back:
-                # This is easy to solve, we just velocity match the aircraft in front.
-                # We might have already changed the speed for this aircraft for other conflicts. So only
-                # change the speed if the one we're about to set is smaller than the one that is already
-                # set.
-                # First, the speed we want to set is equal to the speed of the intruder
-                gs_to_set = bs.traf.gs[intruder_idx]
-                if gs_to_set < bs.traf.gs[ownship_idx]:
-                    # Speed we want to set is smaller, so set it
-                    newgs[ownship_idx] = gs_to_set
+            # Now for the defensive problems.
+            # We basically want to handle each situation one by one, if there are several.
+            for i, pair_intent_geom in enumerate(intent_geom[pair_idx]):
+                # Geometry can be two things: If it's "none", then we have a back-to-front
+                # conflict 
+                if pair_intent_geom is None:
+                    # We have a back to back conflict
+                    # We can determine whether the ownship is in the back or not from the velocity relative to the
+                    # intersection. For this, the velocity and distance of the intruder needs to be 0 and veloity of 
+                    # the ownship is greater than 0.
+                    ownship_in_back =  (dist_to_int[pair_idx][0] != 0) and \
+                                    (dist_to_int[pair_idx][1] == 0)
+                                    
+                    intruder_in_back = (dist_to_int[pair_idx][1] != 0) and \
+                                    (dist_to_int[pair_idx][0] == 0) 
                     
-                # We're done with this pair, just return
-                #print('Intruder is in front.')
-                continue
-                
-            # If we're here, then we must have a classical intersection conflict, and we should solve it
-            # by making the aircraft that has less priority slow down such that the other aircraft
-            # has time to clear the intersection.
-            # ownship_has_prio = int(''.join(filter(str.isdigit, ownship_id))) < \
-            #                    int(''.join(filter(str.isdigit, intruder_id)))
-                               
-            # Different prio: closest to intersection gets priority
-            ownship_has_prio = dist_to_int[pair_idx][0] < dist_to_int[pair_idx][1]
-            
-            if ownship_has_prio:
-                # This aircraft doesn't need to do anything for this intruder as it has priority
-                #print('Intruder has lower priority.')
-                continue
-            
-            # Okay time to make the ownship slow down by an appropriate amount. For this, we need to
-            # take into account how much time does the other aircraft have until it reaches the
-            # intersection point. We will then have to allow them to pass while not exactly coming
-            # to a complete stop. 
-            # First, check if we'll be at the intersection point way faster than the other aircraft
-            if vel_rel_int[pair_idx][0] > 0:
-                time_to_int_ownship = dist_to_int[pair_idx][0] / vel_rel_int[pair_idx][0]
-            else:
-                # Aircraft is standing still, so set a large number for this
-                time_to_int_ownship = 999
-                
-            if vel_rel_int[pair_idx][1] > 0:
-                time_to_int_intruder = dist_to_int[pair_idx][1] / vel_rel_int[pair_idx][1]
-            else:
-                # Aircraft is standing still, so set a large number for this
-                time_to_int_intruder = 999
-            
-            # We might also want to add some time to these for every single turn
-            time_to_int_ownship += turn_time * num_turns[pair_idx][0]
-            time_to_int_intruder+= turn_time * num_turns[pair_idx][1]
-            
-            # Now, if we get to the intersection faster than 3 seconds, we just continue.
-            if time_to_int_intruder - time_to_int_ownship > time_margin:
-                #print('Faster to intersection.')
-                continue
-            else:
-                # Let's just wait for the aircraft to pass
-                #print('Going slow.')
-                newgs[ownship_idx] = 0
-                continue
+                    if intruder_in_back:
+                        # Then we must do nothing, as we have priority
+                        #print('Intruder in the back.')
+                        continue
+                                    
+                    if ownship_in_back:
+                        # This is easy to solve, we just velocity match the aircraft in front.
+                        # We might have already changed the speed for this aircraft for other conflicts. So only
+                        # change the speed if the one we're about to set is smaller than the one that is already
+                        # set.
+                        # First, the speed we want to set is equal to the speed of the intruder
+                        gs_to_set = bs.traf.gs[intruder_idx]
+                        if gs_to_set < bs.traf.gs[ownship_idx]:
+                            # Speed we want to set is smaller, so set it
+                            newgs[ownship_idx] = gs_to_set
+                            
+                        # We're done with this pair, just return
+                        #print('Intruder is in front.')
+                        continue
+                elif isinstance(pair_intent_geom, Point):
+                    # If we're here, then we must have a classical intersection conflict, and we should solve it
+                    # by making the aircraft that has less priority slow down such that the other aircraft
+                    # has time to clear the intersection.
+                                    
+                    # Different prio: closest to intersection gets priority
+                    ownship_has_prio = dist_to_int[pair_idx][0] < dist_to_int[pair_idx][1]
+                    
+                    if ownship_has_prio:
+                        # This aircraft doesn't need to do anything for this intruder as it has priority
+                        #print('Intruder has lower priority.')
+                        continue
+                    
+                    # Okay time to make the ownship slow down by an appropriate amount. For this, we need to
+                    # take into account how much time does the other aircraft have until it reaches the
+                    # intersection point. We will then have to allow them to pass while not exactly coming
+                    # to a complete stop. 
+                    # First, check if we'll be at the intersection point way faster than the other aircraft
+                    if vel_rel_int[pair_idx][0] > 0:
+                        time_to_int_ownship = dist_to_int[pair_idx][0] / vel_rel_int[pair_idx][0]
+                    else:
+                        # Aircraft is standing still, so set a large number for this
+                        time_to_int_ownship = 999
+                        
+                    if vel_rel_int[pair_idx][1] > 0:
+                        time_to_int_intruder = dist_to_int[pair_idx][1] / vel_rel_int[pair_idx][1]
+                    else:
+                        # Aircraft is standing still, so set a large number for this
+                        time_to_int_intruder = 999
+                    
+                    # We might also want to add some time to these for every single turn
+                    time_to_int_ownship += turn_time * num_turns[pair_idx][0]
+                    time_to_int_intruder+= turn_time * num_turns[pair_idx][1]
+                    
+                    # Now, if we get to the intersection faster than 3 seconds, we just continue.
+                    if time_to_int_intruder - time_to_int_ownship > time_margin:
+                        #print('Faster to intersection.')
+                        continue
+                    else:
+                        # Let's just wait for the aircraft to pass
+                        #print('Going slow.')
+                        newgs[ownship_idx] = 0
+                        continue
         
         return newtrack, newgs, newvs, newalt
     
@@ -208,6 +213,7 @@ class DefensiveCR(ConflictResolution):
             their CPA.
         '''
         # Add new conflicts to resopairs and confpairs_all and new losses to lospairs_all
+        print(conf.confpairs)
         self.resopairs.update(conf.confpairs)
 
         # Conflict pairs to be deleted
