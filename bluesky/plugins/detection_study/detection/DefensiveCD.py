@@ -185,15 +185,15 @@ class DefensiveCD(ConflictDetection):
         G = bs.traf.TrafficSpawner.graph
         edges = bs.traf.TrafficSpawner.edges
         nodes = bs.traf.TrafficSpawner.nodes
-        # Get the current edges
-        current_edges = self.get_current_edges()
-        # Get the aircraft that share nodes within their routes
-        acidx_int_pairs, problem_nodes = self.problem_aircraft_and_nodes(current_edges)
-        
         # Do state-based detection for good measure
         confpairs_s, lospairs, inconf_s, tcpamax_s, qdr_s, \
             dist_s, dcpa_s, tcpa_s, tLOS_s, qdr_mat, dist_mat = \
                 self.sb_detect(ownship, intruder, self.rpz, self.hpz, self.dtlookahead)
+        
+        # Get the current edges
+        current_edges = self.get_current_edges()
+        # Get the aircraft that share nodes within their routes
+        acidx_int_pairs, problem_nodes = self.problem_aircraft_and_nodes(current_edges, dist_mat)
                 
         self.los_detected = lospairs
         # if self.los_detected:
@@ -321,7 +321,7 @@ class DefensiveCD(ConflictDetection):
                         # Merge the line
                         intersection = linemerge(intersection)
                         # Take the first point
-                        point_intersection = Point(intersection.coords[0])
+                        point_intersection = Point(intersection.coords.xy[0][0],intersection.coords.xy[0][1])
                     
                     elif isinstance(intersection, Point):
                         #Good then
@@ -338,7 +338,7 @@ class DefensiveCD(ConflictDetection):
                         continue
                         
                     # We have the intersection, we can now compute the distances, turns and stuff to it
-                    if point_intersection:
+                    if not point_intersection.is_empty:
                         # Convert the intents and coordinates to UTM
                         coords_1_utm_lon, coords_1_utm_lat = self.transform_coords.transform(intent_1.coords.xy[0],intent_1.coords.xy[1])
                         coords_2_utm_lon, coords_2_utm_lat = self.transform_coords.transform(intent_2.coords.xy[0],intent_2.coords.xy[1])
@@ -368,7 +368,7 @@ class DefensiveCD(ConflictDetection):
                         # no intersection?, continue to the next node
                         continue
                 
-                if len(dist_to_int)> 0:    
+                if len(dist_to_int)>0 and len(int_geom_list)>0:    
                     # Append the values to the big lists
                     conf_pairs.append((bs.traf.id[pair[0]], bs.traf.id[pair[1]]))
                     dist_to_int.append(dist_to_int_list)
@@ -481,12 +481,12 @@ class DefensiveCD(ConflictDetection):
         avg_angle = np.average(angles) if len(angles) > 0 else 0
         return num_turns, avg_angle
     
-    def problem_aircraft_and_nodes(self, current_edge):
+    def problem_aircraft_and_nodes(self, current_edge, dist_mat):
         '''The point of this function should be to output data such that it can be
         processed in an intent-based manner, but with several intents as possibilities.
         '''
         # Get all the aircraft pairs that are within 300m of each other
-        pairs = np.array(np.where(self.dist_mat<self.lookahead_max)).T
+        pairs = np.array(np.where(dist_mat<self.lookahead_max)).T
         acidx_int_pairs = []
         problem_nodes = []
         for pair in pairs:
@@ -508,7 +508,7 @@ class DefensiveCD(ConflictDetection):
             total_length = 0
             i = current_wpt_id_1
             prev_u, prev_v = -999,-999
-            while total_length < dlookahead1:
+            while total_length < dlookahead1 and i<len(bs.traf.TrafficSpawner.route_edges[acidx1]):
                 u,v = bs.traf.TrafficSpawner.route_edges[acidx1][i]
                 if u==prev_u and v==prev_v:
                     # Next waypoint belongs to the same edge, skip

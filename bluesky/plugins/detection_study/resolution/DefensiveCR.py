@@ -62,6 +62,10 @@ class DefensiveCR(ConflictResolution):
             # lower ACID numbers have higher priority as they have been flying for longer. 
             
             # First, check and handle state-based conflicts
+            # print(f'-------------{pair}---------------')
+            # print(intent_geom)
+            # print(dist_to_int)
+            # print(vel_rel_int)
             if intent_geom[pair_idx][0] == 'statebased':
                 # This is a state-based conflict, so we need to do some special things
                 # First, check if the intruder is in the front
@@ -88,6 +92,7 @@ class DefensiveCR(ConflictResolution):
                 elif intruder_in_front:
                     # We also slow down
                     newgs[ownship_idx] = 0
+                    print(f'Set the speed of {ownship_id} to 0 because of {intruder_id}. Statebased.')
                     continue
                 else:
                     # The other aircraft will slow down
@@ -133,7 +138,7 @@ class DefensiveCR(ConflictResolution):
                     # has time to clear the intersection.
                                     
                     # Different prio: closest to intersection gets priority
-                    ownship_has_prio = dist_to_int[pair_idx][0] < dist_to_int[pair_idx][1]
+                    ownship_has_prio = dist_to_int[pair_idx][i][0] < dist_to_int[pair_idx][i][1]
                     
                     if ownship_has_prio:
                         # This aircraft doesn't need to do anything for this intruder as it has priority
@@ -146,20 +151,20 @@ class DefensiveCR(ConflictResolution):
                     # to a complete stop. 
                     # First, check if we'll be at the intersection point way faster than the other aircraft
                     if vel_rel_int[pair_idx][0] > 0:
-                        time_to_int_ownship = dist_to_int[pair_idx][0] / vel_rel_int[pair_idx][0]
+                        time_to_int_ownship = dist_to_int[pair_idx][i][0] / vel_rel_int[pair_idx][0]
                     else:
                         # Aircraft is standing still, so set a large number for this
                         time_to_int_ownship = 999
                         
                     if vel_rel_int[pair_idx][1] > 0:
-                        time_to_int_intruder = dist_to_int[pair_idx][1] / vel_rel_int[pair_idx][1]
+                        time_to_int_intruder = dist_to_int[pair_idx][i][1] / vel_rel_int[pair_idx][1]
                     else:
                         # Aircraft is standing still, so set a large number for this
                         time_to_int_intruder = 999
                     
                     # We might also want to add some time to these for every single turn
-                    time_to_int_ownship += turn_time * num_turns[pair_idx][0]
-                    time_to_int_intruder+= turn_time * num_turns[pair_idx][1]
+                    time_to_int_ownship += turn_time * num_turns[pair_idx][i][0]
+                    time_to_int_intruder+= turn_time * num_turns[pair_idx][i][1]
                     
                     # Now, if we get to the intersection faster than 3 seconds, we just continue.
                     if time_to_int_intruder - time_to_int_ownship > time_margin:
@@ -169,6 +174,7 @@ class DefensiveCR(ConflictResolution):
                         # Let's just wait for the aircraft to pass
                         #print('Going slow.')
                         newgs[ownship_idx] = 0
+                        print(f'Set the speed of {ownship_id} to 0 because of {intruder_id}.')
                         continue
         
         return newtrack, newgs, newvs, newalt
@@ -213,7 +219,6 @@ class DefensiveCR(ConflictResolution):
             their CPA.
         '''
         # Add new conflicts to resopairs and confpairs_all and new losses to lospairs_all
-        print(conf.confpairs)
         self.resopairs.update(conf.confpairs)
 
         # Conflict pairs to be deleted
