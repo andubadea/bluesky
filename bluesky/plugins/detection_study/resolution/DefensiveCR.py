@@ -26,8 +26,8 @@ def init_plugin():
 class DefensiveCR(ConflictResolution):
     def resolve(self, conf, ownship, intruder):
         # Some constants
-        turn_time  = 3 #seconds
-        time_margin = 5 #seconds
+        turn_time  = 0 #seconds
+        time_margin = 0 #seconds
         frnt_tol = 20
         # Get all the values from CD that we would need
         confpairs = conf.confpairs # Pair IDs in conflict
@@ -47,7 +47,6 @@ class DefensiveCR(ConflictResolution):
         newtrack    = np.copy(ownship.ap.trk)
         
         for pair_idx, pair in enumerate(confpairs):
-            #print(f'--------- {pair} ---------')
             # Get the aircraft IDs
             ownship_id = pair[0]
             intruder_id = pair[1]
@@ -62,10 +61,13 @@ class DefensiveCR(ConflictResolution):
             # lower ACID numbers have higher priority as they have been flying for longer. 
             
             # First, check and handle state-based conflicts
-            # print(f'-------------{pair}---------------')
-            # print(intent_geom)
-            # print(dist_to_int)
-            # print(vel_rel_int)
+            if 'D6' in pair:
+                print(f'-------------{pair}---------------')
+                print(confpairs)
+                print(intent_geom)
+                print(dist_to_int)
+                print(vel_rel_int)
+                print(num_turns)
             if intent_geom[pair_idx][0] == 'statebased':
                 # This is a state-based conflict, so we need to do some special things
                 # First, check if the intruder is in the front
@@ -92,7 +94,6 @@ class DefensiveCR(ConflictResolution):
                 elif intruder_in_front:
                     # We also slow down
                     newgs[ownship_idx] = 0
-                    print(f'Set the speed of {ownship_id} to 0 because of {intruder_id}. Statebased.')
                     continue
                 else:
                     # The other aircraft will slow down
@@ -174,7 +175,7 @@ class DefensiveCR(ConflictResolution):
                         # Let's just wait for the aircraft to pass
                         #print('Going slow.')
                         newgs[ownship_idx] = 0
-                        print(f'Set the speed of {ownship_id} to 0 because of {intruder_id}.')
+                        #print(f'Set the speed of {ownship_id} to 0 because of {intruder_id}.')
                         continue
         
         return newtrack, newgs, newvs, newalt

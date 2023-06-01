@@ -189,6 +189,9 @@ class DefensiveCD(ConflictDetection):
         confpairs_s, lospairs, inconf_s, tcpamax_s, qdr_s, \
             dist_s, dcpa_s, tcpa_s, tLOS_s, qdr_mat, dist_mat = \
                 self.sb_detect(ownship, intruder, self.rpz, self.hpz, self.dtlookahead)
+                
+        if lospairs:
+            print(lospairs)
         
         # Get the current edges
         current_edges = self.get_current_edges()
@@ -218,8 +221,11 @@ class DefensiveCD(ConflictDetection):
         for i, pair in enumerate(acidx_int_pairs):
             # IDX1 is the ownship and IDX2 is the intruder
             idx1, idx2 = pair
+                    
             # Get the problem nodes as well
             pair_nodes = problem_nodes[i]
+            if bs.traf.id[idx1] in ['D6', 'D34']: 
+                print(bs.traf.id[idx1], pair_nodes)
             # Get the lookaheads
             dlookahead1 = bs.traf.gs[idx1] * self.dtlookahead_def
             dlookahead1 = max(min(dlookahead1, self.lookahead_max), self.lookahead_min)
@@ -265,7 +271,7 @@ class DefensiveCD(ConflictDetection):
                     # not a conflict yet
                     continue
                     
-                conf_pairs.append((bs.traf.id[pair[0]], bs.traf.id[pair[1]]))
+                conf_pairs.append((bs.traf.id[idx1], bs.traf.id[idx2]))
                 dist_to_int.append([dist1, dist2])
                 velocity_wrt_int.append([vel1, vel2])
                  # In back-to-front conflicts these don't matter
@@ -287,6 +293,8 @@ class DefensiveCD(ConflictDetection):
                 
                 # We need to loop through the problem nodes
                 for node in pair_nodes:
+                    if node == 2630:
+                        print('CHECKING NODE 2630')
                     # We need to get the path to that node
                     # First, get the previous node, such that we have a complete route
                     prev_node_own = current_edge_1[0]
@@ -315,13 +323,15 @@ class DefensiveCD(ConflictDetection):
                     
                     if intersection.is_empty:
                         # Skip
+                        if node == 2630:
+                            print('INTERSECTION IS EMPTY 2630')
                         continue
                     
                     if isinstance(intersection, MultiLineString):
                         # Merge the line
                         intersection = linemerge(intersection)
                         # Take the first point
-                        point_intersection = Point(intersection.coords.xy[0][0],intersection.coords.xy[0][1])
+                        point_intersection = Point(intersection.coords.xy[0][0],intersection.coords.xy[1][0])
                     
                     elif isinstance(intersection, Point):
                         #Good then
@@ -329,48 +339,51 @@ class DefensiveCD(ConflictDetection):
 
                     elif isinstance(intersection, LineString):
                         # Take first point
-                        point_intersection = Point(intersection.coords.xy[0][0],intersection.coords.xy[0][1])
+                        point_intersection = Point(intersection.coords.xy[0][0],intersection.coords.xy[1][0])
                     
                     else:
                         #uhh, dunno
                         print('asd', intersection)
                         point_intersection = None
                         continue
-                        
-                    # We have the intersection, we can now compute the distances, turns and stuff to it
-                    if not point_intersection.is_empty:
-                        # Convert the intents and coordinates to UTM
-                        coords_1_utm_lon, coords_1_utm_lat = self.transform_coords.transform(intent_1.coords.xy[0],intent_1.coords.xy[1])
-                        coords_2_utm_lon, coords_2_utm_lat = self.transform_coords.transform(intent_2.coords.xy[0],intent_2.coords.xy[1])
-                        intent_1_utm = LineString([*zip(coords_1_utm_lon, coords_1_utm_lat)])
-                        intent_2_utm = LineString([*zip(coords_2_utm_lon, coords_2_utm_lat)])
-                        point_intersection_utm = Point(self.transform_coords.transform(point_intersection.x, point_intersection.y))
-                        
-                        # Get the distance from the current aircraft position to the intersection
-                        dist1 = intent_1_utm.project(point_intersection_utm)
-                        dist2 = intent_2_utm.project(point_intersection_utm)
-                        
-                        # Skip if any of the distances are greater than the lookahead distance
-                        if dist1 > dlookahead1 or dist2 > dlookahead2:
-                            # not a conflict yet
-                            continue
-                        
-                        num_turns1, avg_turn1 = self.get_ac_turn_info(idx1, intent_1)
-                        num_turns2, avg_turn2 = self.get_ac_turn_info(idx1, intent_2)
-                        
-                        # Append things
-                        num_turns_list.append([num_turns1, num_turns2])
-                        dist_to_int_list.append([dist1, dist2])
-                        mean_turn_angle_list.append([avg_turn1, avg_turn2])
-                        int_geom_list.append(point_intersection)
-                        
-                    else:
-                        # no intersection?, continue to the next node
+                    
+                    if node == 2630:
+                        print('INTERSECTION IS: ', point_intersection)
+
+                    # Convert the intents and coordinates to UTM
+                    coords_1_utm_lon, coords_1_utm_lat = self.transform_coords.transform(intent_1.coords.xy[0],intent_1.coords.xy[1])
+                    coords_2_utm_lon, coords_2_utm_lat = self.transform_coords.transform(intent_2.coords.xy[0],intent_2.coords.xy[1])
+                    intent_1_utm = LineString([*zip(coords_1_utm_lon, coords_1_utm_lat)])
+                    intent_2_utm = LineString([*zip(coords_2_utm_lon, coords_2_utm_lat)])
+                    point_intersection_utm = Point(self.transform_coords.transform(point_intersection.x, point_intersection.y))
+                    
+                    # Get the distance from the current aircraft position to the intersection
+                    dist1 = intent_1_utm.project(point_intersection_utm)
+                    dist2 = intent_2_utm.project(point_intersection_utm)
+                    
+                    if node == 2630:
+                        print('DISTANCES AND LOOKAHEADS')
+                        print(dist1, dist2)
+                        print(dlookahead1, dlookahead2)
+                    
+                    # Skip if any of the distances are greater than the lookahead distance
+                    if dist1 > dlookahead1 or dist2 > dlookahead2:
+                        # not a conflict yet
                         continue
+                    
+                    num_turns1, avg_turn1 = self.get_ac_turn_info(idx1, intent_1)
+                    num_turns2, avg_turn2 = self.get_ac_turn_info(idx1, intent_2)
+                    
+                    # Append things
+                    num_turns_list.append([num_turns1, num_turns2])
+                    dist_to_int_list.append([dist1, dist2])
+                    mean_turn_angle_list.append([avg_turn1, avg_turn2])
+                    int_geom_list.append(point_intersection)
+
                 
                 if len(dist_to_int)>0 and len(int_geom_list)>0:    
                     # Append the values to the big lists
-                    conf_pairs.append((bs.traf.id[pair[0]], bs.traf.id[pair[1]]))
+                    conf_pairs.append((bs.traf.id[idx1], bs.traf.id[idx2]))
                     dist_to_int.append(dist_to_int_list)
                     velocity_wrt_int.append([bs.traf.gs[idx1],bs.traf.gs[idx2]])
                     # In back-to-front conflicts these don't matter
