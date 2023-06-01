@@ -224,8 +224,6 @@ class DefensiveCD(ConflictDetection):
                     
             # Get the problem nodes as well
             pair_nodes = problem_nodes[i]
-            if bs.traf.id[idx1] in ['D6', 'D34']: 
-                print(bs.traf.id[idx1], pair_nodes)
             # Get the lookaheads
             dlookahead1 = bs.traf.gs[idx1] * self.dtlookahead_def
             dlookahead1 = max(min(dlookahead1, self.lookahead_max), self.lookahead_min)
@@ -246,8 +244,10 @@ class DefensiveCD(ConflictDetection):
                 coords_1_utm_lon, coords_1_utm_lat = self.transform_coords.transform(acrte_1.wplon, acrte_1.wplat)
                 route_geometry = LineString([*zip(coords_1_utm_lon, coords_1_utm_lat)])
                 # Get the closest locations of these aircraft on the line
-                p1, _ = nearest_points(route_geometry, Point(bs.traf.lon[idx1], bs.traf.lat[idx1]))
-                p2, _ = nearest_points(route_geometry, Point(bs.traf.lon[idx2], bs.traf.lat[idx2]))
+                ac1_lon_utm, ac1_lat_utm = self.transform_coords.transform(bs.traf.lon[idx1], bs.traf.lat[idx1])
+                ac2_lon_utm, ac2_lat_utm = self.transform_coords.transform(bs.traf.lon[idx2], bs.traf.lat[idx2])
+                p1, _ = nearest_points(route_geometry, Point(ac1_lon_utm, ac1_lat_utm))
+                p2, _ = nearest_points(route_geometry, Point(ac2_lon_utm, ac2_lat_utm))
                 
                 distance1 = route_geometry.project(p1)
                 distance2 = route_geometry.project(p2)
@@ -293,8 +293,6 @@ class DefensiveCD(ConflictDetection):
                 
                 # We need to loop through the problem nodes
                 for node in pair_nodes:
-                    if node == 2630:
-                        print('CHECKING NODE 2630')
                     # We need to get the path to that node
                     # First, get the previous node, such that we have a complete route
                     prev_node_own = current_edge_1[0]
@@ -323,8 +321,6 @@ class DefensiveCD(ConflictDetection):
                     
                     if intersection.is_empty:
                         # Skip
-                        if node == 2630:
-                            print('INTERSECTION IS EMPTY 2630')
                         continue
                     
                     if isinstance(intersection, MultiLineString):
@@ -343,12 +339,14 @@ class DefensiveCD(ConflictDetection):
                     
                     else:
                         #uhh, dunno
-                        print('asd', intersection)
+                        print('huh2', intersection)
                         point_intersection = None
                         continue
                     
-                    if node == 2630:
-                        print('INTERSECTION IS: ', point_intersection)
+                    # Check if the point is already in int_geom_list
+                    if point_intersection in int_geom_list:
+                        # We skip this one, it's already in the list
+                        continue
 
                     # Convert the intents and coordinates to UTM
                     coords_1_utm_lon, coords_1_utm_lat = self.transform_coords.transform(intent_1.coords.xy[0],intent_1.coords.xy[1])
@@ -361,18 +359,13 @@ class DefensiveCD(ConflictDetection):
                     dist1 = intent_1_utm.project(point_intersection_utm)
                     dist2 = intent_2_utm.project(point_intersection_utm)
                     
-                    if node == 2630:
-                        print('DISTANCES AND LOOKAHEADS')
-                        print(dist1, dist2)
-                        print(dlookahead1, dlookahead2)
-                    
                     # Skip if any of the distances are greater than the lookahead distance
                     if dist1 > dlookahead1 or dist2 > dlookahead2:
                         # not a conflict yet
                         continue
                     
                     num_turns1, avg_turn1 = self.get_ac_turn_info(idx1, intent_1)
-                    num_turns2, avg_turn2 = self.get_ac_turn_info(idx1, intent_2)
+                    num_turns2, avg_turn2 = self.get_ac_turn_info(idx2, intent_2)
                     
                     # Append things
                     num_turns_list.append([num_turns1, num_turns2])
@@ -381,7 +374,7 @@ class DefensiveCD(ConflictDetection):
                     int_geom_list.append(point_intersection)
 
                 
-                if len(dist_to_int)>0 and len(int_geom_list)>0:    
+                if len(dist_to_int_list)>0 and len(int_geom_list)>0:    
                     # Append the values to the big lists
                     conf_pairs.append((bs.traf.id[idx1], bs.traf.id[idx2]))
                     dist_to_int.append(dist_to_int_list)
@@ -409,16 +402,6 @@ class DefensiveCD(ConflictDetection):
             mean_turn_angle.append([0,0])
             conf_pairs.append((pair[0], pair[1]))
             intent_geom.append(['statebased'])
-            
-        # if conf_pairs:
-        #     print('####################################################')
-        # for i, pair in enumerate(conf_pairs):
-        #     print(f'------------ {pair} ------------')
-        #     print(dist_to_int[i])
-        #     print(velocity_wrt_int[i])
-        #     print(num_turns[i])
-        #     print(mean_turn_angle[i])
-        #     print(intent_geom[i])
         
         return conf_pairs, lospairs, inconf, dist_to_int,velocity_wrt_int, num_turns, mean_turn_angle, qdr_mat, dist_mat,intent_geom
     
@@ -517,10 +500,10 @@ class DefensiveCD(ConflictDetection):
             # Get the future nodes of the ownship
             current_wpt_id_1 = bs.traf.ap.route[acidx1].iactwp
             # Get the nodes in its route within the lookahead distance
-            nodes_to_check_1 = []
             total_length = 0
             i = current_wpt_id_1
-            prev_u, prev_v = -999,-999
+            prev_u, prev_v = current_edge[acidx1]
+            nodes_to_check_1 = [prev_v] # Add the first V by default.
             while total_length < dlookahead1 and i<len(bs.traf.TrafficSpawner.route_edges[acidx1]):
                 u,v = bs.traf.TrafficSpawner.route_edges[acidx1][i]
                 if u==prev_u and v==prev_v:

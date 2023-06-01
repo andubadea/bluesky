@@ -61,13 +61,6 @@ class DefensiveCR(ConflictResolution):
             # lower ACID numbers have higher priority as they have been flying for longer. 
             
             # First, check and handle state-based conflicts
-            if 'D6' in pair:
-                print(f'-------------{pair}---------------')
-                print(confpairs)
-                print(intent_geom)
-                print(dist_to_int)
-                print(vel_rel_int)
-                print(num_turns)
             if intent_geom[pair_idx][0] == 'statebased':
                 # This is a state-based conflict, so we need to do some special things
                 # First, check if the intruder is in the front
