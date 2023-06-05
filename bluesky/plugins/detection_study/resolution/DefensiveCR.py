@@ -148,13 +148,13 @@ class DefensiveCR(ConflictResolution):
                         time_to_int_ownship = dist_to_int[pair_idx][i][0]# / vel_rel_int[pair_idx][0]
                     else:
                         # Aircraft is standing still, so set a large number for this
-                        time_to_int_ownship = 999
+                        time_to_int_ownship = dist_to_int[pair_idx][i][0]
                         
                     if vel_rel_int[pair_idx][1] > 0.1:
                         time_to_int_intruder = dist_to_int[pair_idx][i][1]# / vel_rel_int[pair_idx][1]
                     else:
                         # Aircraft is standing still, so set a large number for this
-                        time_to_int_intruder = 999
+                        time_to_int_intruder = dist_to_int[pair_idx][i][1]
                     
                     # We might also want to add some time to these for every single turn
                     time_to_int_ownship += turn_time * num_turns[pair_idx][i][0]

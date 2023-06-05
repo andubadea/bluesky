@@ -294,15 +294,18 @@ class DefensiveCD(ConflictDetection):
                 # We need to loop through the problem nodes
                 for node in pair_nodes:
                     # We need to get the path to that node
-                    # First, get the previous node, such that we have a complete route
-                    prev_node_own = current_edge_1[0]
-                    prev_node_int = current_edge_2[0]
-                    if prev_node_own == node or prev_node_int == node:
+                    if current_edge_1[0] == node or current_edge_2[0] == node:
                         # We're past the node, skip
                         continue
+                    # First, get the next node, such that we have a complete route
+                    next_node_own = current_edge_1[1]
+                    next_node_int = current_edge_2[1]
                     # Compute the paths to that node for both aircraft
-                    route_path_1 = nx.shortest_path(G, prev_node_own, node)
-                    route_path_2 = nx.shortest_path(G, prev_node_int, node)
+                    route_path_1 = nx.shortest_path(G, next_node_own, node)
+                    route_path_2 = nx.shortest_path(G, next_node_int, node)
+                    # Add the previous node of the aircraft to the route path
+                    route_path_1.insert(0, current_edge_1[0])
+                    route_path_2.insert(0, current_edge_2[0])
                     # Get the geometry
                     geom_path_1 = [edges.loc[(u, v, 0), 'geometry'] for u, v in zip(route_path_1[:-1], route_path_1[1:])]
                     geom_path_2 = [edges.loc[(u, v, 0), 'geometry'] for u, v in zip(route_path_2[:-1], route_path_2[1:])]
@@ -376,8 +379,7 @@ class DefensiveCD(ConflictDetection):
                     dist_to_int_list.append([dist1, dist2])
                     mean_turn_angle_list.append([avg_turn1, avg_turn2])
                     int_geom_list.append(point_intersection)
-
-                
+            
                 if len(dist_to_int_list)>0 and len(int_geom_list)>0:    
                     # Append the values to the big lists
                     conf_pairs.append((bs.traf.id[idx1], bs.traf.id[idx2]))
