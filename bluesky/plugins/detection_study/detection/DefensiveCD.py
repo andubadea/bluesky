@@ -336,6 +336,10 @@ class DefensiveCD(ConflictDetection):
                     elif isinstance(intersection, LineString):
                         # Take first point
                         point_intersection = Point(intersection.coords.xy[0][0],intersection.coords.xy[1][0])
+                        
+                    elif isinstance(intersection, MultiPoint):
+                        #First point I guess
+                        point_intersection = intersection.geoms[0]  
                     
                     else:
                         #uhh, dunno
