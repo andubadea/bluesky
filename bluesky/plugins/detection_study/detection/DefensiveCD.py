@@ -76,6 +76,8 @@ class DefensiveCD(ConflictDetection):
         # New detection parameters
         self.intent_geom = [] # Linestring of aircraft intent per pair
         self.dist_to_int = [] # Distance to intent intersections per pair
+        self.stopping_points = [] # Points at which the aircraft should stop before the intersection per pair
+        self.dist_to_stop = []
         self.vel_rel_int = [] # Velocity relative to intent intersection per pair
         self.num_turns = [] # Number of turns per pair
         self.mean_turn_angle = [] # Mean turn angle per pair
@@ -122,6 +124,8 @@ class DefensiveCD(ConflictDetection):
         # New detection parameters
         self.intent_geom = [] # Linestring of aircraft intent per pair
         self.dist_to_int = [] # Distance to intent intersections per pair
+        self.stopping_points = [] # Points at which the aircraft should stop before the intersection per pair
+        self.dist_to_stop = []
         self.vel_rel_int = [] # Velocity relative to intent intersection per pair
         self.num_turns = [] # Number of turns per pair
         self.mean_turn_angle = [] # Mean turn angle per pair
@@ -161,8 +165,8 @@ class DefensiveCD(ConflictDetection):
     def update(self, ownship, intruder):
         # Detect intersections
         self.confpairs, self.lospairs, self.inconf, self.dist_to_int, self.vel_rel_int, self.num_turns, \
-        self.mean_turn_angle, self.qdr_mat, \
-        self.dist_mat, self.intent_geom = self.detect(ownship, intruder)
+            self.mean_turn_angle, self.qdr_mat, self.dist_mat, self.intent_geom , self.stopping_points, \
+                self.dist_to_stop = self.detect(ownship, intruder)
                 
         # confpairs has conflicts observed from both sides (a, b) and (b, a)
         # confpairs_unique keeps only one of these
@@ -205,7 +209,7 @@ class DefensiveCD(ConflictDetection):
         inconf = np.array([False]*ownship.ntraf)
         
         if len(acidx_int_pairs) == 0:
-            return [], [], inconf, [], [], [], [], qdr_mat, dist_mat, []
+            return [], [], inconf, [], [], [], [], qdr_mat, dist_mat, [], [], []
         
         # For each confpair, we need to get the distance of each aircraft to the intersection,
         # the number of turns until the intersection, and the mean turn angle until the intersection
@@ -216,6 +220,8 @@ class DefensiveCD(ConflictDetection):
         num_turns = []
         mean_turn_angle = []
         intent_geom = []
+        stopping_points = []
+        dist_to_stop = []
         
         # Iterate over the aircraft that have common nodes
         for i, pair in enumerate(acidx_int_pairs):
@@ -278,6 +284,8 @@ class DefensiveCD(ConflictDetection):
                 num_turns.append([0,0])
                 mean_turn_angle.append([0,0])
                 intent_geom.append([None, None])
+                stopping_points.append([None, None])
+                dist_to_stop.append([0,0])
                 inconf[idx1] = True
                 inconf[idx2] = True
                 continue
@@ -290,6 +298,8 @@ class DefensiveCD(ConflictDetection):
                 dist_to_int_list = []
                 mean_turn_angle_list = []
                 int_geom_list = []
+                stopping_points_list = []
+                dist_to_stop_list = []
                 
                 # We need to loop through the problem nodes
                 for node in pair_nodes:
@@ -371,6 +381,26 @@ class DefensiveCD(ConflictDetection):
                         # not a conflict yet
                         continue
                     
+                    # Let's create the stopping points. First, we cut the intents with the intersection point.
+                    intent_1_utm_cut, _ = self.cut_line_with_point(intent_1_utm, point_intersection_utm)
+                    intent_2_utm_cut, _ = self.cut_line_with_point(intent_2_utm, point_intersection_utm)
+                    
+                    # Then, create a buffer around the intersection point
+                    buffer_rpz = point_intersection_utm.buffer(self.rpz_def * 1.1) #10% buffer to the buffer
+                    
+                    # Now, the stopping points are the intersections with the intents
+                    stopping_point_1 = intent_1_utm_cut.intersection(buffer_rpz.exterior)
+                    stopping_point_2 = intent_2_utm_cut.intersection(buffer_rpz.exterior)
+                    
+                    # These might be multipoints. We want to take the point furthest away from the intersection.
+                    if isinstance(stopping_point_1, MultiPoint):
+                        distances_to_points = [intent_1_utm_cut.project(p) for p in stopping_point_1.geoms]
+                        stopping_point_1 = stopping_point_1.geoms[distances_to_points.index(min(distances_to_points))]
+                        
+                    if isinstance(stopping_point_2, MultiPoint):
+                        distances_to_points = [intent_2_utm_cut.project(p) for p in stopping_point_2.geoms]
+                        stopping_point_2 = stopping_point_2.geoms[distances_to_points.index(min(distances_to_points))]
+                    
                     num_turns1, avg_turn1 = self.get_ac_turn_info(idx1, intent_1)
                     num_turns2, avg_turn2 = self.get_ac_turn_info(idx2, intent_2)
                     
@@ -379,6 +409,18 @@ class DefensiveCD(ConflictDetection):
                     dist_to_int_list.append([dist1, dist2])
                     mean_turn_angle_list.append([avg_turn1, avg_turn2])
                     int_geom_list.append(point_intersection)
+                    stopping_points_list.append([stopping_point_1, stopping_point_2])
+                    # Get the distance to stopping points
+                    if stopping_point_1.is_empty:
+                        dist_to_stop_1 = 0
+                    else:
+                        dist_to_stop_1 = intent_1_utm_cut.project(stopping_point_1)
+                        
+                    if stopping_point_2.is_empty:
+                        dist_to_stop_2 = 0
+                    else:
+                        dist_to_stop_2 = intent_2_utm_cut.project(stopping_point_2)
+                    dist_to_stop_list.append([dist_to_stop_1, dist_to_stop_2])
             
                 if len(dist_to_int_list)>0 and len(int_geom_list)>0:    
                     # Append the values to the big lists
@@ -389,6 +431,8 @@ class DefensiveCD(ConflictDetection):
                     num_turns.append(num_turns_list)
                     mean_turn_angle.append(mean_turn_angle_list)
                     intent_geom.append(int_geom_list)
+                    stopping_points.append(stopping_points_list)
+                    dist_to_stop.append(dist_to_stop_list)
                     inconf[idx1] = True
                     inconf[idx2] = True
                 
@@ -408,8 +452,10 @@ class DefensiveCD(ConflictDetection):
             mean_turn_angle.append([0,0])
             conf_pairs.append((pair[0], pair[1]))
             intent_geom.append(['statebased'])
-        
-        return conf_pairs, lospairs, inconf, dist_to_int,velocity_wrt_int, num_turns, mean_turn_angle, qdr_mat, dist_mat,intent_geom
+            stopping_points.append([None, None])
+            dist_to_stop.append([0,0])
+
+        return conf_pairs, lospairs, inconf, dist_to_int, velocity_wrt_int, num_turns, mean_turn_angle, qdr_mat, dist_mat, intent_geom, stopping_points, dist_to_stop
     
     def get_current_edges(self):
         # Get all the edges for all aircraft

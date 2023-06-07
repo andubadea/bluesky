@@ -32,6 +32,8 @@ class DefensiveCR(ConflictResolution):
         # Get all the values from CD that we would need
         confpairs = conf.confpairs # Pair IDs in conflict
         intent_geom = conf.intent_geom # Linestring of aircraft intent per pair
+        stopping_points = conf.stopping_points
+        dist_to_stop = conf.dist_to_stop
         dist_to_int = conf.dist_to_int # Distance to intent intersections per pair
         vel_rel_int = conf.vel_rel_int # Velocity relative to intent intersection per pair
         num_turns = conf.num_turns # Number of turns per pair
@@ -130,6 +132,11 @@ class DefensiveCR(ConflictResolution):
                     # If we're here, then we must have a classical intersection conflict, and we should solve it
                     # by making the aircraft that has less priority slow down such that the other aircraft
                     # has time to clear the intersection.
+                    
+                    # We can set the speed in function of the closest point to stop before the intersection such that
+                    # the RPZ is still enforced. Thus, from the intersection point, we can make a buffer RPZ*1.1 in radius 
+                    # and then intersect that with the current trajectory of the aircraft. Then we can set the speed in function
+                    # of the distance to that point such that the aircraft stops only at that last point. 
                                     
                     # Different prio: closest to intersection gets priority
                     ownship_has_prio = dist_to_int[pair_idx][i][0] < dist_to_int[pair_idx][i][1]
@@ -165,11 +172,19 @@ class DefensiveCR(ConflictResolution):
                         #print('Faster to intersection.')
                         continue
                     else:
-                        # Let's just wait for the aircraft to pass
-                        #print('Going slow.')
-                        newgs[ownship_idx] = 0
-                        #print(f'Set the speed of {ownship_id} to 0 because of {intruder_id}.')
-                        continue
+                        # Let's slow down for the other aircraft to pass.
+                        # If the distance to the stopping point is 0, then we simply stop
+                        distance_to_stopping_point_1 = dist_to_stop[pair_idx][i][0]
+                        
+                        if distance_to_stopping_point_1 < conf.rpz_def / 2:
+                            # Then simply stop
+                            newgs[ownship_idx] = 0
+                            continue
+                        
+                        else:
+                            # Set the speed in function of distance_to_stopping_point
+                            newgs[ownship_idx] = min(newgs[ownship_idx], distance_to_stopping_point_1/conf.rpz_def * 2)
+                            continue
         
         return newtrack, newgs, newvs, newalt
     
