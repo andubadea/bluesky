@@ -385,12 +385,13 @@ class DefensiveCD(ConflictDetection):
                     intent_1_utm_cut, _ = self.cut_line_with_point(intent_1_utm, point_intersection_utm)
                     intent_2_utm_cut, _ = self.cut_line_with_point(intent_2_utm, point_intersection_utm)
                     
-                    # Then, create a buffer around the intersection point
-                    buffer_rpz = point_intersection_utm.buffer(self.rpz_def * 1.1) #10% buffer to the buffer
+                    # Then, create a buffer for each in function of the others' intent
+                    buffer_rpz_1 = intent_1_utm.buffer(self.rpz_def * 1.1) #10% buffer to the buffer
+                    buffer_rpz_2 = intent_2_utm.buffer(self.rpz_def * 1.1)
                     
                     # Now, the stopping points are the intersections with the intents
-                    stopping_point_1 = intent_1_utm_cut.intersection(buffer_rpz.exterior)
-                    stopping_point_2 = intent_2_utm_cut.intersection(buffer_rpz.exterior)
+                    stopping_point_1 = intent_1_utm_cut.intersection(buffer_rpz_2.exterior)
+                    stopping_point_2 = intent_2_utm_cut.intersection(buffer_rpz_1.exterior)
                     
                     # These might be multipoints. We want to take the point furthest away from the intersection.
                     if isinstance(stopping_point_1, MultiPoint):
