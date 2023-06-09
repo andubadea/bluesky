@@ -22,6 +22,7 @@ def init_plugin():
 
     return config
 
+#TODO: Vertical
 
 class DefensiveCR(ConflictResolution):
     def __init__(self):
