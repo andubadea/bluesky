@@ -1,3 +1,7 @@
+"""This plugin holds the wind model for each wind simulation.
+At the beginning of a simulation, this plugin generates a wind value and
+direction for each and every edge within the graph, with a set mean and variance.
+"""
 import bluesky as bs
 import numpy as np
 

@@ -2,6 +2,10 @@ import bluesky as bs
 import numpy as np
 
 from bluesky.traffic.asas import ConflictResolution
+from shapely.geometry import LineString, MultiLineString, GeometryCollection
+from bluesky.tools.aero import kts, ft
+from shapely.geometry.polygon import Polygon
+from shapely.affinity import translate
 
 def init_plugin():
     # Configuration parameters
@@ -14,3 +18,326 @@ def init_plugin():
 class M22CR(ConflictResolution):
     def __init__(self):
         super().__init__()
+        self.enable_altitude_CR = False
+        self.cruiselayerdiff = 30 * ft
+        self.frnt_tol = 20 #deg
+        self.dist_tol = 80
+        
+    
+    def resolve(self, conf, ownship, intruder):
+        """Velocity and altitude-only solving.
+        """
+        # Make a copy of traffic data, track and ground speed
+        newgscapped = np.copy(ownship.gs)
+        newalt      = np.copy(ownship.alt)
+        
+        # Iterate over aircraft in conflict
+        for idx1 in np.argwhere(conf.inconf).flatten():
+            # Get the conflict pairs
+            idx_pairs = self.pairs(conf, ownship, intruder, idx1)
+            # Find the new speed and altitude for this aircraft
+            gs_new, alt_new = self.M22CR(conf, ownship, intruder, idx1, idx_pairs)
+            # Apply these
+            newgscapped[idx1] = gs_new
+            newalt[idx1]      = alt_new  
+            
+        # Apply the autopilot things for VS and track
+        newvs          = ownship.ap.vs
+        newtrack       = ownship.ap.trk
+        
+        return newtrack, newgscapped, newvs, newalt
+    
+    def M22CR(self, conf, ownship, intruder, idx1, idx_pairs):
+        """This function provides a velocity and altitude for the ownship.
+        """
+        # Get the velocity of the ownship
+        v1 = np.array([ownship.gseast[idx1], ownship.gsnorth[idx1]])# [m/s]
+        # Get the distance to other aircraft
+        dist2others = conf.dist_mat[idx1]
+        # Get the lookahead time
+        t = bs.settings.asas_dtlookahead
+        # Get the separation distance
+        self.hpz = conf.hpz[idx1]
+        
+        # For each intruder, we want to collect all the information and then make a decision based on all.
+        # Initialise per-intruder variables
+        n_intr = len(idx_pairs)
+        recd_speed= [ownship.ap.tas[idx1]] * n_intr # Speed in metres, None means maintain current speed
+        should_hold_altitude = [None] * n_intr #True if hold otherwise False, None means indifferent
+        should_ascend = [None] * n_intr # True or False, None means indifferent
+        should_descend = [None] * n_intr #True or False, None means indifferent
+        los_list = [False] * n_intr
+        
+        # Iterate over all intruders
+        for i, idx_pair in enumerate(idx_pairs):
+            # Get the index of the intruder
+            idx2 = intruder.id.index(conf.confpairs[idx_pair][1])
+            # Get the velocity of the intruder
+            v2 = np.array([intruder.gseast[idx2], intruder.gsnorth[idx2]])
+            # Extract conflict bearing and distance information
+            qdr = conf.qdr[idx_pair]
+            dist= conf.dist[idx_pair]
+            # Find the bearing of the intruder with respect to where we are heading
+            qdr_intruder = ((qdr - ownship.trk[idx1]) + 180) % 360 - 180  
+            qdr_difference = ((qdr - ownship.trk[idx2]) + 180) % 360 - 180
+            # Check whether the intruder is in front or in the back
+            intr_in_front = (-self.frnt_tol < qdr_intruder < self.frnt_tol)
+            intr_in_back = (qdr_intruder < -180 + self.frnt_tol or 180 - self.frnt_tol < qdr_intruder)
+            intr_aligned = intr_in_front and -self.frnt_tol < qdr_difference < self.frnt_tol
+            # Determine if intruder is close in altitude:
+            alt_ok = ((abs(ownship.alt[idx1] - intruder.alt[idx2])) > self.hpz)
+            # Determine if we have a LOS
+            los = (dist <= self.rpz)
+            # Determine if intruder is right above or below
+            above = ((ownship.alt[idx1] - intruder.alt[idx2]) < 0)
+            below = ((ownship.alt[idx1] - intruder.alt[idx2]) > 0)
+            # Does the priority check out? If true, then ownship has greater priority
+            own_has_priority = self.check_prio(ownship, intruder, idx1, idx2)
+            
+            # First of all, if we have a loss of separation
+            if los:
+                # Aircraft are either in a true LOS or just on top of each other. 
+                # For both, we do the same thing: kill their vs, make lower priority one to go slow
+                if own_has_priority:
+                    # We have priority, we do something
+                    should_hold_altitude[i] = True
+                    should_ascend[i] = False
+                    should_descend[i] = False
+                    continue
+                else:
+                    # We don't have priority, we go slow.
+                    recd_speed[i] = 5*kts
+                    should_hold_altitude[i] = True
+                    should_ascend[i] = False
+                    should_descend[i] = False
+                    continue
+            elif intr_in_front:
+                # Intruder is in front. If they are also aligned with us and a bit too close, we slow down to create distance.
+                if dist < self.dist_tol and intr_aligned:
+                    recd_speed[i] = max(3*kts, bs.traf.gs[idx2] - (self.dist_tol-dist)/10)
+                elif dist > self.dist_tol and intr_aligned:
+                    # In this case, we just match the speed, as there is enough distance between em.
+                    recd_speed[i] = bs.traf.gs[idx2]
+                elif dist > self.dist_tol:
+                    # The intruder is in front, not aligned, and this is still a conflict. It is probably performing a manoeuver. 
+                    # Just slow down
+                    recd_speed[i] = 5*kts
+                elif dist < self.dist_tol:
+                    # We're also below the distance tolerance now, stop completely.
+                    recd_speed[i] = 0
+                else:
+                    # Uhh, go slow and hope for the best?
+                    recd_speed[i] = 5*kts
+                    
+                if self.enable_altitude_CR:
+                    # We can potentially perform an overtake manoeuver. Check if we can ascend.
+                    can_ascend, _ = self.ac_above_below_check(conf, ownship, intruder, idx1, dist2others)
+                    
+                    if can_ascend:
+                        should_hold_altitude[i] = False
+                        should_ascend[i] = True
+                        should_descend[i] = False
+                        continue
+                    else:
+                        # We only overtake by ascending. maintain altitude.
+                        should_hold_altitude[i] = True
+                        should_ascend[i] = False
+                        should_descend[i] = False
+                        continue
+                else:
+                    # Maintain altitude.
+                    should_hold_altitude[i] = True
+                    should_ascend[i] = False
+                    should_descend[i] = False
+                    continue
+                
+            elif intr_in_back:
+                # We can ignore this  intruder, they're the ones that need to solve.
+                continue
+            
+            else:
+                # We probably just have a normal crossing conflict, let's VO this
+                velocity_obstacle = self.get_VO(conf, ownship, intruder, idx1, idx2)
+                # Get maximum and minimum velocity of ownship
+                vmin = ownship.perf.vmin[idx1]
+                # If we're in a turn, or close to one, the maximum speed is the turn speed
+                if bs.traf.ap.inturn[idx1] or bs.traf.ap.dist2turn[idx1] < 100:
+                    vmax = bs.traf.actwp.nextturnspd[idx1] 
+                else:
+                    vmax = ownship.perf.vmax[idx1]
+                # Create velocity line
+                v_dir = self.normalized(v1)
+                v_line_min = v_dir * vmin
+                v_line_max = v_dir * vmax
+                v_line = LineString([v_line_min, v_line_max])
+                
+                # Get the intersection and process it
+                intersection = velocity_obstacle.intersection(v_line)
+                solutions = []
+                if intersection:
+                    if type(intersection) == LineString:
+                        for velocity in list(intersection.coords):
+                            # Check whether to put velocity "negative" or "positive". 
+                            # Drones can fly backwards.
+                            if np.degrees(self.angle(velocity, v1)) < 1:
+                                solutions.append(self.norm(velocity))
+                            else:
+                                solutions.append(-self.norm(velocity))
+                    elif type(intersection) == MultiLineString or type(intersection) == GeometryCollection:
+                        for line in intersection:
+                            for velocity in list(line.coords):
+                                # Check whether to put velocity "negative" or "positive". 
+                                # Drones can fly backwards.
+                                if np.degrees(self.angle(velocity, v1)) < 1:
+                                    solutions.append(self.norm(velocity))
+                                else:
+                                    solutions.append(-self.norm(velocity))
+                    else:
+                        # Maybe it's a point?
+                        velocity = [intersection.x, intersection.y]
+                        if np.degrees(self.angle(velocity, v1)) < 1:
+                            solutions.append(self.norm(velocity))
+                        else:
+                            solutions.append(-self.norm(velocity))
+                    
+                    # Divide the speeds in negatives and positives
+                    pos_speeds = [spd for spd in solutions if spd >= 0]
+                    neg_speeds = [spd for spd in solutions if spd < 0]
+                    # If there are positive ones, apply the smallest one. Otherwise, apply a negative speed
+                    if pos_speeds:
+                        recd_speed[i] = min(pos_speeds)
+                    elif neg_speeds:
+                        recd_speed[i] = max(neg_speeds)
+                    else:
+                        # Do nothing I guess
+                        recd_speed[i] = bs.traf.gs[idx1]
+                else:
+                    # No intersection, so we can't really do anything
+                    recd_speed[i] = bs.traf.gs[idx1]
+                    
+                # If we do VO solving, don't change altitude
+                should_hold_altitude[i] = True
+                should_ascend[i] = False
+                should_descend[i] = False
+                continue
+            
+    def get_pairs(self, conf, ownship, intruder, idx):
+        '''Returns the indices of conflict pairs that involve aircraft idx
+        '''
+        idx_pairs = np.array([], dtype = int)
+        for idx_pair, pair in enumerate(conf.confpairs):
+            if (ownship.id[idx] == pair[0]):
+                idx_pairs = np.append(idx_pairs, idx_pair)
+        return idx_pairs
+    
+    def check_prio(self, ownship, intruder, idx1, idx2):
+        """Returns true if ownship has priority, and false if it doesn't. 
+        """
+        # The aircraft closest to the intersection point between the headings of the
+        # two aircraft has priority. 
+        pass
+            
+            
+    def ac_above_below_check(self, conf, ownship, intruder, idx1, dist2others):
+        """This function checks if the aircraft can ascend or descend in function of what
+        other aircraft are around it.
+        """
+        can_ascend = True
+        can_descend = True
+        # Get aircraft that are close
+        is_close = np.where(dist2others < self.rpz * 2)[0]
+        # Get the vertical distance for these aircraft
+        vertical_dist = ownship.alt[idx1] - intruder.alt[is_close]
+        # Check if any is smaller than cruise layer difference
+        cruise_diff_ascend = np.logical_and(0 > vertical_dist, vertical_dist > (-self.cruiselayerdiff * 1.1))
+        cruise_diff_descend = np.logical_and(0 < vertical_dist, vertical_dist < (self.cruiselayerdiff * 1.1))
+        # Check also if any is smaller than conf.hpz
+        conf_diff = np.abs(vertical_dist) > conf.hpz[idx1]
+        # Do the or operation on these two
+        dealbreaker_ascend = np.logical_or(cruise_diff_ascend, conf_diff) 
+        dealbreaker_descend = np.logical_or(cruise_diff_descend, conf_diff)
+        
+        # Also check if we're at the bottom or top
+        if self.get_above_cruise_layer == 0 or np.any(dealbreaker_ascend):
+            can_ascend = False
+        if self.get_below_cruise_layer == 0 or np.any(dealbreaker_descend):
+            can_descend = False
+            
+        return can_ascend, can_descend
+    
+    def get_VO(self, conf, ownship, intruder, idx1, idx2):
+        t = conf.dtlookahead[idx1]
+        # Get QDR and DIST of conflict
+        qdr = conf.qdr_mat[idx1, idx2]
+        dist = conf.dist_mat[idx1,idx2]
+        # Get radians qdr
+        qdr_rad = np.radians(qdr)
+        # Get relative position
+        x_rel = np.array([np.sin(qdr_rad)*dist, np.cos(qdr_rad)*dist])
+        # Get the speed of the intruder
+        v2 = np.array([intruder.gseast[idx2], intruder.gsnorth[idx2]])
+        # Get cutoff legs
+        left_leg_circle_point, right_leg_circle_point = self.cutoff_legs(x_rel, self.rpz, t)
+        # Extend cutoff legs
+        right_leg_extended = right_leg_circle_point * t
+        left_leg_extended = left_leg_circle_point * t
+        # Get the final VO
+        final_poly = Polygon([right_leg_extended, (0,0), left_leg_extended])
+        # Translate it by the velocity of the intruder
+        final_poly_translated = translate(final_poly, v2[0], v2[1])
+        # Return
+        return final_poly_translated
+        
+    def cutoff_legs(self, x, r, t):
+        '''Gives the cutoff point of the right leg.'''
+        x = np.array(x)
+        # First get the length of x
+        x_len = self.norm(x)
+        # Find the sine of the angle
+        anglesin = r / x_len
+        # Find the angle itself
+        angle = np.arcsin(anglesin) # Radians
+        
+        # Find the rotation matrices
+        rotmat_left = np.array([[np.cos(angle), -np.sin(angle)],
+                           [np.sin(angle), np.cos(angle)]])
+        
+        rotmat_right = np.array([[np.cos(-angle), -np.sin(-angle)],
+                           [np.sin(-angle), np.cos(-angle)]])
+        
+        # Compute rotated legs
+        left_leg = rotmat_left.dot(x)
+        right_leg = rotmat_right.dot(x)  
+        
+        circ = x/t
+        xc = circ[0]
+        yc = circ[1]
+        xp_r = right_leg[0]
+        yp_r = right_leg[1]
+        xp_l = left_leg[0]
+        yp_l = left_leg[1]
+        
+        b_r = (-2 * xc - 2 * yp_r / xp_r * yc)
+        a_r = 1 + (yp_r / xp_r) ** 2    
+         
+        b_l = (-2 * xc - 2 * yp_l / xp_l * yc)
+        a_l = 1 + (yp_l / xp_l) ** 2    
+        
+        x_r = -b_r / (2 * a_r)
+        x_l = -b_l / (2 * a_l)
+        
+        y_r = yp_r / xp_r * x_r
+        y_l = yp_l / xp_l * x_l 
+        
+        return np.array([x_l, y_l]), np.array([x_r, y_r])
+    
+    def norm_sq(self, x):
+        return np.dot(x, x)
+    
+    def norm(self,x):
+        return np.sqrt(self.norm_sq(x))
+    
+    def normalized(self, x):
+        l = self.norm_sq(x)
+        assert l > 0, (x, l)
+        return x / np.sqrt(l)

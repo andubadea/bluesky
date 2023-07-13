@@ -21,6 +21,7 @@ target/
 
 .DS_Store
 settings.cfg
+settings_CDR.cfg
 *.bak
 # Byte-compiled / optimized / DLL files
 __pycache__/
