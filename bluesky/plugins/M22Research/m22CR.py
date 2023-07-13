@@ -22,6 +22,7 @@ class M22CR(ConflictResolution):
         self.cruiselayerdiff = 30 * ft
         self.frnt_tol = 20 #deg
         self.dist_tol = 80
+        self.rpz = bs.traf.cd.rpz_def
         
     
     def resolve(self, conf, ownship, intruder):
@@ -34,7 +35,7 @@ class M22CR(ConflictResolution):
         # Iterate over aircraft in conflict
         for idx1 in np.argwhere(conf.inconf).flatten():
             # Get the conflict pairs
-            idx_pairs = self.pairs(conf, ownship, intruder, idx1)
+            idx_pairs = self.get_pairs(conf, ownship, intruder, idx1)
             # Find the new speed and altitude for this aircraft
             gs_new, alt_new = self.M22CR(conf, ownship, intruder, idx1, idx_pairs)
             # Apply these
@@ -100,6 +101,7 @@ class M22CR(ConflictResolution):
                 # For both, we do the same thing: kill their vs, make lower priority one to go slow
                 if own_has_priority:
                     # We have priority, we do something
+                    recd_speed[i] = bs.traf.ap.tas[idx1]
                     should_hold_altitude[i] = True
                     should_ascend[i] = False
                     should_descend[i] = False
@@ -221,6 +223,13 @@ class M22CR(ConflictResolution):
                 should_descend[i] = False
                 continue
             
+        # We're done with the for loop, we have some decisions to make.
+        # First of all, the new velocity is the smallest one in the speed list.
+        gs_new = min(recd_speed)
+        # Don't change altitude for now
+        alt_new = bs.traf.alt[idx1]
+        return gs_new, alt_new
+            
     def get_pairs(self, conf, ownship, intruder, idx):
         '''Returns the indices of conflict pairs that involve aircraft idx
         '''
@@ -341,3 +350,9 @@ class M22CR(ConflictResolution):
         l = self.norm_sq(x)
         assert l > 0, (x, l)
         return x / np.sqrt(l)
+    
+    def angle(self, a, b):
+        ''' Find non-directional angle between vector a and b'''
+        unit_a = a / np.linalg.norm(a)
+        unit_b = b / np.linalg.norm(b)
+        return np.arccos(np.clip(np.dot(unit_a, unit_b), -1.0, 1.0))

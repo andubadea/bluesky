@@ -9,7 +9,7 @@ def init_plugin():
     config = {
         'plugin_name': 'M22DELAY',
         'plugin_type': 'sim',
-        'reset': M22Delay.reset
+        #'reset': M22Delay.reset
     }
     return config
 
@@ -17,6 +17,9 @@ class M22Delay(Entity):
     def __init__(self):
         super().__init__()
         self.mean = 0 # Mean delay
+        
+    def reset(self):
+        pass
         
         
     @stack.command

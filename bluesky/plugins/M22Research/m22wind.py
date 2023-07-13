@@ -13,11 +13,14 @@ def init_plugin():
     config = {
         'plugin_name': 'M22WIND',
         'plugin_type': 'sim',
-        'reset': M22Wind.reset
+        #'reset': M22Wind.reset
     }
     return config
 
 class M22Wind(Entity):
     def __init__(self):
         super().__init__()
+        
+    def reset(self):
+        pass
         
