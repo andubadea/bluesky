@@ -95,3 +95,4 @@ ssd.obj
 *-checkpoint.py
 *-checkpoint.ipynb
 .ropeproject/config.py
+.gitignore_global.swp
