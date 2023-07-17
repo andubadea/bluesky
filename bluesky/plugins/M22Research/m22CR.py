@@ -22,7 +22,7 @@ class M22CR(ConflictResolution):
         self.cruiselayerdiff = 30 * ft
         self.frnt_tol = 20 #deg
         self.dist_tol = 80
-        self.rpz = bs.traf.cd.rpz_def
+        self.rpz = bs.traf.cd.rpz_def * 1.2 # For good measure
         self.cruise_spd = 30*kts
         
     
@@ -85,7 +85,7 @@ class M22CR(ConflictResolution):
             # Check whether the intruder is in front or in the back
             intr_in_front = (-self.frnt_tol < qdr_intruder < self.frnt_tol)
             intr_in_back = (qdr_intruder < -180 + self.frnt_tol or 180 - self.frnt_tol < qdr_intruder)
-            intr_aligned = intr_in_front and -self.frnt_tol < qdr_difference < self.frnt_tol
+            intr_front_aligned = intr_in_front and -self.frnt_tol < qdr_difference < self.frnt_tol
             head_on = (abs((np.degrees(self.angle(v1, v2)))) > (180-self.frnt_tol))
             # Determine if intruder is close in altitude:
             alt_ok = ((abs(ownship.alt[idx1] - intruder.alt[idx2])) > self.hpz)
@@ -98,21 +98,19 @@ class M22CR(ConflictResolution):
             if intr_in_back:
                 # Ownship has priority if it is front of the intruder
                 own_has_priority = True
-            elif intr_aligned:
+            elif intr_front_aligned:
                 # Ownship doesn't have priority if intruder is in front.
                 own_has_priority = False
             else:
                 # Determine the priority based on proximity to intersection
                 own_has_priority = self.check_prio(conf, ownship, intruder, idx1, idx2)
+            
             # First of all, if we have a loss of separation
-            if bs.traf.id[idx1] == 'D33':
-                print(own_has_priority)
             if los:
-                print(bs.traf.id[idx1], bs.traf.id[idx2])
                 # Aircraft are either in a true LOS or just on top of each other. 
                 # For both, we do the same thing: kill their vs, make lower priority one to go slow
                 if own_has_priority:
-                    # We have priority, we do something
+                    # We have priority, continue our way
                     recd_speed[i] = self.cruise_spd
                     should_hold_altitude[i] = True
                     should_ascend[i] = False
@@ -128,9 +126,10 @@ class M22CR(ConflictResolution):
                 
             elif intr_in_front:
                 # Intruder is in front. If they are also aligned with us and a bit too close, we slow down to create distance.
-                if dist < self.dist_tol and intr_aligned:
-                    recd_speed[i] = max(3*kts, bs.traf.gs[idx2] - (self.dist_tol-dist)/5)
-                elif dist > self.dist_tol and intr_aligned:
+                if dist < self.dist_tol and intr_front_aligned:
+                    # Woah there slow down
+                    recd_speed[i] = 10*kts
+                elif dist > self.dist_tol and intr_front_aligned:
                     # In this case, we just match the speed, as there is enough distance between em.
                     recd_speed[i] = bs.traf.gs[idx2]
                 elif head_on:
@@ -355,13 +354,10 @@ class M22CR(ConflictResolution):
         qdr_1_wrt_2 = ((conf.qdr_mat[idx2, idx1] - ownship.trk[idx2]) + 180) % 360 - 180
         qdr_2_wrt_1 = ((conf.qdr_mat[idx1, idx2] - ownship.trk[idx1]) + 180) % 360 - 180 
         
-        if bs.traf.id[idx1] == 'D33':
-            print(qdr_1_wrt_2, qdr_2_wrt_1) 
-        
         if abs(qdr_1_wrt_2) < 90 and abs(qdr_2_wrt_1) > 90:
             return True
         
-        if abs(qdr_1_wrt_2) > abs(qdr_2_wrt_1):
+        if abs(qdr_1_wrt_2) < abs(qdr_2_wrt_1):
             # Ownship is closer to physical intersection
             return True
         
@@ -494,3 +490,110 @@ class M22CR(ConflictResolution):
             the conflict resolution algorithm.
         '''
         return np.array([False] * len(self.active))
+    
+    def resumenav(self, conf, ownship, intruder):
+        '''
+            Decide for each aircraft in the conflict list whether the ASAS
+            should be followed or not, based on if the aircraft pairs passed
+            their CPA AND if ownship is a certain distance away from the intruding
+            aircraft.
+        '''
+        # Add new conflicts to resopairs and confpairs_all and new losses to lospairs_all
+        self.resopairs.update(conf.confpairs)
+
+        # Conflict pairs to be deleted
+        delpairs = set()
+        changeactive = dict()
+
+        # Look at all conflicts, also the ones that are solved but CPA is yet to come
+        for conflict in self.resopairs:
+            idx1, idx2 = bs.traf.id2idx(conflict)
+            # If the ownship aircraft is deleted remove its conflict from the list
+            if idx1 < 0:
+                delpairs.add(conflict)
+                continue
+            
+
+            if idx2 >= 0:
+                # Distance vector using flat earth approximation
+                re = 6371000.
+                dist = re * np.array([np.radians(intruder.lon[idx2] - ownship.lon[idx1]) *
+                                      np.cos(0.5 * np.radians(intruder.lat[idx2] +
+                                                              ownship.lat[idx1])),
+                                      np.radians(intruder.lat[idx2] - ownship.lat[idx1])])
+
+                # Relative velocity vector
+                vrel = np.array([intruder.gseast[idx2] - ownship.gseast[idx1],
+                                 intruder.gsnorth[idx2] - ownship.gsnorth[idx1]])
+
+                # Check if conflict is past CPA
+                past_cpa = np.dot(dist, vrel) > 0.0
+
+                # Also check the distance and altitude between the two aircraft.
+                distance = self.norm(dist)
+                # We want enough distance between aircraft
+                dist_ok = (distance > self.rpz * 2) 
+                # We also want enough altitude
+                alt_ok = abs(ownship.alt[idx1]-intruder.alt[idx2]) >= (self.cruiselayerdiff-1)
+                # hor_los:
+                # Aircraft should continue to resolve until there is no horizontal
+                # LOS. This is particularly relevant when vertical resolutions
+                # are used.
+                hdist = np.linalg.norm(dist)
+                hor_los = hdist < conf.rpz[idx1]
+
+                # Bouncing conflicts:
+                # If two aircraft are getting in and out of conflict continously,
+                # then they it is a bouncing conflict. ASAS should stay active until
+                # the bouncing stops.
+                is_bouncing = \
+                    abs(ownship.trk[idx1] - intruder.trk[idx2]) < self.cruiselayerdiff and \
+                    hdist < conf.rpz[idx1] * self.resofach
+                    
+                # Group some checks together
+                # The autopilot is truly ok if both the vertical separation and the speed
+                # it wants to apply are ok
+                # ap_ok = ap_spd_ok and alt_ok 
+                # Navigation is ok if 
+                # - Altitude is ok and vertical speed is 0 OR 
+                # - Distance between the aircraft is ok OR 
+                # - The autopilot is ok AND
+                # - The autopilot vertical speed is ok
+                nav_ok = (alt_ok or dist_ok)
+                conf_ok = (past_cpa and not hor_los and not is_bouncing) or alt_ok
+
+            # Start recovery for ownship if intruder is deleted, or if past CPA
+            # and not in horizontal LOS or a bouncing conflict
+            if idx2 >= 0 and (not (nav_ok and conf_ok)):
+                # Enable ASAS for this aircraft
+                changeactive[idx1] = True
+                # We also need to check if this aircraft needs to be doing a turn, aka, if the
+                # autopilot speed is lower than the CR speed. If it is, then we need to update
+                # the speed to that value. Thus, either the conflict is still ok and CD won't be
+                # triggered again, or a new conflict will be triggered and CR will take over again.
+                if self.tas[idx1] > bs.traf.ap.tas[idx1]:
+                    self.tas[idx1] = bs.traf.ap.tas[idx1]
+                
+            else:
+                # Switch ASAS off for ownship if there are no other conflicts
+                # that this aircraft is involved in.
+                changeactive[idx1] = changeactive.get(idx1, False)
+                # If conflict is solved, remove it from the resopairs list
+                delpairs.add(conflict)
+                    
+        for idx, active in changeactive.items():
+            # Loop a second time: this is to avoid that ASAS resolution is
+            # turned off for an aircraft that is involved simultaneously in
+            # multiple conflicts, where the first, but not all conflicts are
+            # resolved.
+            self.active[idx] = active
+            if not active:
+                # Waypoint recovery after conflict: Find the next active waypoint
+                # and send the aircraft to that waypoint.
+                iwpid = bs.traf.ap.route[idx].iactwp
+                if iwpid != -1:  # To avoid problems if there are no waypoints
+                    bs.traf.ap.route[idx].direct(
+                        idx, bs.traf.ap.route[idx].wpname[iwpid])
+
+        # Remove pairs from the list that are past CPA or have deleted aircraft
+        self.resopairs -= delpairs
