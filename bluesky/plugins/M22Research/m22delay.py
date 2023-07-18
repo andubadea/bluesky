@@ -63,7 +63,7 @@ class M22Delay(Entity):
             acidx = bs.traf.id.index(acid)
             ## Add route
             # Extract the street number info
-            bs.traf.TrafficHandler.street_number[acidx] = wpt_data[:,6]
+            bs.traf.TrafficHandler.street_numbers[acidx] = wpt_data[:,6]
             # Get rid of the street info, we will keep that in traffic handler
             wpt_data_stripped = wpt_data[:,0:6].flatten
             # Now add the waypoints for this aircraft
@@ -102,7 +102,7 @@ class M22Delay(Entity):
             acidx = bs.traf.id.index(acid)
             ## Add route
             # Extract the street number info
-            bs.traf.TrafficHandler.street_number[acidx] = wpt_data[:,6]
+            bs.traf.TrafficHandler.street_numbers[acidx] = wpt_data[:,6]
             # Get rid of the street info, we will keep that in traffic handler
             wpt_data_stripped = wpt_data[:,0:6].flatten
             # Now add the waypoints for this aircraft

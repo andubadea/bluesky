@@ -25,7 +25,7 @@ class TrafficHandler(Entity):
         
         with self.settrafarrays():
             self.allocated_alt = []
-            self.street_number = []
+            self.street_numbers = []
             
     def create(self, n=1):
         super().create(n)
