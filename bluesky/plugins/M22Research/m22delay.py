@@ -17,6 +17,7 @@ class M22Delay(Entity):
     def __init__(self):
         super().__init__()
         self.mean = 0 # Mean delay
+        self.delay_probability = 0 # probability of delay
         
     def reset(self):
         pass

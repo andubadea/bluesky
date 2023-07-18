@@ -13,7 +13,7 @@ def init_plugin():
         'plugin_type': 'sim'
     }
     # Put TrafficSpawner in bs.traf
-    bs.traf.TrafficSpawner = TrafficHandler()
+    bs.traf.TrafficHandler = TrafficHandler()
     return config
 
 class TrafficHandler(Entity):
@@ -22,6 +22,14 @@ class TrafficHandler(Entity):
         # When to stop simulating
         self.stop_time = 2*60*60 #seconds
         self.stop_time_enable = True
+        
+        with self.settrafarrays():
+            self.allocated_alt = []
+            
+    def create(self, n=1):
+        super().create(n)
+        # Save the starting altitude
+        self.allocated_alt[-n:] = bs.traf.alt[-n:]
 
     @timed_function(dt = 0.5)
     def delete_aircraft(self):

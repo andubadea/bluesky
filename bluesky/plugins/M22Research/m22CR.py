@@ -18,7 +18,7 @@ def init_plugin():
 class M22CR(ConflictResolution):
     def __init__(self):
         super().__init__()
-        self.enable_altitude_CR = False
+        self.enable_altitude_CR = True
         self.cruiselayerdiff = 30 * ft
         self.frnt_tol = 20 #deg
         self.dist_tol = 80
@@ -212,18 +212,13 @@ class M22CR(ConflictResolution):
                     else:
                         # No intersection, so we can't really do anything
                         recd_speed[i] = bs.traf.ap.tas[idx1]
-                        
-                    # If we do VO solving, don't change altitude
-                    should_hold_altitude[i] = True
-                    should_ascend[i] = False
-                    should_descend[i] = False
-                    continue
                     
                 if self.enable_altitude_CR:
                     # We can potentially perform an overtake manoeuver. Check if we can ascend.
                     can_ascend, _ = self.ac_above_below_check(conf, ownship, intruder, idx1, dist2others)
                     
-                    if can_ascend:
+                    if can_ascend and not alt_ok:
+                        # Only ascend if we are on the same level
                         should_hold_altitude[i] = False
                         should_ascend[i] = True
                         should_descend[i] = False
@@ -332,9 +327,36 @@ class M22CR(ConflictResolution):
         # We're done with the for loop, we have some decisions to make.
         # First of all, the new velocity is the smallest one in the speed list.
         gs_new = min(min(recd_speed), bs.traf.ap.tas[idx1])
-        # Don't change altitude for now
-        alt_new = bs.traf.alt[idx1]
+        # Let's work on the altitude
+        if np.any(should_hold_altitude):
+            # Hold altitude
+            alt_new = bs.traf.alt[idx1]
+        elif np.any(should_ascend):
+            # We should ascend a layer if we aren't already ascending
+            if abs(bs.traf.vs[idx1]) > 0:
+                # Keep this resolution altitude
+                alt_new = bs.traf.cr.alt[idx1]
+            else:
+                # Go up a layer
+                alt_new = self.get_layer_above(idx1)
+        else:
+            # Maintain altitude
+            alt_new = bs.traf.alt[idx1]
         return gs_new, alt_new
+    
+    def get_layer_above(self, idx):
+        '''Get the layer above the current layer of the aircraft.'''
+        possible_layers = [30,  60,  90, 120, 150, 180, 210, 240, 270, 300, 330, 360, 390,
+                            420, 450, 480]
+        
+        layer_index = possible_layers.index(min(possible_layers, key = lambda x: abs(x-bs.traf.alt[idx]/ft)))
+        if layer_index + 1 < len(possible_layers)-1:
+            # We can hop
+            return possible_layers[layer_index+1] * ft
+        else:
+            # We can't hop
+            return possible_layers[layer_index] * ft
+
             
     def get_pairs(self, conf, ownship, intruder, idx):
         '''Returns the indices of conflict pairs that involve aircraft idx
@@ -382,12 +404,6 @@ class M22CR(ConflictResolution):
         # Do the or operation on these two
         dealbreaker_ascend = np.logical_or(cruise_diff_ascend, conf_diff) 
         dealbreaker_descend = np.logical_or(cruise_diff_descend, conf_diff)
-        
-        # Also check if we're at the bottom or top
-        if self.get_above_cruise_layer == 0 or np.any(dealbreaker_ascend):
-            can_ascend = False
-        if self.get_below_cruise_layer == 0 or np.any(dealbreaker_descend):
-            can_descend = False
             
         return can_ascend, can_descend
     
@@ -534,7 +550,7 @@ class M22CR(ConflictResolution):
                 # We want enough distance between aircraft
                 dist_ok = (distance > self.rpz * 2) 
                 # We also want enough altitude
-                alt_ok = abs(ownship.alt[idx1]-intruder.alt[idx2]) >= (self.cruiselayerdiff-1)
+                alt_ok = abs(ownship.alt[idx1]-intruder.alt[idx2]) >= (2*self.cruiselayerdiff)
                 # hor_los:
                 # Aircraft should continue to resolve until there is no horizontal
                 # LOS. This is particularly relevant when vertical resolutions
@@ -572,6 +588,14 @@ class M22CR(ConflictResolution):
                 # the speed to that value. Thus, either the conflict is still ok and CD won't be
                 # triggered again, or a new conflict will be triggered and CR will take over again.
                 if self.tas[idx1] > bs.traf.ap.tas[idx1]:
+                    self.tas[idx1] = bs.traf.ap.tas[idx1]
+                    
+                # However, if we have priority, we can resume normal operations
+                qdr = bs.traf.cd.qdr_mat[idx1, idx2]
+                qdr_intruder = ((qdr - ownship.trk[idx1]) + 180) % 360 - 180  
+                intr_in_back = (qdr_intruder < -180 + self.frnt_tol or 180 - self.frnt_tol < qdr_intruder)
+                if intr_in_back or self.check_prio(conf, ownship, intruder, idx1, idx2):
+                    # Set the speed to the autopilot one
                     self.tas[idx1] = bs.traf.ap.tas[idx1]
                 
             else:
