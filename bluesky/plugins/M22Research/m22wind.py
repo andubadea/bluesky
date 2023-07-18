@@ -13,9 +13,13 @@ def init_plugin():
     config = {
         'plugin_name': 'M22WIND',
         'plugin_type': 'sim',
-        #'reset': M22Wind.reset
+        'reset': reset
     }
+    bs.traf.m22wind = M22Wind()
     return config
+
+def reset():
+    bs.traf.m22wind.reset()
 
 class M22Wind(Entity):
     def __init__(self):

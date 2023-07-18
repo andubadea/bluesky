@@ -1,6 +1,6 @@
 import bluesky as bs
 from bluesky import stack
-from bluesky.core import Entity, timed_function
+from bluesky.core import Entity
 from bluesky.tools.misc import degto180
 from bluesky.core.simtime import timed_function
 import numpy as np
@@ -25,6 +25,7 @@ class TrafficHandler(Entity):
         
         with self.settrafarrays():
             self.allocated_alt = []
+            self.street_number = []
             
     def create(self, n=1):
         super().create(n)
