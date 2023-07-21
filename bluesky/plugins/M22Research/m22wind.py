@@ -36,17 +36,17 @@ class M22Wind(WindSim):
         self.directions = np.zeros(len(self.streets_gpd))
         # Create the wind
         self.create_wind()
-        # Print the wind to check
-        print(list(zip(self.magnitudes, self.directions, self.streets_bearings)))
         
     @stack.command
-    def setwind(self, magnitude:float, direction:float):
+    def setM22wind(self, magnitude:float, direction:float):
         '''Set the magnitude [m/s] and direction [deg] of the wind.
         The direction is where the wind is blowing towards, i.e., if blowing from West towards
         East, dir needs to be 90 deg.'''
         self.global_mag = magnitude
         self.global_dir = direction
         self.create_wind()
+        # Set the winddim at more than 0
+        self.winddim = 1
 
     def load_steets(self, city):
         '''Load the streets of the city and compute their average bearings.'''      
@@ -133,7 +133,7 @@ class M22Wind(WindSim):
         # Get the active waypoint indices
         iactwps = [route.iactwp for route in bs.traf.ap.route]
         # Now return the street indices on which aircraft is in function of iactwp
-        return [bs.traf.TrafficHandler.street_numbers[i][j] for i,j in enumerate(iactwps)]
+        return [int(bs.traf.TrafficHandler.street_numbers[i][j]) for i,j in enumerate(iactwps)]
         
     
     def getdata(self, lats, lons, alts):
@@ -143,10 +143,10 @@ class M22Wind(WindSim):
         if self.global_mag == 0:
             return np.zeros(len(lats)), np.zeros(len(lats))
         
-        # Exception in case we don't have vectors yet. If we only have one aircraft, wind doesn't
-        # matter anyway
-        if len(lats) == 1 and bs.traf.gs[-1] == 0:
+        if len(lats) == 1:
+            # This getdata is coming from a CRE command, so ignore it
             return 0,0
+    
         # Convert to radians
         hdg = np.deg2rad(bs.traf.hdg)
         # Basically, the absolute value of the wind will be affected for each and every
@@ -154,12 +154,16 @@ class M22Wind(WindSim):
         # This, we first take the wind value for each and every aircraft in function of
         # the street they are on
         street_ids = self.get_street_ids()
+        print('---------------')
+        print(street_ids)
         
         # Now get the magnitudes and directions of the wind. Positive if speed increases, negative if speed decreases.
         gs_windmags = self.magnitudes[street_ids] * self.directions[street_ids]
+        print(gs_windmags)
         
         # Now get the would-be wind-inclusive ground speed magnitudes
         gs_would_be = bs.traf.gs + gs_windmags
+        print(gs_would_be)
         
         # Now project these onto the direction of the aircraft
         gs_would_be_east = gs_would_be * np.sin(hdg)
@@ -172,6 +176,8 @@ class M22Wind(WindSim):
         # The wind to return is just the difference between these
         veast = gs_would_be_east - gseast
         vnorth = gs_would_be_north - gsnorth
+        
+        print(veast, vnorth)
 
         # Aircraft going slow are unaffected
         veast = np.where(bs.traf.gs < 10*kts, 0, veast)

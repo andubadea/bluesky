@@ -6,7 +6,7 @@ from bluesky.tools.geo import kwikdist_matrix
 from bluesky.core import Entity, timed_function
 from bluesky import stack
 from bluesky.traffic import Route
-from bluesky.tools.aero import nm
+from bluesky.tools.aero import nm, kts, ft
 
 def init_plugin():
     # Configuration parameters
@@ -39,7 +39,6 @@ class M22Delay(Entity):
         wpt_data is in the following repeating sequence:
         lat, lon, alt, spd, FLYTURN/FLYBY/FLYOVER, street_number
         """
-        print(acid)
         if len(wpt_data)%6 !=0:
             bs.scr.echo('You missed a waypoint value, arguement number must be a multiple of 6.')
             return
@@ -66,9 +65,9 @@ class M22Delay(Entity):
             acidx = bs.traf.id.index(acid)
             ## Add route
             # Set the default cruise speed, turn speed, and rate
-            bs.traf.ap.route[acidx].cruisespd(acidx, acspd)
-            bs.traf.ap.route[acidx].addwptMode(acidx, 'TURNBANK', 25)
-            bs.traf.ap.route[acidx].addwptMode(acidx, 'TURNRAD', 0.00216)
+            bs.traf.ap.cruisespd[acidx] = acspd
+            bs.traf.ap.route[acidx].addwptMode(acidx, 'TURNBANK', 25*ft)
+            bs.traf.ap.route[acidx].addwptMode(acidx, 'TURNRAD', 0.00216*ft)
             # Extract the street number info
             bs.traf.TrafficHandler.street_numbers[acidx] = wpt_data[:,5]
             # Get rid of the street info, we will keep that in traffic handler
@@ -112,9 +111,9 @@ class M22Delay(Entity):
             acidx = bs.traf.id.index(acid)
             ## Add route
             # Set the default cruise speed, turn speed, and rate
-            bs.traf.ap.route[acidx].cruisespd(acidx, acspd)
-            bs.traf.ap.route[acidx].addwptMode(acidx, 'TURNBANK', 25)
-            bs.traf.ap.route[acidx].addwptMode(acidx, 'TURNRAD', 0.00216)
+            bs.traf.ap.cruisespd[acidx] = acspd
+            bs.traf.ap.route[acidx].addwptMode(acidx, 'TURNBANK', 25*ft)
+            bs.traf.ap.route[acidx].addwptMode(acidx, 'TURNRAD', 0.00216*ft)
             # Extract the street number info
             bs.traf.TrafficHandler.street_numbers[acidx] = wpt_data[:,5]
             # Get rid of the street info, we will keep that in traffic handler

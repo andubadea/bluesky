@@ -256,7 +256,7 @@ class Traffic(Entity):
 
         # Wind
         if self.wind.winddim > 0:
-            applywind         = self.alt[-n:]> 50.*ft
+            applywind         = self.alt[-n:]> 10.*ft
             self.windnorth[-n:], self.windeast[-n:]  = self.wind.getdata(self.lat[-n:], self.lon[-n:], self.alt[-n:])
             self.gsnorth[-n:] = self.gsnorth[-n:] + self.windnorth[-n:]*applywind
             self.gseast[-n:]  = self.gseast[-n:]  + self.windeast[-n:]*applywind
