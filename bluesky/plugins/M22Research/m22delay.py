@@ -5,6 +5,8 @@ import random
 from bluesky.tools.geo import kwikdist_matrix
 from bluesky.core import Entity, timed_function
 from bluesky import stack
+from bluesky.traffic import Route
+from bluesky.tools.aero import nm
 
 def init_plugin():
     # Configuration parameters
@@ -37,11 +39,12 @@ class M22Delay(Entity):
         wpt_data is in the following repeating sequence:
         lat, lon, alt, spd, FLYTURN/FLYBY/FLYOVER, street_number
         """
+        print(acid)
         if len(wpt_data)%6 !=0:
             bs.scr.echo('You missed a waypoint value, arguement number must be a multiple of 6.')
             return
         # Reshape the wp args
-        args = np.reshape(args, (int(len(args)/6), 6))
+        wpt_data = np.reshape(wpt_data, (int(len(wpt_data)/6), 6))
         # First of all, do a delay roll, and see if we delay this aircraft
         delay = 0
         roll = random.random()
@@ -55,19 +58,26 @@ class M22Delay(Entity):
         
         # We want to spawn the aircraft, but we gotta check whether that is possible
         can_spawn_aircraft = self.proximity_check(aclat, aclon, acalt)
-        
+
         if can_spawn_aircraft:
             # Spawn it then
             bs.traf.cre(acid, actype, aclat, aclon, achdg, acalt, acspd)
             # And now get its idx
             acidx = bs.traf.id.index(acid)
             ## Add route
+            # Set the default cruise speed, turn speed, and rate
+            bs.traf.ap.route[acidx].cruisespd(acidx, acspd)
+            bs.traf.ap.route[acidx].addwptMode(acidx, 'TURNBANK', 25)
+            bs.traf.ap.route[acidx].addwptMode(acidx, 'TURNRAD', 0.00216)
             # Extract the street number info
-            bs.traf.TrafficHandler.street_numbers[acidx] = wpt_data[:,6]
+            bs.traf.TrafficHandler.street_numbers[acidx] = wpt_data[:,5]
             # Get rid of the street info, we will keep that in traffic handler
-            wpt_data_stripped = wpt_data[:,0:6].flatten
+            wpt_data_stripped = wpt_data[:,0:5].flatten()
             # Now add the waypoints for this aircraft
-            bs.traf.ap.route[acidx].addwaypoints(acid, wpt_data_stripped)
+            Route.addwaypoints(acidx, *wpt_data_stripped)
+            # Some more commands to get it going
+            bs.traf.ap.setLNAV(acidx, True)
+            bs.traf.ap.setVNAV(acidx, True)
             return
         else:
             # Add it to buffer
@@ -98,15 +108,22 @@ class M22Delay(Entity):
             _, _, _, actype, aclat, aclon, achdg, acalt, acspd, wpt_data = temp[acid]
             # Spawn it then
             bs.traf.cre(acid, actype, aclat, aclon, achdg, acalt, acspd)
-            # And now get its idx
+            # And now get its idx and route
             acidx = bs.traf.id.index(acid)
             ## Add route
+            # Set the default cruise speed, turn speed, and rate
+            bs.traf.ap.route[acidx].cruisespd(acidx, acspd)
+            bs.traf.ap.route[acidx].addwptMode(acidx, 'TURNBANK', 25)
+            bs.traf.ap.route[acidx].addwptMode(acidx, 'TURNRAD', 0.00216)
             # Extract the street number info
-            bs.traf.TrafficHandler.street_numbers[acidx] = wpt_data[:,6]
+            bs.traf.TrafficHandler.street_numbers[acidx] = wpt_data[:,5]
             # Get rid of the street info, we will keep that in traffic handler
-            wpt_data_stripped = wpt_data[:,0:6].flatten
+            wpt_data_stripped = wpt_data[:,0:5].flatten()
             # Now add the waypoints for this aircraft
-            bs.traf.ap.route[acidx].addwaypoints(acid, wpt_data_stripped)
+            Route.addwaypoints(acidx, *wpt_data_stripped)
+            # Some more commands to get it going
+            bs.traf.ap.setLNAV(acidx, True)
+            bs.traf.ap.setVNAV(acidx, True)
             # Remove the aircraft from the dictionary
             self.aircraft_buffer.pop(acid)
             
@@ -118,14 +135,12 @@ class M22Delay(Entity):
         # First of all, get all the aircraft that are within the altitude tolerance.
         ac_close_alt = np.logical_and(acalt - layer_diff < bs.traf.alt, 
                                     bs.traf.alt < acalt + layer_diff)
-        if not ac_close_alt:
-            return True
         
         # Out of the aircraft that are within the altitude layer
         lats = bs.traf.lat[ac_close_alt]
         lons = bs.traf.lon[ac_close_alt]
         
-        dists = kwikdist_matrix(np.array([aclat]), np.array([aclon]), lats, lons)
+        dists = kwikdist_matrix(np.array([aclat]), np.array([aclon]), lats, lons) * nm
         
         dist_not_ok = np.any(dists < bs.traf.cd.rpz_def * 2)
         

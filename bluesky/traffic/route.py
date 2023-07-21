@@ -506,7 +506,7 @@ class Route(Replaceable):
         # Args come in this order: lat, lon, alt, spd, FLYTURN/FLYBY/FLYOVER
         # For flyturn properties, use ADDWPTMODE
         if len(args)%5 !=0:
-            bs.scr.echo('You missed a waypoint value, arguement number must be a multiple of 6.')
+            bs.scr.echo('You missed a waypoint value, arguement number must be a multiple of 5.')
             return
 
         # Get and reset current aircraft route
@@ -1590,7 +1590,6 @@ class Route(Replaceable):
         """Sets the cruise speed of an aircraft in the autopilot. This speed is applied
         after the aircraft exits a turn.
         """
-        
         # First, make sure that the velocity is within the performance limits of the aircraft.
         minspd = bs.traf.perf.vmin[acidx]
         maxspd = bs.traf.perf.vmax[acidx]
