@@ -44,6 +44,11 @@ class M22Wind(WindSim):
         East, dir needs to be 90 deg.'''
         self.global_mag = magnitude
         self.global_dir = direction
+        # Disable if the magnitude is set to 0
+        if magnitude == 0:
+            self.winddim = 0
+            return
+        
         self.create_wind()
         # Set the winddim at more than 0
         self.winddim = 1
