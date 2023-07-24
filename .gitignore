@@ -98,3 +98,5 @@ ssd.obj
 *-checkpoint.py
 *-checkpoint.ipynb
 .ropeproject/config.py
+settings_M22.cfg
+.gitignore_global.swp
