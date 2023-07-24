@@ -19,10 +19,6 @@ def init_plugin():
 class TrafficHandler(Entity):
     def __init__(self):
         super().__init__()
-        # When to stop simulating
-        self.stop_time = 2*60*60 #seconds
-        self.stop_time_enable = True
-        
         with self.settrafarrays():
             self.allocated_alt = []
             self.street_numbers = []
@@ -47,15 +43,10 @@ class TrafficHandler(Entity):
             acids_to_delete = np.array(bs.traf.id)[delete_array]
             for acid in acids_to_delete:
                 stack.stack(f'DEL {acid}')
-                
-        if (self.stop_time_enable and bs.sim.simt > self.stop_time):
-            stack.stack(f'HOLD')
-            stack.stack(f'DELETEALL')
-            stack.stack(f'RESET')
             
     @stack.command
     def deleteall(self):
-        '''Deletes all aircraft.'''
+        '''Delete all aircraft.'''
         while self.ntraf>0:
             self.delete(0)
         return
