@@ -2,6 +2,7 @@ import bluesky as bs
 from bluesky import stack
 from bluesky.core import Entity
 from bluesky.tools.misc import degto180
+from bluesky.tools.aero import kts, ft
 from bluesky.core.simtime import timed_function
 import numpy as np
 
@@ -19,6 +20,8 @@ def init_plugin():
 class TrafficHandler(Entity):
     def __init__(self):
         super().__init__()
+        self.cruise_spd = 30 * kts
+        self.cruiselayerdiff = 30 * ft
         with self.settrafarrays():
             self.allocated_alt = []
             self.street_numbers = []
@@ -43,7 +46,6 @@ class TrafficHandler(Entity):
             # Get the ACIDs of the aircraft to delete
             acids_to_delete = np.array(bs.traf.id)[delete_array]
             for acid in acids_to_delete:
-                print(f'{acid} had a mission that lasted for {bs.sim.simt - bs.traf.m22delay.cre_time[bs.traf.id.index(acid)]} seconds.')
                 stack.stack(f'DEL {acid}')
             
     @stack.command
@@ -70,4 +72,4 @@ class TrafficHandler(Entity):
                                                   np.logical_not(in_vert_man),
                                                   np.logical_not(speed_zero)))
         
-        bs.traf.selspd = np.where(set_cruise_speed, bs.traf.cr.cruise_spd, bs.traf.selspd)
+        bs.traf.selspd = np.where(set_cruise_speed, bs.traf.TrafficHandler.cruise_spd, bs.traf.selspd)

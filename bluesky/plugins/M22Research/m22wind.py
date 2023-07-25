@@ -178,9 +178,9 @@ class M22Wind(WindSim):
         veast = gs_would_be_east - gseast
         vnorth = gs_would_be_north - gsnorth
 
-        # Aircraft going slow are unaffected
-        veast = np.where(bs.traf.gs < 10*kts, 0, veast)
-        vnorth = np.where(bs.traf.gs < 10*kts, 0 , vnorth)
+        # Aircraft going slower than 15 kts are unaffected.
+        veast = np.where(bs.traf.tas < 15*kts, 0, veast)
+        vnorth = np.where(bs.traf.tas < 15*kts, 0 , vnorth)
         
         return vnorth, veast
         

@@ -55,7 +55,7 @@ class M22Delay(Entity):
         # First of all, do a delay roll, and see if we delay this aircraft
         delay = 0
         roll = random.random()
-        if roll*100 < self.delay_probability:
+        if roll < self.delay_probability:
             delay = self.get_delay()
             
         if delay > 0:
@@ -138,7 +138,7 @@ class M22Delay(Entity):
     def proximity_check(self, aclat, aclon, acalt):
         '''Checks whether an aircraft is safe to spawn at the specified location.
         Returns true if we can spawn, false if we cannot.'''
-        layer_diff = bs.traf.cr.cruiselayerdiff
+        layer_diff = bs.traf.TrafficHandler.cruiselayerdiff
         # First of all, get all the aircraft that are within the altitude tolerance.
         ac_close_alt = np.logical_and(acalt - layer_diff < bs.traf.alt, 
                                     bs.traf.alt < acalt + layer_diff)
@@ -166,5 +166,4 @@ class M22Delay(Entity):
         """Set the average and standard deviation of the delay.
         """
         self.mean = mean
-        self.probability = probability
-        
+        self.delay_probability = probability
