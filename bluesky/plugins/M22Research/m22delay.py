@@ -29,9 +29,17 @@ class M22Delay(Entity):
         
         self.aircraft_buffer = dict()
         
+        with self.settrafarrays():
+            self.cre_time = []
+        
     def reset(self):
         self.mean = 0
         self.delay_probability = 0
+        self.aircraft_buffer = dict()
+        
+    def create(self, n=1):
+        super().create(n)
+        self.cre_time[-n:] = [bs.sim.simt]*n
         
     @stack.command
     def M22cre(self, acid:'txt', actype:'txt', aclat:'lat', aclon:'lon', achdg:'hdg', acalt:'alt', acspd:'spd', *wpt_data):
@@ -154,7 +162,7 @@ class M22Delay(Entity):
         return np.random.default_rng().exponential(self.mean)
         
     @stack.command
-    def setdelay(self, mean:float=0, probability:float=0):
+    def setm22delay(self, mean:float=0, probability:float=0):
         """Set the average and standard deviation of the delay.
         """
         self.mean = mean

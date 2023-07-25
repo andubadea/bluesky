@@ -27,6 +27,7 @@ class TrafficHandler(Entity):
         super().create(n)
         # Save the starting altitude
         self.allocated_alt[-n:] = bs.traf.alt[-n:]
+        self.street_numbers[-n:] = [None] * n
 
     @timed_function(dt = 0.5)
     def delete_aircraft(self):
@@ -42,6 +43,7 @@ class TrafficHandler(Entity):
             # Get the ACIDs of the aircraft to delete
             acids_to_delete = np.array(bs.traf.id)[delete_array]
             for acid in acids_to_delete:
+                print(f'{acid} had a mission that lasted for {bs.sim.simt - bs.traf.m22delay.cre_time[bs.traf.id.index(acid)]} seconds.')
                 stack.stack(f'DEL {acid}')
             
     @stack.command
