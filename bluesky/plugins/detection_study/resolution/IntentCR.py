@@ -71,6 +71,34 @@ class IntentCR(ConflictResolution):
                 intruder_in_back = (rel_qdr_intruder < -180 + frnt_tol or 180 - frnt_tol < rel_qdr_intruder)
                 intruder_aligned_front = intruder_in_front and -frnt_tol < rel_trk_intruder < frnt_tol
                 
+                # Determine priority only in case of LOS
+                if dist_mat[ownship_idx, intruder_idx] < conf.rpz_def:
+                    if intruder_in_back:
+                        # Ownship has priority if it is front of the intruder
+                        own_has_priority = True
+                    elif intruder_aligned_front:
+                        # Ownship doesn't have priority if intruder is in front.
+                        own_has_priority = False
+                    else:
+                        # Determine the priority based on proximity to intersection
+                        qdr_1_wrt_2 = ((conf.qdr_mat[intruder_idx, ownship_idx] - ownship.trk[intruder_idx]) + 180) % 360 - 180
+                        qdr_2_wrt_1 = ((conf.qdr_mat[ownship_idx, intruder_idx] - ownship.trk[ownship_idx]) + 180) % 360 - 180 
+                        if (abs(qdr_1_wrt_2) < 90 and abs(qdr_2_wrt_1) > 90) or abs(qdr_1_wrt_2) < abs(qdr_2_wrt_1):
+                            own_has_priority = True
+                        else:
+                            own_has_priority = False
+                            
+                    if own_has_priority:
+                        # We have priority, continue our way
+                        newgs[ownship_idx] = bs.traf.ap.tas[ownship_idx]
+                        newvs[ownship_idx] = 0
+                        continue
+                    else:
+                        # We don't have priority, we go slow.
+                        newgs[ownship_idx] = 0
+                        newvs[ownship_idx] = 0
+                        continue
+                
                 if intruder_aligned_front:
                     # Match the speed of the intruder
                     # First, the speed we want to set is equal to the speed of the intruder
