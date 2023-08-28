@@ -51,7 +51,8 @@ def init(mode='sim', configfile=None, scenfile=None, discoverable=False,
     if discoverable:
         assert mode == 'server', 'BlueSky init: Discoverable can only be set in server mode.'
     if scenfile:
-        assert mode != 'client', 'BlueSky init: Scenario file cannot be passed to a client.'
+        pass
+        #assert mode != 'client', 'BlueSky init: Scenario file cannot be passed to a client.'
     if gui:
         assert mode != 'sim' or gui == 'pygame', 'BlueSky init: Gui type shouldn\'t be specified in sim mode.'
     if detached:
