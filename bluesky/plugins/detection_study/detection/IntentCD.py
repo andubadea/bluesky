@@ -90,8 +90,8 @@ class IntentCD(ConflictDetection):
         self.precision = 0.0001 # metres
         
         # Logging
-        self.conflictlog = datalog.crelog('CONFLICTLOG', None, confheader)
-        self.uniqueconfloslog = datalog.crelog('WASLOSLOG', None, uniqueconflosheader)
+        self.conflictlog = datalog.crelog('CDR_CONFLICTLOG', None, confheader)
+        self.uniqueconfloslog = datalog.crelog('CDR_WASLOSLOG', None, uniqueconflosheader)
         
         # Conflict related
         self.prevconfpairs = set()
@@ -202,8 +202,8 @@ class IntentCD(ConflictDetection):
             dist_s, dcpa_s, tcpa_s, tLOS_s, qdr_mat, dist_mat = \
                 self.sb_detect(ownship, intruder, self.rpz, self.hpz, self.dtlookahead)
         self.los_detected = lospairs
-        if self.los_detected:
-            print(self.los_detected)
+        # if self.los_detected:
+        #     print(self.los_detected)
         inconf = np.array([False]*ownship.ntraf)
         
         if len(acidx_int_pairs) == 0:
@@ -1040,9 +1040,7 @@ class IntentCD(ConflictDetection):
             if dictkey in done_pairs:
                 # Already done, continue
                 continue
-                
-            pair_idx = self.confpairs.index(confpair)
-            
+
             self.conflictlog.log(
                 self.unique_conf_dict[dictkey][0],
                 confpair[0],
@@ -1050,17 +1048,9 @@ class IntentCD(ConflictDetection):
                 bs.traf.lat[idx1],
                 bs.traf.lon[idx1],
                 bs.traf.alt[idx1],
-                self.dist_to_int[pair_idx][0],
-                self.vel_rel_int[pair_idx][0],
-                self.num_turns[pair_idx][0],
-                self.mean_turn_angle[pair_idx][0],
                 bs.traf.lat[idx2],
                 bs.traf.lon[idx2],
-                bs.traf.alt[idx2],
-                self.dist_to_int[pair_idx][1],
-                self.vel_rel_int[pair_idx][1],
-                self.num_turns[pair_idx][1],
-                self.mean_turn_angle[pair_idx][1]
+                bs.traf.alt[idx2]
             )
             
         # Now check the new LOS
@@ -1092,6 +1082,10 @@ class IntentCD(ConflictDetection):
         # Now handle aircraft that are no longer in confpairs
         done_pairs = []
         for confpair in confpairs_out:
+            # There is a possibility that one aircraft thinks it is still in a conflict while the other
+            # doesn't. If this confpair is still in confpairs but inverted, skip it
+            if (confpair[1], confpair[0]) in self.confpairs:
+                continue
             # Log these in the uniqueconfloslog
             if confpair[0] not in bs.traf.id or confpair[1] not in bs.traf.id:
                 # One of these aircraft was deleted, so just log them and done.
@@ -1136,12 +1130,6 @@ class IntentCD(ConflictDetection):
         
         self.prevconfpairs = set(self.confpairs)
         self.prevlospairs = set(self.lospairs)
-        
-    @bs.stack.command
-    def startCDlog(self):
-        # Start the logs
-        self.conflictlog.start()
-        self.uniqueconfloslog.start()
         
         
         

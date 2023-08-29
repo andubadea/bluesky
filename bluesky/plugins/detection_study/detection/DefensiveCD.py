@@ -5,10 +5,9 @@ import pyproj
 import networkx as nx
 import osmnx as ox
 import matplotlib.pyplot as plt
-import time
+from bluesky.tools.geo import qdrpos
 
 from shapely.geometry import LineString, Point, MultiLineString, MultiPoint, GeometryCollection
-from shapely import STRtree
 from shapely.ops import split, nearest_points, linemerge, snap
 from shapely.affinity import rotate
 from bluesky.tools.aero import nm
@@ -45,17 +44,9 @@ confheader = \
     'LAT1 [deg],' + \
     'LON1 [deg],' + \
     'ALT1 [ft],' + \
-    'DIST1 [m],' + \
-    'VEL1 [m/s],' + \
-    'TURNS1 [-],' + \
-    'AVGANGLE1 [deg],' + \
     'LAT2 [deg],' + \
     'LON2 [deg],' + \
-    'ALT2 [ft],' + \
-    'DIST2 [m],' + \
-    'VEL2 [m/s],' + \
-    'TURNS2 [-],' + \
-    'AVGANGLE2 [deg]\n'
+    'ALT2 [ft]\n'
 
 uniqueconflosheader = \
     '#######################################################\n' + \
@@ -76,6 +67,7 @@ class DefensiveCD(ConflictDetection):
         # New detection parameters
         self.intent_geom = [] # Linestring of aircraft intent per pair
         self.dist_to_int = [] # Distance to intent intersections per pair
+        self.int_coords = [] # Coordinates of the intersection point
         self.stopping_points = [] # Points at which the aircraft should stop before the intersection per pair
         self.dist_to_stop = []
         self.vel_rel_int = [] # Velocity relative to intent intersection per pair
@@ -93,8 +85,8 @@ class DefensiveCD(ConflictDetection):
         self.precision = 0.0001 # metres
         
         # Logging
-        self.conflictlog = datalog.crelog('CONFLICTLOG', None, confheader)
-        self.uniqueconfloslog = datalog.crelog('WASLOSLOG', None, uniqueconflosheader)
+        self.conflictlog = datalog.crelog('CDR_CONFLICTLOG', None, confheader)
+        self.uniqueconfloslog = datalog.crelog('CDR_WASLOSLOG', None, uniqueconflosheader)
         
         # Conflict related
         self.prevconfpairs = set()
@@ -103,6 +95,7 @@ class DefensiveCD(ConflictDetection):
         self.counter2id = dict() # Keep track of the other way around
         self.unique_conf_id_counter = 0 # Start from 0, go up
         self.confhold =  [] # array to keep track of the conflicts we are
+        self.already_logged = [] #unique conflict IDs that have already been logged
         # keeping for an extra few seconds
         self.hold_time = 10 #seconds
         
@@ -125,6 +118,7 @@ class DefensiveCD(ConflictDetection):
         self.intent_geom = [] # Linestring of aircraft intent per pair
         self.dist_to_int = [] # Distance to intent intersections per pair
         self.stopping_points = [] # Points at which the aircraft should stop before the intersection per pair
+        self.int_coords = [] # Coordinates of the intersection point
         self.dist_to_stop = []
         self.vel_rel_int = [] # Velocity relative to intent intersection per pair
         self.num_turns = [] # Number of turns per pair
@@ -181,7 +175,7 @@ class DefensiveCD(ConflictDetection):
         self.lospairs_unique = lospairs_unique   
         
         # Update the logging
-        #self.update_log()
+        self.update_log()
         return
     
     def detect(self, ownship, intruder):
@@ -194,8 +188,8 @@ class DefensiveCD(ConflictDetection):
             dist_s, dcpa_s, tcpa_s, tLOS_s, qdr_mat, dist_mat = \
                 self.sb_detect(ownship, intruder, self.rpz, self.hpz, self.dtlookahead)
                 
-        if lospairs:
-            print(lospairs)
+        # if lospairs:
+        #     print(lospairs)
         
         # Get the current edges
         current_edges = self.get_current_edges()
@@ -217,6 +211,7 @@ class DefensiveCD(ConflictDetection):
         conf_pairs = []
         dist_to_int = []
         velocity_wrt_int = []
+        int_coords = []
         num_turns = []
         mean_turn_angle = []
         intent_geom = []
@@ -262,6 +257,8 @@ class DefensiveCD(ConflictDetection):
                     # Ownship is in the back, so distance to intersection of intruder is , and so is the velocity
                     dist2 = 0
                     vel2 = 0
+                    # Intersection coords are simply the coords of ac2
+                    int_latlon = [bs.traf.lat[idx2], bs.traf.lon[idx2]]
                     # For ownship, the velocity is just its own velocity, and the distance is just distance 2 - distance 1
                     dist1 = distance2 - distance1
                     vel1 = bs.traf.gs[idx1]
@@ -269,6 +266,8 @@ class DefensiveCD(ConflictDetection):
                     # Ownship is in the front
                     dist1 = 0
                     vel1 = 0
+                    # Intersection coords are simply the coords of ac1
+                    int_latlon = [bs.traf.lat[idx1], bs.traf.lon[idx1]]
                     dist2 = distance1 - distance2
                     vel2 = bs.traf.gs[idx2]
                     
@@ -283,6 +282,7 @@ class DefensiveCD(ConflictDetection):
                  # In back-to-front conflicts these don't matter
                 num_turns.append([0,0])
                 mean_turn_angle.append([0,0])
+                int_coords.append(int_latlon)
                 intent_geom.append([None, None])
                 stopping_points.append([None, None])
                 dist_to_stop.append([0,0])
@@ -296,6 +296,7 @@ class DefensiveCD(ConflictDetection):
                 # will have several entries for each aircraft pair.
                 num_turns_list = []
                 dist_to_int_list = []
+                int_coords_list = []
                 mean_turn_angle_list = []
                 int_geom_list = []
                 stopping_points_list = []
@@ -364,6 +365,9 @@ class DefensiveCD(ConflictDetection):
                     if point_intersection in int_geom_list:
                         # We skip this one, it's already in the list
                         continue
+                    
+                    # Get the int_latlon
+                    int_latlon = [point_intersection.y, point_intersection.x]
 
                     # Convert the intents and coordinates to UTM
                     coords_1_utm_lon, coords_1_utm_lat = self.transform_coords.transform(intent_1.coords.xy[0],intent_1.coords.xy[1])
@@ -410,6 +414,7 @@ class DefensiveCD(ConflictDetection):
                     dist_to_int_list.append([dist1, dist2])
                     mean_turn_angle_list.append([avg_turn1, avg_turn2])
                     int_geom_list.append(point_intersection)
+                    int_coords_list.append(int_latlon)
                     stopping_points_list.append([stopping_point_1, stopping_point_2])
                     # Get the distance to stopping points
                     if stopping_point_1.is_empty:
@@ -427,6 +432,7 @@ class DefensiveCD(ConflictDetection):
                     # Append the values to the big lists
                     conf_pairs.append((bs.traf.id[idx1], bs.traf.id[idx2]))
                     dist_to_int.append(dist_to_int_list)
+                    int_coords.append(int_coords_list[0]) # only append the first value for this one
                     velocity_wrt_int.append([bs.traf.gs[idx1],bs.traf.gs[idx2]])
                     # In back-to-front conflicts these don't matter
                     num_turns.append(num_turns_list)
@@ -449,6 +455,7 @@ class DefensiveCD(ConflictDetection):
             inconf[idx2] = True
             dist_to_int.append([tcpa_s[j] * bs.traf.gs[idx1], tcpa_s[j] * bs.traf.gs[idx2]])
             velocity_wrt_int.append([bs.traf.gs[idx1], bs.traf.gs[idx2]])
+            int_coords.append(qdrpos(bs.traf.lat[idx1], bs.traf.lon[idx1], bs.traf.hdg[idx1], dcpa_s[confpairs_s.index(pair)]/nm))
             num_turns.append([0,0])
             mean_turn_angle.append([0,0])
             conf_pairs.append((pair[0], pair[1]))
@@ -778,8 +785,6 @@ class DefensiveCD(ConflictDetection):
             if dictkey in done_pairs:
                 # Already done, continue
                 continue
-                
-            pair_idx = self.confpairs.index(confpair)
             
             self.conflictlog.log(
                 self.unique_conf_dict[dictkey][0],
@@ -788,17 +793,9 @@ class DefensiveCD(ConflictDetection):
                 bs.traf.lat[idx1],
                 bs.traf.lon[idx1],
                 bs.traf.alt[idx1],
-                self.dist_to_int[pair_idx][0],
-                self.vel_rel_int[pair_idx][0],
-                self.num_turns[pair_idx][0],
-                self.mean_turn_angle[pair_idx][0],
                 bs.traf.lat[idx2],
                 bs.traf.lon[idx2],
-                bs.traf.alt[idx2],
-                self.dist_to_int[pair_idx][1],
-                self.vel_rel_int[pair_idx][1],
-                self.num_turns[pair_idx][1],
-                self.mean_turn_angle[pair_idx][1]
+                bs.traf.alt[idx2]
             )
             
         # Now check the new LOS
@@ -830,6 +827,10 @@ class DefensiveCD(ConflictDetection):
         # Now handle aircraft that are no longer in confpairs
         done_pairs = []
         for confpair in confpairs_out:
+            # There is a possibility that one aircraft thinks it is still in a conflict while the other
+            # doesn't. If this confpair is still in confpairs but inverted, skip it
+            if (confpair[1], confpair[0]) in self.confpairs:
+                continue
             # Log these in the uniqueconfloslog
             if confpair[0] not in bs.traf.id or confpair[1] not in bs.traf.id:
                 # One of these aircraft was deleted, so just log them and done.
@@ -874,12 +875,6 @@ class DefensiveCD(ConflictDetection):
         
         self.prevconfpairs = set(self.confpairs)
         self.prevlospairs = set(self.lospairs)
-        
-    @bs.stack.command
-    def startCDlog(self):
-        # Start the logs
-        self.conflictlog.start()
-        self.uniqueconfloslog.start()
         
     def cut_line_with_point(self, line, splitter):
         """Split a LineString with a Point
