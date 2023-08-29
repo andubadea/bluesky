@@ -2,7 +2,7 @@
 import numpy as np
 from bluesky import stack
 import bluesky as bs
-from bluesky.tools import geo
+from bluesky.tools import geo, datalog
 from bluesky.tools.aero import nm
 from bluesky.traffic.asas import ConflictDetection
 
@@ -21,6 +21,32 @@ def init_plugin():
 
     return config
 
+confheader = \
+    '#######################################################\n' + \
+    'CONF LOG\n' + \
+    'Conflict Statistics\n' + \
+    '#######################################################\n\n' + \
+    'Parameters [Units]:\n' + \
+    'Simulation time [s], ' + \
+    'Unique CONF ID [-]' + \
+    'ACID1 [-],' + \
+    'ACID2 [-],' + \
+    'LAT1 [deg],' + \
+    'LON1 [deg],' + \
+    'ALT1 [ft],' + \
+    'LAT2 [deg],' + \
+    'LON2 [deg],' + \
+    'ALT2 [ft]\n'
+
+uniqueconflosheader = \
+    '#######################################################\n' + \
+    'Unique CONF LOS LOG\n' + \
+    'Shows whether unique conflicts results in a LOS\n' + \
+    '#######################################################\n\n' + \
+    'Parameters [Units]:\n' + \
+    'Unique CONF ID, ' + \
+    'Resulted in LOS\n'
+
 
 class M22CD(ConflictDetection):
     def __init__(self):
@@ -29,6 +55,19 @@ class M22CD(ConflictDetection):
         self.qdr_mat = np.array([])
         self.rpz_actual = 32 #m
         self.rpz_buffered = 40 #m
+        
+        # Logging
+        self.conflictlog = datalog.crelog('CDR_CONFLICTLOG', None, confheader)
+        self.uniqueconfloslog = datalog.crelog('CDR_WASLOSLOG', None, uniqueconflosheader)
+        
+        # Conflict related
+        self.prevconfpairs = set()
+        self.prevlospairs = set()
+        self.unique_conf_dict = dict()
+        self.counter2id = dict() # Keep track of the other way around
+        self.unique_conf_id_counter = 0 # Start from 0, go up
+        self.confhold =  [] # array to keep track of the conflicts we are
+        self.already_logged = [] #unique conflict IDs that have already been logged
         return
         
     def clearconfdb(self):
@@ -46,6 +85,15 @@ class M22CD(ConflictDetection):
         self.tcpamax = np.zeros(bs.traf.ntraf)
         self.dist_mat = np.array([])
         self.qdr_mat = np.array([])
+        
+        # Conflict related
+        self.prevconfpairs = set()
+        self.prevlospairs = set()
+        self.unique_conf_dict = dict()
+        self.counter2id = dict() # Keep track of the other way around
+        self.unique_conf_id_counter = 0 # Start from 0, go up
+        self.confhold =  [] # array to keep track of the conflicts we are
+        self.already_logged = [] #unique conflict IDs that have already been logged
         return
         
     def update(self, ownship, intruder):
@@ -65,6 +113,9 @@ class M22CD(ConflictDetection):
         # Update confpairs_unique and lospairs_unique
         self.confpairs_unique = confpairs_unique
         self.lospairs_unique = lospairs_unique    
+        
+        # Update the logging
+        self.update_log()
         
     def detect(self, ownship, intruder, rpz, hpz, dtlookahead):
         ''' Conflict detection between ownship (traf) and intruder (traf/adsb).'''
@@ -161,3 +212,135 @@ class M22CD(ConflictDetection):
         return confpairs, lospairs, inconf, tcpamax, \
             qdr[swconfl], dist[swconfl], np.sqrt(dcpa2[swconfl]), \
                 tcpa[swconfl], tinconf[swconfl], qdr, dist
+                
+    def update_log(self):
+        '''Here, we are logging the information for current conflicts as well as
+        whether these conflicts resulted in a LOS or not.'''
+        confpairs_new = list(set(self.confpairs) - self.prevconfpairs) # New confpairs
+        confpairs_out = list(self.prevconfpairs - set(self.confpairs)) # Pairs that are no longer in conflict
+        lospairs_new = list(set(self.lospairs) - self.prevlospairs) # New lospairs
+        
+        # First of all, add the new conflicts to the unique dict tracker
+        for confpair in confpairs_new:
+            # The dict is of the following format:
+            # lower_number_acidx_newer_number_acidx : [unique_id, was it a LOS or not]
+            # First, get the aircraft IDX
+            idx1 = bs.traf.id.index(confpair[0])
+            idx2 = bs.traf.id.index(confpair[1])
+            # Create dictionary entry
+            if idx1 < idx2:
+                dictkey = confpair[0] + confpair[1]
+            else:
+                dictkey = confpair[1] + confpair[0]
+                
+            if dictkey in self.unique_conf_dict:
+                # Pair already in there
+                continue
+            else:
+                self.unique_conf_dict[dictkey] = [self.unique_conf_id_counter, False]
+                self.counter2id[self.unique_conf_id_counter] = dictkey 
+                self.unique_conf_id_counter += 1
+                
+        # Log data in the conflog for all existing conflicts
+        done_pairs = []
+        for confpair in self.confpairs:
+            idx1 = bs.traf.id.index(confpair[0])
+            idx2 = bs.traf.id.index(confpair[1])
+            if idx1 < idx2:
+                dictkey = confpair[0] + confpair[1]
+            else:
+                dictkey = confpair[1] + confpair[0]
+                
+            if dictkey in done_pairs:
+                # Already done, continue
+                continue
+            
+            self.conflictlog.log(
+                self.unique_conf_dict[dictkey][0],
+                confpair[0],
+                confpair[1],
+                bs.traf.lat[idx1],
+                bs.traf.lon[idx1],
+                bs.traf.alt[idx1],
+                bs.traf.lat[idx2],
+                bs.traf.lon[idx2],
+                bs.traf.alt[idx2]
+            )
+            
+        # Now check the new LOS
+        done_pairs = []
+        for lospair in lospairs_new:
+            # Set the los flag of these in the unique dict tracker
+            idx1 = bs.traf.id.index(lospair[0])
+            idx2 = bs.traf.id.index(lospair[1])
+            if idx1 < idx2:
+                dictkey = lospair[0] + lospair[1]
+            else:
+                dictkey = lospair[1] + lospair[0]
+                
+            if dictkey in done_pairs:
+                # Already done, continue
+                continue
+            
+            done_pairs.append(dictkey)
+                
+            # Set the bool as true
+            if dictkey in self.unique_conf_dict:
+                self.unique_conf_dict[dictkey][1] = True
+            else:
+                # This LOS was not detected, but it is usually because of weird geometry
+                #print(dictkey)
+                continue
+                
+            
+        # Now handle aircraft that are no longer in confpairs
+        done_pairs = []
+        for confpair in confpairs_out:
+            # There is a possibility that one aircraft thinks it is still in a conflict while the other
+            # doesn't. If this confpair is still in confpairs but inverted, skip it
+            if (confpair[1], confpair[0]) in self.confpairs:
+                continue
+            # Log these in the uniqueconfloslog
+            if confpair[0] not in bs.traf.id or confpair[1] not in bs.traf.id:
+                # One of these aircraft was deleted, so just log them and done.
+                if confpair[0] + confpair[1] in self.unique_conf_dict:
+                    dictkey = confpair[0] + confpair[1]
+                elif confpair[1] + confpair[0] in self.unique_conf_dict:
+                    dictkey = confpair[1] + confpair[0]
+                else:
+                    # Absolutely no clue, continue I guess
+                    print('huh')
+                    continue
+                
+                self.uniqueconfloslog.log(
+                self.unique_conf_dict[dictkey][0],
+                str(self.unique_conf_dict[dictkey][1])
+                )
+                self.unique_conf_dict.pop(dictkey)
+                continue
+                    
+                
+            idx1 = bs.traf.id.index(confpair[0])
+            idx2 = bs.traf.id.index(confpair[1])
+            
+            if idx1 < idx2:
+                dictkey = confpair[0] + confpair[1]
+            else:
+                dictkey = confpair[1] + confpair[0]
+                
+            if dictkey in done_pairs:
+                # Already done, continue
+                continue
+            
+            done_pairs.append(dictkey)
+            
+            # We want to keep this entry for a few extra seconds and see what happens
+            # Get the conflict info and log it, then delete the entry
+            self.uniqueconfloslog.log(
+                self.unique_conf_dict[dictkey][0],
+                str(self.unique_conf_dict[dictkey][1])
+            )
+            self.unique_conf_dict.pop(dictkey)
+        
+        self.prevconfpairs = set(self.confpairs)
+        self.prevlospairs = set(self.lospairs)
