@@ -19,7 +19,6 @@ for density in densities:
                     f'00:00:00>RESO {method[1]}\n' + \
                     '00:00:00>STARTLOGS\n' + \
                     '00:00:00>STARTCDRLOGS\n' + \
-                    '00:00:00>SCHEDULE 01:00:00 HOLD\n' + \
                     '00:00:01>FF'
             scen_name = f'CDR_{method[0]}_{density}_{i}'
             scenario_names.append(scen_name)
@@ -29,7 +28,8 @@ for density in densities:
 with open(batchfilename, 'w') as f:
     for name in scenario_names:
         to_write = f'00:00:00.00>SCEN {name}\n' + \
-                    f'00:00:00.00>PCALL {name}.scn\n' + \
+                    f'00:00:00.00>PCALL CDR/{name}.scn\n' + \
+                    '00:00:00>SCHEDULE 02:00:00 HOLD\n' + \
                     '00:00:00.00>FF\n\n'
                     
         f.write(to_write)

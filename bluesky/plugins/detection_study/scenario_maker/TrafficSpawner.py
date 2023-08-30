@@ -100,6 +100,14 @@ class TrafficSpawner(Entity):
         self.confinside_all = 0
         self.deleted_aircraft = 0
         self.losmindist = dict()
+        
+        with self.settrafarrays():
+            self.route_edges = []
+            # Metrics
+            self.distance2D = np.array([])
+            self.distance3D = np.array([])
+            self.distancealt = np.array([])
+            self.create_time = np.array([])
     
     @command
     def loadcity(self, city = None):
@@ -130,17 +138,17 @@ class TrafficSpawner(Entity):
 
         G = ox.graph_from_gdfs(nodes, edges)
         
-        bs.stack.stack(f'SCHEDULE 00:00:00 PAN {self.city_centre_coords[0]},{self.city_centre_coords[1]}')
-        bs.stack.stack(f'SCHEDULE 00:00:00 ZOOM 15')
+        # bs.stack.stack(f'SCHEDULE 00:00:00 PAN {self.city_centre_coords[0]},{self.city_centre_coords[1]}')
+        # bs.stack.stack(f'SCHEDULE 00:00:00 ZOOM 15')
         # bs.stack.stack(f'SCHEDULE 00:00:01 CDMETHOD INTENTCD')
         # bs.stack.stack(f'SCHEDULE 00:00:01 RESO INTENTCR')
         # bs.stack.stack(f'SCHEDULE 00:00:00 CDMETHOD DEFENSIVECD')
         # bs.stack.stack(f'SCHEDULE 00:00:00 RESO DEFENSIVECR')
-        bs.stack.stack(f'SCHEDULE 00:00:00 CDMETHOD m22CD')
-        bs.stack.stack(f'SCHEDULE 00:00:00 RESO m22CR')
-        bs.stack.stack(f'SCHEDULE 00:00:00 STARTLOGS')
-        bs.stack.stack(f'SCHEDULE 00:00:00 STARTCDRLOGS')
-        bs.stack.stack(f'HOLD')
+        # bs.stack.stack(f'SCHEDULE 00:00:00 CDMETHOD m22CD')
+        # bs.stack.stack(f'SCHEDULE 00:00:00 RESO m22CR')
+        # bs.stack.stack(f'SCHEDULE 00:00:00 STARTLOGS')
+        # bs.stack.stack(f'SCHEDULE 00:00:00 STARTCDRLOGS')
+        # bs.stack.stack(f'HOLD')
         return G, edges, nodes
     
     @command
@@ -233,8 +241,10 @@ class TrafficSpawner(Entity):
             # save the create time
             self.create_time[acidx] = bs.sim.simt
     
-    @timed_function(dt = 0.5)
+    @timed_function(dt = bs.sim.simdt)
     def delete_aircraft(self):
+        # Update logging
+        self.update_logging()
         # Delete aircraft that have LNAV off and have gone past the last waypoint.
         # Also added logging in here because why not.
         lnav_on = bs.traf.swlnav
@@ -276,6 +286,7 @@ class TrafficSpawner(Entity):
             stack.stack(f'DELETEALL')
             stack.stack(f'RESET')
             
+    def update_logging(self):        
         # Increment the distance metrics
         resultantspd = np.sqrt(bs.traf.gs * bs.traf.gs + bs.traf.vs * bs.traf.vs)
         self.distance2D += bs.sim.simdt * abs(bs.traf.gs)
@@ -359,6 +370,6 @@ class TrafficSpawner(Entity):
     @command
     def deleteall(self):
         '''Deletes all aircraft.'''
-        while self.ntraf>0:
-            self.delete(0)
+        while bs.traf.ntraf>0:
+            bs.traf.delete(0)
         return
