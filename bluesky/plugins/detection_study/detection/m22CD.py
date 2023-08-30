@@ -241,21 +241,7 @@ class M22CD(ConflictDetection):
                 self.counter2id[self.unique_conf_id_counter] = dictkey 
                 self.unique_conf_id_counter += 1
                 
-        # Log data in the conflog for all existing conflicts
-        done_pairs = []
-        for confpair in self.confpairs:
-            idx1 = bs.traf.id.index(confpair[0])
-            idx2 = bs.traf.id.index(confpair[1])
-            if idx1 < idx2:
-                dictkey = confpair[0] + confpair[1]
-            else:
-                dictkey = confpair[1] + confpair[0]
-                
-            if dictkey in done_pairs:
-                # Already done, continue
-                continue
-            
-            self.conflictlog.log(
+                self.conflictlog.log(
                 self.unique_conf_dict[dictkey][0],
                 confpair[0],
                 confpair[1],
