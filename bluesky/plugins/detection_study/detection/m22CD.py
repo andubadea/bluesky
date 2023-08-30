@@ -309,7 +309,7 @@ class M22CD(ConflictDetection):
                     dictkey = confpair[1] + confpair[0]
                 else:
                     # Absolutely no clue, continue I guess
-                    print('huh')
+                    #print('huh')
                     continue
                 
                 self.uniqueconfloslog.log(

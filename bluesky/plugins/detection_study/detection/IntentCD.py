@@ -237,7 +237,8 @@ class IntentCD(ConflictDetection):
             dist1, dist2, vel1, vel2, intent1, intent2, int_point, is_conf = self.intersection_info(idx1, idx2)
             
             if not is_conf and pair in confpairs_s:
-                print(f'This is a conflict that statebased detects: {pair}.')
+                #print(f'This is a conflict that statebased detects: {pair}.')
+                pass
             
             if vel1 < 0 or vel2 < 0:
                 # One aircraft is moving away from the intersection point, so no longer a conflict                                
@@ -296,8 +297,6 @@ class IntentCD(ConflictDetection):
         for j, pair in enumerate(confpairs_s):
             # First, skip the pair if it's already in confpairs
             if pair in conf_pairs:
-                if pair[0] == 'D84':
-                    print('Skipped.')
                 # They are going to solve it intent-based
                 continue
             
@@ -311,9 +310,7 @@ class IntentCD(ConflictDetection):
             # Get the minimum distance between these lines
             p1,p2 = nearest_points(intent1, intent2) 
             dist_between_points = ((p1.x-p2.x)**2 + (p1.y-p2.y)**2)**0.5
-            
-            if pair[0] == 'D84':
-                print(f'Dist {dist_between_points}.')
+
             # Skip this conflict if the distance between the intents is greater than rpz
             if dist_between_points > self.rpz_def:
                 continue
@@ -380,7 +377,7 @@ class IntentCD(ConflictDetection):
             return 0, 0, 0, 0, intent1, intent2, intersection, False
 
         if isinstance(intersection, GeometryCollection):
-            print('GEOMETRY COLLECTION')
+            #print('GEOMETRY COLLECTION')
             return 0, 0, 0, 0, intent1, intent2, intersection, False
     
     def handle_point_intersection(self, idx1, idx2, intent1, intent2, intersection):
@@ -644,7 +641,7 @@ class IntentCD(ConflictDetection):
             
             else:
                 # Something is wrong.
-                print('AAAAAAAAAAAAAA')
+                #print('AAAAAAAAAAAAAA')
                 return 0, 0, 0, 0, intent1, intent2, intersection, False
     
     
@@ -679,8 +676,8 @@ class IntentCD(ConflictDetection):
             avg_angle_2 = 0
         else:
             # We probably shouldn't be in this function at all then? Probably not a conflict.
-            print('BBBBBBBBBBBB')
-            print(dist1, dist2)
+            #print('BBBBBBBBBBBB')
+            #print(dist1, dist2)
             num_turns_1 = 0
             avg_angle_1 = 0
             num_turns_2 = 0
@@ -1095,7 +1092,7 @@ class IntentCD(ConflictDetection):
                     dictkey = confpair[1] + confpair[0]
                 else:
                     # Absolutely no clue, continue I guess
-                    print('huh')
+                    #print('huh')
                     continue
                 
                 self.uniqueconfloslog.log(

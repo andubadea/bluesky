@@ -357,7 +357,7 @@ class DefensiveCD(ConflictDetection):
                     
                     else:
                         #uhh, dunno
-                        print('huh2', intersection)
+                        #print('huh2', intersection)
                         point_intersection = None
                         continue
                     
@@ -840,7 +840,7 @@ class DefensiveCD(ConflictDetection):
                     dictkey = confpair[1] + confpair[0]
                 else:
                     # Absolutely no clue, continue I guess
-                    print('huh')
+                    #print('huh')
                     continue
                 
                 self.uniqueconfloslog.log(
