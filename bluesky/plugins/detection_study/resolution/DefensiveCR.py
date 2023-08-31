@@ -70,12 +70,6 @@ class DefensiveCR(ConflictResolution):
             
             # First, check and handle state-based conflicts
             if intent_geom[pair_idx][0] == 'statebased':
-                # Check if we're supposed to be waiting at a stopping point
-                if self.stopping_dict.get(ownship_id+intruder_id, False):
-                    # Set the speed to 0, and wait for the conflict to finish
-                    newgs[ownship_idx] = 0
-                    continue
-                
                 # This is a state-based conflict, so we need to do some special things
                 # First, check if the intruder is in the front
                 qdr = qdr_mat[ownship_idx, intruder_idx]
@@ -84,6 +78,28 @@ class DefensiveCR(ConflictResolution):
                 intruder_in_front = -frnt_tol < rel_qdr_intruder < frnt_tol
                 intruder_in_back = (rel_qdr_intruder < -180 + frnt_tol or 180 - frnt_tol < rel_qdr_intruder)
                 intruder_aligned_front = intruder_in_front and -frnt_tol < rel_trk_intruder < frnt_tol
+                
+                # Check if we're supposed to be waiting at a stopping point
+                if self.stopping_dict.get(ownship_id+intruder_id, False):
+                    # Is this a head-on conflict? Cuz then we can't really do anything about it.
+                    # Determine a priority based on ACID and make the one with the lower one go.
+                    v1 = np.array([ownship.gseast[ownship_idx], ownship.gsnorth[ownship_idx]])
+                    v2 = np.array([intruder.gseast[intruder_idx], intruder.gsnorth[intruder_idx]])
+                    head_on = (abs((np.degrees(self.angle(v1, v2)))) > (180-frnt_tol))
+                    if head_on:
+                        if int(ownship_id.replace('D','')) < int(intruder_id.replace('D','')):
+                            # We have priority, let's just go
+                            newgs[ownship_idx] = bs.traf.ap.tas[ownship_idx]
+                        else:
+                            # make one of em stop
+                            newgs[ownship_idx] = 0
+                    else:
+                        # Set the speed to 0, and wait for the conflict to finish
+                        newgs[ownship_idx] = 0
+                    if dist_mat[ownship_idx, intruder_idx] < bs.traf.cd.rpz_def:
+                        # Loss of separation, overwrite stopping anyway
+                        newgs[ownship_idx] = bs.traf.ap.tas[ownship_idx]
+                    continue
                 
                 # Determine priority only in case of LOS
                 if dist_mat[ownship_idx, intruder_idx] < conf.rpz_def:
@@ -369,3 +385,9 @@ class DefensiveCR(ConflictResolution):
 
         # Remove pairs from the list that are past CPA or have deleted aircraft
         self.resopairs -= delpairs
+        
+    def angle(self, a, b):
+        ''' Find non-directional angle between vector a and b'''
+        unit_a = a / np.linalg.norm(a)
+        unit_b = b / np.linalg.norm(b)
+        return np.arccos(np.clip(np.dot(unit_a, unit_b), -1.0, 1.0))
