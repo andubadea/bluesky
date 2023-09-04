@@ -1,13 +1,14 @@
 # Simple script to create scenarios and a batch file
 
-batchfilename = 'scenario/CDR/batch_noreso.scn'
+batchfilename = 'scenario/CDR/batch_h_noreso.scn'
 # How many repetitions
 num_repetitions = 5
 
 scenario_names = []
 
 # Independent variables
-densities = [50, 100, 150, 200, 250]
+#densities = [50, 100, 150, 200, 250]
+densities = [300, 350, 400, 450, 500]
 cd_cr_methods = [['M22CD', 'M22CR'],['INTENTCD', 'INTENTCR'], ['DEFENSIVECD', 'DEFENSIVECR']]
 
 for density in densities:
@@ -20,7 +21,7 @@ for density in densities:
                     '00:00:00>STARTLOGS\n' + \
                     '00:00:00>STARTCDRLOGS\n' + \
                     '00:00:01>FF'
-            scen_name = f'CDR_{method[0]}_{density}_{i}_noreso'
+            scen_name = f'CDR_{method[0]}_{density}_{i}'
             scenario_names.append(scen_name)
             with open(f'scenario/CDR/{scen_name}.scn', 'w') as f:
                 f.write(to_write)
