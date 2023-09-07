@@ -1,6 +1,6 @@
 # Simple script to create scenarios and a batch file
 
-batchfilename = 'scenario/CDR/batch_h.scn'
+batchfilename = 'scenario/CDR/batch.scn'
 # How many repetitions
 num_repetitions = 5
 
@@ -8,7 +8,7 @@ scenario_names = []
 
 # Independent variables
 #densities = [50, 100, 150, 200, 250]
-densities = [300, 350, 400, 450, 500]
+densities = [600, 800, 1000]
 cd_cr_methods = [['M22CD', 'M22CR'],['INTENTCD', 'INTENTCR'], ['DEFENSIVECD', 'DEFENSIVECR']]
 
 for density in densities:
