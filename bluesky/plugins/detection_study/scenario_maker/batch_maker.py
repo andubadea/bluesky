@@ -21,7 +21,7 @@ for density in densities:
                     '00:00:00>STARTLOGS\n' + \
                     '00:00:00>STARTCDRLOGS\n' + \
                     '00:00:01>FF'
-            scen_name = f'CDR_{method[0]}_{density}_{i}'
+            scen_name = f'CDR_{method[0]}_{density}_{i}_CR'
             scenario_names.append(scen_name)
             with open(f'scenario/CDR/{scen_name}.scn', 'w') as f:
                 f.write(to_write)
@@ -35,7 +35,7 @@ for density in densities:
                     '00:00:00>STARTLOGS\n' + \
                     '00:00:00>STARTCDRLOGS\n' + \
                     '00:00:01>FF'
-            scen_name = f'CDR_{method[0]}_{density}_{i}_noreso'
+            scen_name = f'CDR_{method[0]}_{density}_{i}_NR'
             scenario_names.append(scen_name)
             with open(f'scenario/CDR/{scen_name}.scn', 'w') as f:
                 f.write(to_write)
