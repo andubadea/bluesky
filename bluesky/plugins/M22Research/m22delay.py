@@ -27,6 +27,9 @@ class M22Delay(Entity):
         self.mean = 0 # Mean delay
         self.delay_probability = 0 # probability of delay
         
+        # Upper limit for delay
+        self.delay_limit = 300 # seconds
+        
         self.aircraft_buffer = dict()
         
         with self.settrafarrays():
@@ -171,7 +174,7 @@ class M22Delay(Entity):
     def get_delay(self):
         """Return a random delay for this aircraft. Distribution is exponential
         """
-        return np.random.default_rng().exponential(self.mean)
+        return min(np.random.default_rng().exponential(self.mean), self.delay_limit)
         
     @stack.command
     def setm22delay(self, mean:float=0, probability:float=0):
