@@ -22,6 +22,7 @@ for density in densities:
                     f'00:00:00>RESO {method[1]}\n' + \
                     '00:00:00>STARTLOGS\n' + \
                     '00:00:00>STARTCDRLOGS\n' + \
+                    '00:00:00>IMPL WINDSIM CDRWIND\n' + \
                     '00:00:00>SETWIND 0 0\n' + \
                     '00:00:01>FF'
             scen_name = f'CDR_{method[0]}_{density}_{i}_{0}_{0}_CR'
@@ -37,6 +38,7 @@ for density in densities:
                     f'00:00:00>CDMETHOD {method[0]}\n' + \
                     '00:00:00>STARTLOGS\n' + \
                     '00:00:00>STARTCDRLOGS\n' + \
+                    '00:00:00>IMPL WINDSIM CDRWIND\n' + \
                     '00:00:00>SETWIND 0 0\n' + \
                     '00:00:01>FF'
             scen_name = f'CDR_{method[0]}_{density}_{i}_{0}_{0}_NR'
@@ -55,9 +57,10 @@ for windmag in winds:
                         f'00:00:00>CDMETHOD {method[0]}\n' + \
                         '00:00:00>STARTLOGS\n' + \
                         '00:00:00>STARTCDRLOGS\n' + \
+                        '00:00:00>IMPL WINDSIM CDRWIND\n' + \
                         f'00:00:00>SETWIND {windmag} {winddir}\n' + \
                         '00:00:01>FF'
-                scen_name = f'CDR_{method[0]}_{density}_{windmag}_{winddir}_{i}_CR'
+                scen_name = f'CDR_{method[0]}_{density}_{i}_{windmag}_{winddir}_CR'
                 scenario_names.append(scen_name)
                 with open(f'scenario/CDR/{scen_name}.scn', 'w') as f:
                     f.write(to_write)
