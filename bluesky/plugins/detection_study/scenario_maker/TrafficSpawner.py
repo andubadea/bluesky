@@ -32,7 +32,7 @@ class TrafficSpawner(Entity):
         super().__init__()
         self.target_ntraf = 250
         # Load default city
-        self.graph, self.edges, self.nodes = self.loadcity('Vienna')
+        self.graph, self.edges, self.nodes, self.street_dict = self.loadcity('Vienna')
         # Traffic ID increment
         self.traf_id = 1
         #default alt and speed
@@ -77,7 +77,7 @@ class TrafficSpawner(Entity):
     def reset(self):
         self.target_ntraf = 50
         # Load default city
-        self.graph, self.edges, self.nodes = self.loadcity('Vienna')
+        self.graph, self.edges, self.nodes, self.street_dict = self.loadcity('Vienna')
         # Traffic ID increment
         self.traf_id = 1
         #default alt and speed
@@ -138,6 +138,10 @@ class TrafficSpawner(Entity):
 
         G = ox.graph_from_gdfs(nodes, edges)
         
+        # Also load the street numbers
+        with open(f'{self.path}/street_numbers.pkl', 'rb') as f:
+            street_dict = pickle.load(f)
+        
         # bs.stack.stack(f'SCHEDULE 00:00:00 PAN {self.city_centre_coords[0]},{self.city_centre_coords[1]}')
         # bs.stack.stack(f'SCHEDULE 00:00:00 ZOOM 15')
         # bs.stack.stack(f'SCHEDULE 00:00:01 CDMETHOD INTENTCD')
@@ -149,7 +153,7 @@ class TrafficSpawner(Entity):
         # bs.stack.stack(f'SCHEDULE 00:00:00 STARTLOGS')
         # bs.stack.stack(f'SCHEDULE 00:00:00 STARTCDRLOGS')
         # bs.stack.stack(f'HOLD')
-        return G, edges, nodes
+        return G, edges, nodes, street_dict
     
     @command
     def trafficnumber(self, target_ntraf = 50):

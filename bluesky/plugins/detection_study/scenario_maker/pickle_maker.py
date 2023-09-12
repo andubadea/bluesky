@@ -1,4 +1,5 @@
 import osmnx as ox
+import geopandas as gpd
 import pickle
 import numpy as np
 import networkx as nx
@@ -6,6 +7,7 @@ from shapely.ops import linemerge
 from multiprocessing import Pool
 import random
 import os
+import momepy
 from os.path import exists
 import tqdm
 
@@ -34,8 +36,26 @@ path = f'{city}'
 min_dist = 1000 # Metres
 
 # Load the graph for that city
-G = ox.load_graphml(f'{path}/streets.graphml')
-nodes, edges = ox.graph_to_gdfs(G)
+nodes = gpd.read_file(f'{path}/streets.gpkg', layer='nodes')
+edges = gpd.read_file(f'{path}/streets.gpkg', layer='edges')
+
+nodes.set_index(['osmid'], inplace=True)
+edges.set_index(['u', 'v', 'key'], inplace=True)
+
+G = ox.graph_from_gdfs(nodes, edges)
+
+# # Run coins
+# continuity = momepy.COINS(edges, angle_threshold=90)
+# continuity.stroke_gdf().to_file(city + '/street_groups.gpkg', driver='GPKG')
+# edges['stroke'] = continuity.stroke_attribute()
+
+# # Make street dict
+# stroke_dict = dict()
+# for u,v,_ in edges.index.to_list():
+#     stroke_dict[(u,v)] = edges.loc[(u,v,0), 'stroke']
+# # Pickle it
+# with open(f'{city}/street_numbers.pkl', 'wb') as f:
+#     pickle.dump(stroke_dict, f, protocol=pickle.HIGHEST_PROTOCOL)
 
 # Let's make some origin and destinations from this graph
 nodes_already_added = []
