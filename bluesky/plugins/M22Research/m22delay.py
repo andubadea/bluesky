@@ -33,16 +33,18 @@ class M22Delay(Entity):
         self.aircraft_buffer = dict()
         
         with self.settrafarrays():
-            self.cre_time = []
+            self.create_time = []
         
     def reset(self):
         self.mean = 0
         self.delay_probability = 0
         self.aircraft_buffer = dict()
+        with self.settrafarrays():
+            self.create_time = []
         
     def create(self, n=1):
         super().create(n)
-        self.cre_time[-n:] = [bs.sim.simt]*n
+        self.create_time[-n:] = [bs.sim.simt]*n
         
     @stack.command
     def M22cre(self, acid:'txt', actype:'txt', aclat:'lat', aclon:'lon', achdg:'hdg', acalt:'alt', acspd:'spd', *wpt_data):
