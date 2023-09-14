@@ -3,7 +3,7 @@ from bluesky import stack
 from bluesky.core import Entity
 from bluesky.tools.geo import kwikdist
 from bluesky.tools.misc import degto180
-from bluesky.tools.aero import kts, ft, fpm
+from bluesky.tools.aero import kts, ft, fpm, nm
 from bluesky.core.simtime import timed_function
 import numpy as np
 
@@ -50,7 +50,6 @@ class TrafficHandler(Entity):
         self.distance2D[-n:] = [0]*n
         self.distance3D[-n:] = [0]*n
         self.distancealt[-n:] = [0]*n
-        self.create_time[-n:] = [0]*n
         
     def reset(self):
         # Logging related stuff
