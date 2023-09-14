@@ -1,6 +1,6 @@
 # Simple script to create scenarios and a batch file
 
-batchfilename = 'scenario/CDR/batch.scn'
+batchfilename = 'scenario/CDR/batch_wind.scn'
 # How many repetitions
 num_repetitions = 5
 
@@ -55,6 +55,7 @@ for windmag in winds:
                 to_write = f'00:00:00>TRAFFICNUMBER {density}\n' + \
                         f'00:00:00>SEED {i}\n' + \
                         f'00:00:00>CDMETHOD {method[0]}\n' + \
+                        f'00:00:00>RESO {method[1]}\n' + \
                         '00:00:00>STARTLOGS\n' + \
                         '00:00:00>STARTCDRLOGS\n' + \
                         '00:00:00>IMPL WINDSIM CDRWIND\n' + \
