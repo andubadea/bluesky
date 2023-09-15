@@ -323,8 +323,28 @@ class IntentCD(ConflictDetection):
                     own_cur_pos = Point(bs.traf.lon[idx1], bs.traf.lat[idx1])
                     int_cur_pos = Point(bs.traf.lon[idx2], bs.traf.lat[idx2])
                     # Only need the front line
-                    _, intent_1 = self.cut_line_with_point(linemerge(geom_path_1), own_cur_pos)
-                    _, intent_2 = self.cut_line_with_point(linemerge(geom_path_2), int_cur_pos)
+                    # Merge the lines
+                    merge1 = linemerge(geom_path_1)
+                    merge2 = linemerge(geom_path_2)
+                    
+                    if isinstance(merge1, MultiLineString):
+                        # Do the merge manually then
+                        line_coords = []
+                        for line in geom_path_1:
+                            for coord in list(line.coords):
+                                line_coords.append(coord)
+                        merge1 = LineString(line_coords)
+                        
+                    if isinstance(merge2, MultiLineString):
+                        # Do the merge manually then
+                        line_coords = []
+                        for line in geom_path_2:
+                            for coord in list(line.coords):
+                                line_coords.append(coord)
+                        merge2 = LineString(line_coords)
+                
+                    _, intent_1 = self.cut_line_with_point(merge1, own_cur_pos)
+                    _, intent_2 = self.cut_line_with_point(merge2, int_cur_pos)
                     # We intersect these two, we should get a point. If we get anything else than a point, then we convert it to a point.
                     # Basically, this should confirm that the node we are looking at is indeed an intersection. It could also be the case
                     # that the two aircraft have a certain portion of the path in common towards that node. In that case, we get a line
