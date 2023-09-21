@@ -62,7 +62,7 @@ class DefensiveCD(ConflictDetection):
     def __init__(self):
         super().__init__()
         # Lookahead parameters
-        self.lookahead_min = 100 #metres
+        self.lookahead_min = 50 #metres
         self.lookahead_max = 500 #metres
         
         # New detection parameters
