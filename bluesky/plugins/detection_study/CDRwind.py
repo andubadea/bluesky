@@ -25,8 +25,8 @@ class CDRWind(WindSim):
     def __init__(self):
         super().__init__()
         # Global wind properties
-        self.global_mag = 5
-        self.global_dir = 90
+        self.global_mag = 0
+        self.global_dir = 0
         # Load the streets
         self.streets_gpd, self.streets_bearings = self.load_steets('Vienna')
         # This will contain magnitudes for each street. Street index is equivalent to array index
