@@ -30,8 +30,7 @@ class DefensiveCR(ConflictResolution):
     
     def resolve(self, conf, ownship, intruder):
         # Some constants
-        turn_time  = 0 #seconds
-        time_margin = 0 #seconds
+        cruise_spd = bs.traf.TrafficSpawner.spd
         frnt_tol = 20
         spd_factor = 3
         # Get all the values from CD that we would need
@@ -213,24 +212,10 @@ class DefensiveCR(ConflictResolution):
                     # intersection point. We will then have to allow them to pass while not exactly coming
                     # to a complete stop. 
                     # First, check if we'll be at the intersection point way faster than the other aircraft
-                    if vel_rel_int[pair_idx][0] > 0.1:
-                        time_to_int_ownship = dist_to_int[pair_idx][i][0]# / vel_rel_int[pair_idx][0]
-                    else:
-                        # Aircraft is standing still, so set a large number for this
-                        time_to_int_ownship = dist_to_int[pair_idx][i][0]
-                        
-                    if vel_rel_int[pair_idx][1] > 0.1:
-                        time_to_int_intruder = dist_to_int[pair_idx][i][1]# / vel_rel_int[pair_idx][1]
-                    else:
-                        # Aircraft is standing still, so set a large number for this
-                        time_to_int_intruder = dist_to_int[pair_idx][i][1]
+                    dist_to_int_ownship = dist_to_int[pair_idx][i][0]
+                    dist_to_int_intruder = dist_to_int[pair_idx][i][1]
                     
-                    # We might also want to add some time to these for every single turn
-                    time_to_int_ownship += turn_time * num_turns[pair_idx][i][0]
-                    time_to_int_intruder+= turn_time * num_turns[pair_idx][i][1]
-                    
-                    # Now, if we get to the intersection faster than 3 seconds, we just continue.
-                    if time_to_int_intruder - time_to_int_ownship > time_margin:
+                    if dist_to_int_intruder > dist_to_int_ownship:
                         #print('Faster to intersection.')
                         continue
                     else:
@@ -239,15 +224,16 @@ class DefensiveCR(ConflictResolution):
                         self.stopping_dict[ownship_id+intruder_id] = True
                         # If the distance to the stopping point is 0, then we simply stop
                         distance_to_stopping_point_1 = dist_to_stop[pair_idx][i][0]
+                        distance_to_start_stopping = self.distaccel(cruise_spd, 0, ownship_idx)*2
                         
-                        if distance_to_stopping_point_1 < conf.rpz_def / 2:
+                        if distance_to_stopping_point_1 < distance_to_start_stopping:
                             # Then simply stop
                             newgs[ownship_idx] = 0
                             continue
                         
                         else:
                             # Set the speed in function of distance_to_stopping_point
-                            newgs[ownship_idx] = min(newgs[ownship_idx], distance_to_stopping_point_1/conf.rpz_def * spd_factor)
+                            newgs[ownship_idx] = min(newgs[ownship_idx], (distance_to_stopping_point_1/3/conf.rpz_def)*cruise_spd)
                             continue
         
         return newtrack, newgs, newvs, newalt
@@ -390,3 +376,12 @@ class DefensiveCR(ConflictResolution):
         unit_a = a / np.linalg.norm(a)
         unit_b = b / np.linalg.norm(b)
         return np.arccos(np.clip(np.dot(unit_a, unit_b), -1.0, 1.0))
+    
+    def distaccel(self,v0,v1,idx):
+        """Calculate distance travelled during acceleration/deceleration
+        v0 = start speed, v1 = endspeed, axabs = magnitude of accel/decel
+        accel/decel is detemremind by sign of v1-v0
+        axabs is acceleration/deceleration of which absolute value will be used
+        solve for x: x = vo*t + 1/2*a*t*t    v = v0 + a*t """
+        axabs = bs.traf.perf.axmax[idx]
+        return 0.5*np.abs(v1*v1-v0*v0)/np.maximum(.001,np.abs(axabs))
