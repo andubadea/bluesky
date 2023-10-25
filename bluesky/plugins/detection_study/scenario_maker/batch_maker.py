@@ -1,6 +1,6 @@
 # Simple script to create scenarios and a batch file
 
-batchfilename = 'scenario/CDR/batch_wind.scn'
+batchfilename = 'scenario/CDR/batch.scn'
 # How many repetitions
 num_repetitions = 5
 
