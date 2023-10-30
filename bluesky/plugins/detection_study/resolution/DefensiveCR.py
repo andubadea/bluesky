@@ -224,7 +224,7 @@ class DefensiveCR(ConflictResolution):
                         self.stopping_dict[ownship_id+intruder_id] = True
                         # If the distance to the stopping point is 0, then we simply stop
                         distance_to_stopping_point_1 = dist_to_stop[pair_idx][i][0]
-                        distance_to_start_stopping = self.distaccel(cruise_spd, 0, ownship_idx)*2
+                        distance_to_start_stopping = self.distaccel(cruise_spd, 0, ownship_idx)*1.2 #buffer
                         
                         if distance_to_stopping_point_1 < distance_to_start_stopping:
                             # Then simply stop
