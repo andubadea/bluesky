@@ -3,6 +3,7 @@ import numpy as np
 import random
 
 from bluesky.tools.geo import kwikdist_matrix
+from bluesky.tools.misc import txt2tim
 from bluesky.core import Entity, timed_function
 from bluesky import stack
 from bluesky.traffic import Route
@@ -92,7 +93,7 @@ class M22Delay(Entity):
             for wpidx, rta_point in enumerate(rta_info):
                 if rta_point:
                     acrte = Route._routes.get(acid)
-                    acrte.wprta[wpidx] = float(rta_point)
+                    acrte.wprta[wpidx] = txt2tim(rta_point)
             # Some more commands to get it going
             bs.traf.ap.setLNAV(acidx, True)
             bs.traf.ap.setVNAV(acidx, True)
