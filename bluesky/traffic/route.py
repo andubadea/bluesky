@@ -503,17 +503,17 @@ class Route(Replaceable):
 
     @stack.command
     def addwaypoints(acidx: 'acid', *args):
-        # Args come in this order: lat, lon, alt, spd, FLYTURN/FLYBY/FLYOVER
+        # Args come in this order: lat, lon, alt, spd, FLYTURN/FLYBY/FLYOVER, RTA
         # For flyturn properties, use ADDWPTMODE
-        if len(args)%5 !=0:
-            bs.scr.echo('You missed a waypoint value, arguement number must be a multiple of 5.')
+        if len(args)%6 !=0:
+            bs.scr.echo('You missed a waypoint value, arguement number must be a multiple of 6: lat, lon, alt, spd, FLYTURN/FLYBY/FLYOVER, RTA')
             return
 
         # Get and reset current aircraft route
         acid = bs.traf.id[acidx]
         acrte = Route._routes.get(acid)
 
-        args = reshape(args, (int(len(args)/5), 5))
+        args = reshape(args, (int(len(args)/6), 6))
 
         for wpdata in args:
             # Get needed values
@@ -547,6 +547,10 @@ class Route(Replaceable):
                 acrte.swflyturn = False
 
             wpidx = acrte.addwpt_simple(acidx, acid, Route.wplatlon, lat, lon, alt, spd)
+            # Add RTA
+            rta_time = txt2tim(wpdata[5])
+            if rta_time > 0:
+                acrte.wprta[wpidx] = rta_time
         
         # Direct to first waypoint
         acrte.direct(acidx, acrte.wpname[0])  # 0 if no orig
