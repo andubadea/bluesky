@@ -207,16 +207,16 @@ class DefensiveCR(ConflictResolution):
                         #print('Intruder has lower priority.')
                         continue
                     
-                    # Okay time to make the ownship slow down by an appropriate amount. For this, we need to
-                    # take into account how much time does the other aircraft have until it reaches the
-                    # intersection point. We will then have to allow them to pass while not exactly coming
-                    # to a complete stop. 
-                    # First, check if we'll be at the intersection point way faster than the other aircraft
-                    dist_to_int_ownship = dist_to_int[pair_idx][i][0]
-                    dist_to_int_intruder = dist_to_int[pair_idx][i][1]
+                    # First, check a rough estimate of time to get to intersection
+                    time_to_int_ownship = dist_to_int[pair_idx][i][0] / cruise_spd
+                    time_to_int_intruder = dist_to_int[pair_idx][i][1] / cruise_spd
                     
-                    if dist_to_int_intruder > dist_to_int_ownship:
-                        #print('Faster to intersection.')
+                    # Add penalties for turns
+                    time_to_int_ownship += num_turns[pair_idx][i][0] * 5
+                    time_to_int_intruder += num_turns[pair_idx][i][1] * 5
+                    
+                    if time_to_int_intruder > time_to_int_ownship:
+                        #print('Closer to intersection.')
                         continue
                     else:
                         # Let's slow down for the other aircraft to pass.
