@@ -548,9 +548,10 @@ class Route(Replaceable):
 
             wpidx = acrte.addwpt_simple(acidx, acid, Route.wplatlon, lat, lon, alt, spd)
             # Add RTA
-            rta_time = txt2tim(wpdata[5])
-            if rta_time > 0:
-                acrte.wprta[wpidx] = rta_time
+            if wpdata[5]:
+                rta_time = txt2tim(wpdata[5])
+                if rta_time > 0:
+                    acrte.wprta[wpidx] = rta_time
         
         # Direct to first waypoint
         acrte.direct(acidx, acrte.wpname[0])  # 0 if no orig

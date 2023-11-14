@@ -636,6 +636,12 @@ class Autopilot(Entity, replaceable=True):
 
     def setspeedforRTA(self, idx, torta, xtorta):
         #debug print("setspeedforRTA called, torta,xtorta =",torta,xtorta/nm)
+        # Is the next waypoint a turn waypoint? Then we take the RTA as the time we need to be
+        # at the location where the turn starts. So then the following thing needs to be calculated:
+        #                                        this v is where we start decelerating again
+        # ------------x-------------------------------x----------turn
+        #        this ^ is where we start accelerating again
+        is_turn_wpt = bs.traf.actwp.nextturnidx[idx] == bs.traf.ap.route[idx].iactwp
 
         # Calculate required CAS to meet RTA
         # for aircraft nr. idx (scalar)
@@ -644,8 +650,12 @@ class Autopilot(Entity, replaceable=True):
 
         deltime = torta-bs.sim.simt # Remaining time to next RTA [s] in simtime
         if deltime>0: # Still possible?
-            gsrta = calcvrta(bs.traf.gs[idx], xtorta,
-                             deltime, bs.traf.perf.axmax[idx])
+            if is_turn_wpt:
+                gsrta = self.calcvturnrta(idx, xtorta,
+                                deltime, bs.traf.perf.axmax[idx])
+            else:
+                gsrta = calcvrta(bs.traf.gs[idx], xtorta,
+                                deltime, bs.traf.perf.axmax[idx])
 
             # Subtract tail wind speed vector
             tailwind = (bs.traf.windnorth[idx]*bs.traf.gsnorth[idx] + bs.traf.windeast[idx]*bs.traf.gseast[idx]) / \
@@ -662,6 +672,82 @@ class Autopilot(Entity, replaceable=True):
             return rtacas
         else:
             return False
+        
+    def calcvturnrta(self, idx, xtorta, deltime, amax):
+        '''Takes into account turning. Considers that the RTA is set at the point just before the
+        turn is initiated.
+        We work with low altitude drones only so we only use gs here.''' 
+        gs = bs.traf.gs[idx]
+        # xtorta will now be the distance to the next waypoint. So to get our actual distance, we need to subtract
+        # the distance at which we will start turning.
+        xtorta -= bs.traf.actwp.turndist[idx]
+        
+        # Is turn speed specified and are we not already slow enough? We only decelerate for turns, not accel.
+        turnspd = bs.traf.actwp.nextturnspd[idx]
+
+        # Distance at which the deceleration will start happening
+        dxdecelturn = distaccel(gs, turnspd, amax)
+        
+        if dxdecelturn > xtorta:
+            return gs #do nothing
+        
+        # Calculate the time it will take us to get there with the current speed
+        time_total = time_to_turn_start(gs, xtorta, turnspd, amax)
+        
+        if abs(time_total - deltime) < 0.1:
+            # Close enough
+            return gs
+        
+        if time_total > deltime:
+            # We're too slow, but how badly?
+            # If we were to increase the velocity by what is possible within one simulation time, would
+            # we be faster? Let's see
+            gs_f = gs + amax * bs.sim.simdt
+            # With an amax of 5m/s2 and a simdt of 0.05, the velocity will increment by 0.25 m/s
+            # Calculate everything again using this gs
+            time_total_f = time_to_turn_start(gs_f, xtorta, turnspd, amax)
+            if time_total_f > deltime:
+                # We still don't make it in time, return vmax of this aircraft
+                return bs.traf.perf.vmax[idx]
+            
+            else:
+                # Oh, now we would make it in time, so it means that the correct speed is somewhere between
+                # gs and gs_f
+                # We can do a quick and dirty search to two significant digits
+                for gs_ff in np.linspace(gs, gs_f, 10):
+                    # Calculate the things again
+                    time_total_ff = time_to_turn_start(gs_ff, xtorta, turnspd, amax)
+                    # Initially, we will be slower, and at some point we will be faster
+                    # We want the value right as we get faster
+                    if time_total_ff - deltime < 0:
+                        # Ok with this speed we will be faster
+                        return gs_ff
+        
+        else:
+            # Ok so we'll be faster, we need to do the same thing as before but for slowing down
+            gs_f = gs - amax * bs.sim.simdt
+            # With an amax of 5m/s2 and a simdt of 0.05, the velocity will increment by 0.25 m/s
+            # Calculate everything again using this gs
+            time_total_f = time_to_turn_start(gs_f, xtorta, turnspd, amax)
+            if time_total_f < deltime:
+                # We are still faster, so then slow down as much as possible
+                return 0
+            
+            else:
+                # Oh, now we would make it in time, so it means that the correct speed is somewhere between
+                # gs and gs_f
+                # We can do a quick and dirty search to two significant digits
+                for gs_ff in np.linspace(gs, gs_f, 10):
+                    # Calculate the things again
+                    time_total_ff = time_to_turn_start(gs_ff, xtorta, turnspd, amax)
+                    # Initially, we will be faster, and at some point we will be faster
+                    # We want the value right as we get faster
+                    if time_total_ff - deltime > 0:
+                        # Ok with this speed we will be slightly slower, perfect
+                        return gs_ff
+        
+        # Uh, something should have happened before, return current speed I guess
+        return gs
 
     @stack.command(name='ALT')
     def selaltcmd(self, idx: 'acid', alt: 'alt', vspd: 'vspd'=None):
@@ -1023,3 +1109,10 @@ def distaccel(v0,v1,axabs):
     axabs is acceleration/deceleration of which absolute value will be used
     solve for x: x = vo*t + 1/2*a*t*t    v = v0 + a*t """
     return 0.5*np.abs(v1*v1-v0*v0)/np.maximum(.001,np.abs(axabs))
+
+def time_to_turn_start(gs, totaldist, turnspd, amax):
+    dxdecelturn = distaccel(gs, turnspd, amax)
+    cruise_dist = totaldist - dxdecelturn
+    time_cruise = cruise_dist / gs
+    time_decel = (gs - turnspd) / amax
+    return time_cruise + time_decel

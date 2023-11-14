@@ -85,15 +85,16 @@ class M22Delay(Entity):
             # Extract the street number and RTA info
             bs.traf.TrafficHandler.street_numbers[acidx] = wpt_data[:,6]
             rta_info = wpt_data[:,4]
-            # Get rid of the street info, we will keep that in traffic handler
-            wpt_data_stripped = np.delete(wpt_data[:,0:6], 4,1).flatten()
+            # We need to format this stuff in the following way:
+            # lat, lon, alt, spd, FLYTURN/FLYBY/FLYOVER, RTA
+            #wpt_data_stripped = np.delete(wpt_data[:,0:6], 4,1).flatten()
+            # First, remove street info
+            wpt_data_stripped = wpt_data[:,0:6]
+            # Put RTA last
+            wpt_data_stripped[:, [5, 4]] = wpt_data_stripped[:, [4, 5]]
+            wpt_data_stripped = wpt_data_stripped.flatten()
             # Now add the waypoints for this aircraft
             Route.addwaypoints(acidx, *wpt_data_stripped)
-            # Add the RTA to the route
-            for wpidx, rta_point in enumerate(rta_info):
-                if rta_point:
-                    acrte = Route._routes.get(acid)
-                    acrte.wprta[wpidx] = txt2tim(rta_point)
             # Some more commands to get it going
             bs.traf.ap.setLNAV(acidx, True)
             bs.traf.ap.setVNAV(acidx, True)
