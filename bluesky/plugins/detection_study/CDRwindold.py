@@ -15,13 +15,13 @@ from bluesky.tools.geo import kwikqdrdist
 def init_plugin():
     # Configuration parameters
     config = {
-        'plugin_name': 'CDRWIND',
+        'plugin_name': 'CDRWINDOLD',
         'plugin_type': 'sim',
     }
     return config
 
 
-class CDRWind(WindSim):
+class CDRWindOld(WindSim):
     def __init__(self):
         super().__init__()
         # Global wind properties
@@ -117,8 +117,26 @@ class CDRWind(WindSim):
         # Also get the default magnitude of the wind on this street
         default_mag = abs(np.cos(np.deg2rad(angle_diff)) * self.global_mag)
         
+        # We can introduce some randomness in the wind by sampling a normal distribution around the
+        # default magnitude. Absolute value in case it somehow samples a negative one.
+        sampled_mag = abs(np.random.normal(default_mag, default_mag/10))
+        
+        # If the angle difference is smaller than 30, then it is guaranteed that the direction
+        # matches the global
+        if angle_diff < 30:
+            return sampled_mag, default_dir
+        
+        # Otherwise, we first make a roll to see if we should flip a coin or not. This probability is
+        # just the sin value
+        coin_flip_probability = abs(np.sin(np.deg2rad(angle_diff)))
+        if np.random.random() < coin_flip_probability:
+            # Perform a coin flip
+            if np.random.random() < 0.5:
+                # Flip the direction
+                default_dir *= -1
+        
         # Return the magnitude and direction
-        return default_mag, default_dir
+        return sampled_mag, default_dir
         
     
     def get_anglular_distance(self, unit1, unit2):
