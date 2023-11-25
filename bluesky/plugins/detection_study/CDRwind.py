@@ -116,7 +116,7 @@ class CDRWind(WindSim):
         
         # Also get the default magnitude of the wind on this street
         default_mag = abs(np.cos(np.deg2rad(angle_diff)) * self.global_mag)
-        
+    
         # Return the magnitude and direction
         return default_mag, default_dir
         
@@ -166,21 +166,21 @@ class CDRWind(WindSim):
         # Now get the would-be wind-inclusive ground speed magnitudes
         gs_would_be = bs.traf.gs + gs_windmags
         
-        # Now project these onto the direction of the aircraft
+        # The GS should always be greater than 0, so do that
+        gs_would_be = np.where(gs_would_be < 5*kts, 5*kts, gs_would_be)
+        
+        # Get the would be gs in north and east direction
         gs_would_be_east = gs_would_be * np.sin(hdg)
         gs_would_be_north = gs_would_be * np.cos(hdg)
         
-        # Now also get the normal ground speeds
-        gseast = bs.traf.gs * np.sin(hdg)
-        gsnorth = bs.traf.gs * np.cos(hdg)
+        veast = gs_would_be_east - bs.traf.gseast
+        vnorth = gs_would_be_north - bs.traf.gsnorth
         
-        # The wind to return is just the difference between these
-        veast = gs_would_be_east - gseast
-        vnorth = gs_would_be_north - gsnorth
-
-        # Aircraft going slower than 15 kts are unaffected.
-        veast = np.where(bs.traf.tas < 15*kts, 0, veast)
-        vnorth = np.where(bs.traf.tas < 15*kts, 0 , vnorth)
+        # But we also want aircraft with low ground speeds to not experience wind
+        applywind = bs.traf.gs > 15*kts
+        veast = np.where(applywind, veast, 0)
+        vnorth = np.where(applywind, vnorth, 0)
         
+        # Also get the absolute wind value per aircraft for use in CR
         return vnorth, veast
         
