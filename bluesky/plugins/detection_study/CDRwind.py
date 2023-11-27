@@ -177,7 +177,7 @@ class CDRWind(WindSim):
         vnorth = gs_would_be_north - bs.traf.gsnorth
         
         # But we also want aircraft with low ground speeds to not experience wind
-        applywind = bs.traf.gs > 15*kts
+        applywind = bs.traf.gs > 10*kts
         veast = np.where(applywind, veast, 0)
         vnorth = np.where(applywind, vnorth, 0)
         
