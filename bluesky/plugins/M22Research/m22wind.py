@@ -25,8 +25,8 @@ class M22Wind(WindSim):
     def __init__(self):
         super().__init__()
         # Global wind properties
-        self.global_mag = 5
-        self.global_dir = 90
+        self.global_mag = 0
+        self.global_dir = 0
         # Load the streets
         self.streets_gpd, self.streets_bearings = self.load_steets('Vienna')
         # This will contain magnitudes for each street. Street index is equivalent to array index
@@ -102,27 +102,9 @@ class M22Wind(WindSim):
         
         # Also get the default magnitude of the wind on this street
         default_mag = abs(np.cos(np.deg2rad(angle_diff)) * self.global_mag)
-        
-        # We can introduce some randomness in the wind by sampling a normal distribution around the
-        # default magnitude. Absolute value in case it somehow samples a negative one.
-        sampled_mag = abs(np.random.normal(default_mag, default_mag/10))
-        
-        # If the angle difference is smaller than 30, then it is guaranteed that the direction
-        # matches the global
-        if angle_diff < 30:
-            return sampled_mag, default_dir
-        
-        # Otherwise, we first make a roll to see if we should flip a coin or not. This probability is
-        # just the sin value
-        coin_flip_probability = abs(np.sin(np.deg2rad(angle_diff)))
-        if np.random.random() < coin_flip_probability:
-            # Perform a coin flip
-            if np.random.random() < 0.5:
-                # Flip the direction
-                default_dir *= -1
-        
+    
         # Return the magnitude and direction
-        return sampled_mag, default_dir
+        return default_mag, default_dir
         
     
     def get_anglular_distance(self, unit1, unit2):
@@ -165,6 +147,9 @@ class M22Wind(WindSim):
         
         # Now get the would-be wind-inclusive ground speed magnitudes
         gs_would_be = bs.traf.gs + gs_windmags
+
+        # The GS should always be greater than 0 as the drone is capable to compensate
+        gs_would_be = np.where(gs_would_be < 5*kts, 5*kts, gs_would_be)
         
         # Now project these onto the direction of the aircraft
         gs_would_be_east = gs_would_be * np.sin(hdg)
@@ -178,9 +163,10 @@ class M22Wind(WindSim):
         veast = gs_would_be_east - gseast
         vnorth = gs_would_be_north - gsnorth
 
-        # Aircraft going slower than 15 kts are unaffected.
-        veast = np.where(bs.traf.tas < 15*kts, 0, veast)
-        vnorth = np.where(bs.traf.tas < 15*kts, 0 , vnorth)
+        # Only apply wind to cruising aircraft
+        applywind = np.logical_not(bs.traf.ap.inturn)
+        veast = np.where(applywind, veast, 0)
+        vnorth = np.where(applywind, vnorth, 0)
         
         return vnorth, veast
         
