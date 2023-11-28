@@ -165,8 +165,8 @@ class CDRWind(WindSim):
         
         # Now get the would-be wind-inclusive ground speed magnitudes
         gs_would_be = bs.traf.gs + gs_windmags
-        
-        # The GS should always be greater than 0, so do that
+
+        # The GS should always be greater than 0 as the drone is capable to compensate
         gs_would_be = np.where(gs_would_be < 5*kts, 5*kts, gs_would_be)
         
         # Get the would be gs in north and east direction
@@ -176,8 +176,8 @@ class CDRWind(WindSim):
         veast = gs_would_be_east - bs.traf.gseast
         vnorth = gs_would_be_north - bs.traf.gsnorth
         
-        # But we also want aircraft with low ground speeds to not experience wind
-        applywind = bs.traf.gs > 10*kts
+        # Only apply wind to cruising aircraft
+        applywind = np.logical_not(bs.traf.ap.inturn)
         veast = np.where(applywind, veast, 0)
         vnorth = np.where(applywind, vnorth, 0)
         

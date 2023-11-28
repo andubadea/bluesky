@@ -49,12 +49,12 @@ class APorASAS(TrafficArrays):
         if bs.traf.wind.winddim > 0:
 
             # Calculate wind correction
-            vwn, vwe = bs.traf.wind.getdata(bs.traf.lat, bs.traf.lon, bs.traf.alt)
             Vw       = np.sqrt(vwn * vwn + vwe * vwe)
             winddir  = np.arctan2(vwe, vwn)
-            drift    = np.radians(bs.traf.trk) - winddir  # [rad]
+            drift    = np.radians(self.trk) - winddir  # [rad]
             steer    = np.arcsin(np.minimum(1.0, np.maximum(-1.0,
                                      Vw * np.sin(drift) / np.maximum(0.001, bs.traf.tas))))
+
             # desired heading
             self.hdg = (self.trk + np.degrees(steer)) % 360.
         else:
