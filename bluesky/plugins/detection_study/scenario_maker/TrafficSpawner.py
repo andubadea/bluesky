@@ -183,7 +183,14 @@ class TrafficSpawner(Entity):
     @timed_function(dt = 1)
     def spawn_traffic(self):
         '''Function to spawn traffic to maintain a traffic level equal to ntraf.'''
+        # Skip first second
+        if bs.sim.simt < 1:
+            return
         attempts = 0
+        
+        # is wind enabled?
+        wind_enabled = bs.traf.wind.global_mag > 0
+        
         while bs.traf.ntraf < self.target_ntraf and attempts < 20:
             # Choose a random origin and destination
             origin = random.choice(list(self.orig_dest_dict.keys()))
@@ -224,8 +231,13 @@ class TrafficSpawner(Entity):
             # Add the edges to this guy
             self.route_edges[acidx] = edges
             
+            # For wind purposes, we want to shift edges by 1
+            edges_c = list(edges[1:])
+            # Last waypoint doesn't really matter anyway, duplicate last edge number
+            edges_c.append(edges_c[-1])
+            
             # Start adding waypoints
-            for lat, lon, turn in zip(lats, lons, turns):
+            for lat, lon, turn, edge in zip(lats, lons, turns, edges_c):
                 if turn:
                     acrte.turnspd = 5 * kts
                     acrte.swflyby = False
@@ -235,7 +247,22 @@ class TrafficSpawner(Entity):
                     acrte.swflyturn = False
                     
                 wptype  = Route.wplatlon
-                acrte.addwpt_simple(acidx, acid, wptype, lat, lon, self.alt, self.spd)
+                
+                # If wind is enabled, we want to set the cruise speed along the streets correctly
+                if wind_enabled:
+                    # Get the street number of this edge
+                    street_no = bs.traf.TrafficSpawner.street_dict[tuple(edge)]
+                    # Get the supposed wind magnitude and direction
+                    windmag = bs.traf.wind.magnitudes[street_no] * bs.traf.wind.directions[street_no]
+                    # Adjust the cruise spd
+                    wind_cruise_spd = self.spd + windmag
+                    # If this guy is smaller than 0, just set it as 5 kts
+                    if wind_cruise_spd < 0:
+                        wind_cruise_spd = 5 * kts
+                    # Add the waypoint
+                    acrte.addwpt_simple(acidx, acid, wptype, lat, lon, self.alt, wind_cruise_spd)
+                else:
+                    acrte.addwpt_simple(acidx, acid, wptype, lat, lon, self.alt, self.spd)
             
             # Calculate the flight plan
             acrte.calcfp()

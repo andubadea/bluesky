@@ -42,16 +42,19 @@ class CDRWind(WindSim):
         '''Set the magnitude [m/s] and direction [deg] of the wind.
         The direction is where the wind is blowing towards, i.e., if blowing from West towards
         East, dir needs to be 90 deg.'''
+        # Temp solution: Set the actual wind dim at 0, we're implementing wind using cruise velocities
         self.global_mag = magnitude
         self.global_dir = direction
         # Disable if the magnitude is set to 0
-        if magnitude == 0:
-            self.winddim = 0
-            return
+        # if magnitude == 0:
+        #     self.winddim = 0
+        #     return
         
         self.create_wind()
         # Set the winddim at more than 0
-        self.winddim = 1
+        #self.winddim = 1
+        
+        self.winddim = 0
 
     def load_steets(self, city):
         '''Load the streets of the city and compute their average bearings.'''      
@@ -145,7 +148,7 @@ class CDRWind(WindSim):
         '''This function needs to return vnorth and veast. Thus, we ignore the lats, lons, alts
         and just return the individual wind for each and every aircraft.'''
         # If global magnitude is 0, just return 0s
-        if self.global_mag == 0:
+        if self.global_mag == 0 or self.winddim == 0:
             return np.zeros(len(lats)), np.zeros(len(lats))
         
         if len(lats) == 1:
@@ -167,7 +170,11 @@ class CDRWind(WindSim):
         gs_would_be = bs.traf.gs + gs_windmags
 
         # The GS should always be greater than 0 as the drone is capable to compensate
-        gs_would_be = np.where(gs_would_be < 5*kts, 5*kts, gs_would_be)
+        gs_would_be = np.where(gs_would_be < 2*kts, 2*kts, gs_would_be)
+        # Also compensate for CR solutions, as drones can have negative TAS values
+        # If the CR command is smaller than the windmag along the street, set the
+        # wind as the value of the tas.
+        gs_would_be = np.where(bs.traf.cr.tas < gs_windmags, bs.traf.cr.tas, gs_would_be)
         
         # Get the would be gs in north and east direction
         gs_would_be_east = gs_would_be * np.sin(hdg)
