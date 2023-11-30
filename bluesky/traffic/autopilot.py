@@ -287,11 +287,11 @@ class Autopilot(Entity, replaceable=True):
             if bs.traf.wind.global_mag > 0:
                 # We have wind, so let's calculate the cruise speed for this aircraft
                 iactwp = bs.traf.ap.route[i].iactwp
-                street_no = bs.traf.TrafficHandler.street_numbers[i][iactwp]
+                street_no = int(bs.traf.TrafficHandler.street_numbers[i][iactwp])
                 # Get the wind magnitude and direction
                 windmag = bs.traf.wind.magnitudes[street_no] * bs.traf.wind.directions[street_no]
                 # Adjust the cruise spd
-                wind_cruise_spd = self.spd + windmag
+                wind_cruise_spd = self.cruisespd[i] + windmag
                 # If this guy is smaller than 0, just set it as 5 kts
                 if wind_cruise_spd < 0:
                     wind_cruise_spd = 5 * kts
@@ -666,6 +666,26 @@ class Autopilot(Entity, replaceable=True):
         # for aircraft nr. idx (scalar)
         if torta < -90. : # -999 signals there is no RTA defined in remainder of route
             return False
+        
+        # We need to calculate the RTA limits due to wind.
+        # For example, if wind is blowing from the front and RTA is demanding
+        # 35 knots, we can't actually do 35 knots because that's our performance
+        # limit. So we need to limit the RTA such that the wind is taken into
+        # account.
+        # First, get the wind this aircraft is supposed to experience
+        if bs.traf.wind.global_mag > 0:
+            # We have wind, so let's calculate the cruise speed for this aircraft
+            iactwp = bs.traf.ap.route[idx].iactwp
+            street_no = int(bs.traf.TrafficHandler.street_numbers[idx][iactwp])
+            # Get the wind magnitude and direction
+            windmag = bs.traf.wind.magnitudes[street_no] * bs.traf.wind.directions[street_no]
+            # The maximum and minimum velocities that this drone can now do are different, calculate em
+            vmax_wind = bs.traf.perf.vmax[idx] + windmag
+            vmin_wind = -bs.traf.perf.vmax[idx] + windmag
+
+        else:
+            vmax_wind = bs.traf.perf.vmax[idx]
+            vmin_wind = -bs.traf.perf.vmax[idx]
 
         deltime = torta-bs.sim.simt # Remaining time to next RTA [s] in simtime
         if deltime>0: # Still possible?
@@ -685,12 +705,13 @@ class Autopilot(Entity, replaceable=True):
 
             # Performance limits on speed will be applied in traf.update
             if bs.traf.actwp.spdcon[idx]<0. and bs.traf.swvnavspd[idx]:
-                bs.traf.actwp.spd[idx] = rtacas
+                bs.traf.actwp.spd[idx] = np.clip(rtacas, vmin_wind, vmax_wind)
                 #print("setspeedforRTA: xtorta =",xtorta)
 
-            return rtacas
+            return np.clip(rtacas, vmin_wind, vmax_wind)
         else:
-            return False
+            # Go as fast as possible to maybe catch up
+            return np.clip(bs.traf.perf.vmax[idx], vmin_wind, vmax_wind)
         
     def calcvturnrta(self, idx, xtorta, deltime, amax):
         '''Takes into account turning. Considers that the RTA is set at the point just before the

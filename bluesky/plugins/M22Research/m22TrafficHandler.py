@@ -192,7 +192,7 @@ class TrafficHandler(Entity):
             self.delete(0)
         return
     
-    @timed_function(name='cruisespd', dt = 0.5)
+    #@timed_function(name='cruisespd', dt = 0.5)
     def speed_control(self):
         '''Set the cruise speed of all aircraft.'''
         # First, some checks
@@ -209,4 +209,4 @@ class TrafficHandler(Entity):
                                                   np.logical_not(in_vert_man),
                                                   np.logical_not(speed_zero)))
         
-        bs.traf.selspd = np.where(set_cruise_speed, bs.traf.TrafficHandler.cruise_spd, bs.traf.selspd)
+        bs.traf.selspd = np.where(set_cruise_speed, bs.traf.actwp.cruisespd, bs.traf.selspd)
