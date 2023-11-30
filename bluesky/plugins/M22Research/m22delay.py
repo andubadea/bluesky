@@ -95,6 +95,11 @@ class M22Delay(Entity):
             wpt_data_stripped = wpt_data_stripped.flatten()
             # Now add the waypoints for this aircraft
             Route.addwaypoints(acidx, *wpt_data_stripped)
+            # Add the RTA to the route
+            for wpidx, rta_point in enumerate(rta_info):
+                if rta_point:
+                    acrte = Route._routes.get(acid)
+                    acrte.wprta[wpidx] = float(rta_point)
             # Some more commands to get it going
             bs.traf.ap.setLNAV(acidx, True)
             bs.traf.ap.setVNAV(acidx, True)
