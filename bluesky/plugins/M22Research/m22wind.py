@@ -50,8 +50,8 @@ class M22Wind(WindSim):
             return
         
         self.create_wind()
-        # Set the winddim at more than 0
-        self.winddim = 1
+        # We don't want the BlueSky way of dealing with wind
+        self.winddim = 0
 
     def load_steets(self, city):
         '''Load the streets of the city and compute their average bearings.'''      
@@ -119,7 +119,7 @@ class M22Wind(WindSim):
         '''Because there is no trafarray with iactwp, this needs to be a for loop.'''
         # Get the active waypoint indices
         iactwps = [route.iactwp for route in bs.traf.ap.route]
-        # Now return the street indices on which aircraft is in function of iactwp
+        # Now return the street indices on which aircraft are in function of iactwp
         return [int(bs.traf.TrafficHandler.street_numbers[i][j]) for i,j in enumerate(iactwps)]
         
     

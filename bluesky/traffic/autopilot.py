@@ -11,7 +11,7 @@ from bluesky import stack
 from bluesky.tools import geo
 from bluesky.tools.misc import degto180
 from bluesky.tools.position import txt2pos
-from bluesky.tools.aero import ft, nm, fpm, vcasormach2tas, vcas2tas, tas2cas, cas2tas, g0
+from bluesky.tools.aero import ft, nm, fpm, vcasormach2tas, vcas2tas, tas2cas, cas2tas, g0, kts
 from bluesky.core import Entity, timed_function
 from .route import Route
 
@@ -282,6 +282,25 @@ class Autopilot(Entity, replaceable=True):
             # VNAV = FMS ALT/SPD mode incl. RTA
             self.ComputeVNAV(i, toalt, bs.traf.actwp.xtoalt[i], bs.traf.actwp.torta[i],
                              bs.traf.actwp.xtorta[i])
+            
+            # Calculate cruise stuff
+            if bs.traf.wind.global_mag > 0:
+                # We have wind, so let's calculate the cruise speed for this aircraft
+                iactwp = bs.traf.ap.route[i].iactwp
+                street_no = bs.traf.TrafficHandler.street_numbers[i][iactwp]
+                # Get the wind magnitude and direction
+                windmag = bs.traf.wind.magnitudes[street_no] * bs.traf.wind.directions[street_no]
+                # Adjust the cruise spd
+                wind_cruise_spd = self.spd + windmag
+                # If this guy is smaller than 0, just set it as 5 kts
+                if wind_cruise_spd < 0:
+                    wind_cruise_spd = 5 * kts
+                    
+                # Set the current cruise speed as this
+                bs.traf.actwp.cruisespd[i] = wind_cruise_spd
+            else:
+                # Set it as the default cruise speed of this aircraft
+                bs.traf.actwp.cruisespd[i] = self.cruisespd[i]
 
         
 
@@ -454,12 +473,12 @@ class Autopilot(Entity, replaceable=True):
         
         # Apply the cruise speed if the past or next waypoint doesn't have a speed constraint 
         # and if there is actually a cruise speed to apply
-        usecruisespd = np.logical_and.reduce((self.cruisespd > 0,
+        usecruisespd = np.logical_and.reduce((bs.traf.actwp.cruisespd > 0,
                                               bs.traf.actwp.spd < 0,
                                               np.logical_not(usenextspdcon),
                                               justexitedturn))
         
-        bs.traf.selspd = np.where(usecruisespd, self.cruisespd, bs.traf.selspd)
+        bs.traf.selspd = np.where(usecruisespd, bs.traf.actwp.cruisespd, bs.traf.selspd)
 
         # Below crossover altitude: CAS=const, above crossover altitude: Mach = const
         self.tas = vcasormach2tas(bs.traf.selspd, bs.traf.alt)

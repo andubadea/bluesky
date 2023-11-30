@@ -40,6 +40,7 @@ class ActiveWaypoint(Entity, replaceable=True):
             self.swlastwp    = np.array([],dtype=bool) # switch indicating this is the last waypoint
             self.curlegdir   = np.array([])    # [deg] direction to active waypoint upon activation
             self.curleglen   = np.array([])    # [deg] direction to active waypoint upon activation
+            self.cruisespd   = np.array([])    # m/s, indended cruise speed while going to this waypoint
 
     def create(self, n=1):
         super().create(n)
@@ -74,6 +75,7 @@ class ActiveWaypoint(Entity, replaceable=True):
         self.swlastwp[-n:]   = False    # Switch indicating active waypoint is last waypoint
         self.curlegdir[-n:]  = -999.0   # [deg] direction to active waypoint upon activation
         self.curleglen[-n:]  = -999.0   # [nm] distance to active waypoint upon activation
+        self.cruisespd[-n:]  = -999.0   # m/s, indended cruise speed while going to this waypoint
   
     def reached(self, qdr, dist):
         # Calculate distance before waypoint where to start the turn
