@@ -397,7 +397,7 @@ class OpenAP(PerfBase):
     def calc_axmax(self):
         # accelerations depending on phase and wing type
         axmax_fixwing_ground = 2
-        axmax_rotor = 3.5
+        axmax_rotor = 3
 
         axmax = np.zeros(bs.traf.ntraf)
 
