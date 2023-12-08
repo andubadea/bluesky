@@ -81,7 +81,7 @@ class M22Delay(Entity):
             # Set the default cruise speed, turn speed, and rate
             bs.traf.ap.cruisespd[acidx] = acspd
             bs.traf.ap.route[acidx].addwptMode(acidx, 'TURNBANK', 25*ft)
-            bs.traf.ap.route[acidx].addwptMode(acidx, 'TURNRAD', 0.00216*ft)
+            bs.traf.ap.route[acidx].addwptMode(acidx, 'TURNRAD', 0.00269978*ft)
             # Extract the street number and RTA info
             bs.traf.TrafficHandler.street_numbers[acidx] = wpt_data[:,6]
             # We need to format this stuff in the following way:
