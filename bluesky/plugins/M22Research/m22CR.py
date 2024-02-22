@@ -288,8 +288,8 @@ class M22CR(ConflictResolution):
                                     solutions.append(self.norm(velocity))
                                 else:
                                     solutions.append(-self.norm(velocity))
-                    elif type(intersection) == MultiPoint.geoms:
-                        for p in intersection:
+                    elif type(intersection) == MultiPoint:
+                        for p in intersection.geoms:
                             velocity = [p.x, p.y]
                             if np.degrees(self.angle(velocity, v1)) < 1:
                                 solutions.append(self.norm(velocity))
