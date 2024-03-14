@@ -27,6 +27,7 @@ class M22Delay(Entity):
         super().__init__()
         self.mean = 0 # Mean delay
         self.delay_probability = 0 # probability of delay
+        self.rta_on = False
         
         # Upper limit for delay
         self.delay_limit = 300 # seconds
@@ -39,6 +40,7 @@ class M22Delay(Entity):
     def reset(self):
         self.mean = 0
         self.delay_probability = 0
+        self.rta_on = False
         self.aircraft_buffer = dict()
         with self.settrafarrays():
             self.create_time = []
@@ -90,6 +92,11 @@ class M22Delay(Entity):
             wpt_data_stripped = wpt_data[:,0:6]
             # Put RTA last
             wpt_data_stripped[:, [5, 4]] = wpt_data_stripped[:, [4, 5]]
+            # Change RTA if disabled
+            if not self.rta_on:
+                # RTA is off, set everyting as None
+                wpt_data_stripped[:,5] = [None] * len(wpt_data_stripped)
+                
             wpt_data_stripped = wpt_data_stripped.flatten()
             # Now add the waypoints for this aircraft
             Route.addwaypoints(acidx, *wpt_data_stripped)
@@ -139,6 +146,10 @@ class M22Delay(Entity):
             wpt_data_stripped = wpt_data[:,0:6]
             # Put RTA last
             wpt_data_stripped[:, [5, 4]] = wpt_data_stripped[:, [4, 5]]
+            if not self.rta_on:
+                # RTA is off, set everyting as None
+                wpt_data_stripped[:,5] = [None] * len(wpt_data_stripped)
+                
             wpt_data_stripped = wpt_data_stripped.flatten()
             # Now add the waypoints for this aircraft
             Route.addwaypoints(acidx, *wpt_data_stripped)
@@ -189,3 +200,7 @@ class M22Delay(Entity):
             self.delay_probability = 0
         else:
             self.delay_probability = probability
+            
+    @stack.command
+    def enableRTA(self):
+        self.rta_on = True
