@@ -711,6 +711,7 @@ class Autopilot(Entity, replaceable=True):
             return np.clip(rtacas, vmin_wind, vmax_wind)
         else:
             # Go as fast as possible to maybe catch up
+            bs.traf.actwp.spd[idx] = np.clip(bs.traf.perf.vmax[idx], vmin_wind, vmax_wind)
             return np.clip(bs.traf.perf.vmax[idx], vmin_wind, vmax_wind)
         
     def calcvturnrta(self, idx, xtorta, deltime, amax):
