@@ -91,7 +91,7 @@ def start(hostname=None):
 
     else:
         client.connect(hostname=hostname)
-        bs.stack.stack('BATCH M2.2/batch.scn')
+        bs.stack.stack(bs.settings.startup_command)
 
     # Start the Qt main loop
     # app.exec_()
