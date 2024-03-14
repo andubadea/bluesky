@@ -132,7 +132,7 @@ class M22Delay(Entity):
             # Set the default cruise speed, turn speed, and rate
             bs.traf.ap.cruisespd[acidx] = acspd
             bs.traf.ap.route[acidx].addwptMode(acidx, 'TURNBANK', 25*ft)
-            bs.traf.ap.route[acidx].addwptMode(acidx, 'TURNRAD', 0.00216*ft)
+            bs.traf.ap.route[acidx].addwptMode(acidx, 'TURNRAD', 0.00269978*ft)
             # Extract the street number and RTA info
             bs.traf.TrafficHandler.street_numbers[acidx] = wpt_data[:,6]
             # First, remove street info
@@ -180,4 +180,12 @@ class M22Delay(Entity):
         """Set the average and standard deviation of the delay.
         """
         self.mean = mean
-        self.delay_probability = probability
+        assert (mean >= 0 and probability >= 0)
+        if 1 < probability <= 100:
+            # Probably a percentage
+            probability = probability / 100
+        elif probability > 100:
+            # Probably a mistake, set it as 0
+            self.delay_probability = 0
+        else:
+            self.delay_probability = probability
