@@ -27,12 +27,16 @@ class M22Delay(Entity):
         super().__init__()
         self.mean = 0 # Mean delay
         self.delay_probability = 0 # probability of delay
-        self.rta_on = False
+        self.rta_on = False # Use RTA or not
+        self.spawn_protention = False # Stop aircraft from spawning in a LOS
         
         # Upper limit for delay
         self.delay_limit = 300 # seconds
         
+        # Aircraft buffer
         self.aircraft_buffer = dict()
+        
+        
         
         with self.settrafarrays():
             self.create_time = []
@@ -41,6 +45,7 @@ class M22Delay(Entity):
         self.mean = 0
         self.delay_probability = 0
         self.rta_on = False
+        self.spawn_protention = False
         self.aircraft_buffer = dict()
         with self.settrafarrays():
             self.create_time = []
@@ -163,6 +168,9 @@ class M22Delay(Entity):
     def proximity_check(self, aclat, aclon, acalt):
         '''Checks whether an aircraft is safe to spawn at the specified location.
         Returns true if we can spawn, false if we cannot.'''
+        if not self.spawn_protention:
+            # Spawn protection not enabled
+            return True
         layer_diff = bs.traf.TrafficHandler.cruiselayerdiff
         # First of all, get all the aircraft that are within the altitude tolerance.
         ac_close_alt = np.logical_and(acalt - layer_diff < bs.traf.alt, 
@@ -204,3 +212,7 @@ class M22Delay(Entity):
     @stack.command
     def enableRTA(self):
         self.rta_on = True
+        
+    @stack.command
+    def enableSpawnProtection(self):
+        self.spawn_protention = True
