@@ -32,7 +32,7 @@ class TrafficSpawner(Entity):
         super().__init__()
         self.target_ntraf = 250
         # Load default city
-        self.graph, self.edges, self.nodes, self.street_dict = self.loadcity('Vienna')
+        self.graph, self.edges, self.nodes, self.street_dict = self.loadcity('Vienna_section')
         # Traffic ID increment
         self.traf_id = 1
         #default alt and speed
@@ -77,7 +77,7 @@ class TrafficSpawner(Entity):
     def reset(self):
         self.target_ntraf = 50
         # Load default city
-        self.graph, self.edges, self.nodes, self.street_dict = self.loadcity('Vienna')
+        self.graph, self.edges, self.nodes, self.street_dict = self.loadcity('Vienna_section')
         # Traffic ID increment
         self.traf_id = 1
         #default alt and speed
