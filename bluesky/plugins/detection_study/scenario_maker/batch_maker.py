@@ -10,7 +10,7 @@ scenario_names = []
 
 # Independent variables
 #densities = [50, 100, 150, 200, 250]
-densities = [10,20,30,40,50]
+densities = [25, 50, 75, 100]
 winds = []
 directions = []
 cd_cr_methods = [['M22CD', 'M22CR'],['M22CD', 'M22CRCOOP']]
