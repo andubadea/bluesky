@@ -27,7 +27,7 @@ for density in densities:
                     '00:00:00>IMPL WINDSIM CDRWIND\n' + \
                     '00:00:00>SETWIND 0 0\n' + \
                     '00:00:01>FF'
-            scen_name = f'{experiment_name}_{method[0]}_{density}_{i+1}_{0}_{0}_CR'
+            scen_name = f'{experiment_name}_{method[1]}_{density}_{i+1}_{0}_{0}_CR'
             scenario_names.append(scen_name)
             with open(f'{folder_name}{scen_name}.scn', 'w') as f:
                 f.write(to_write)
@@ -43,7 +43,7 @@ for density in densities:
                     '00:00:00>IMPL WINDSIM CDRWIND\n' + \
                     '00:00:00>SETWIND 0 0\n' + \
                     '00:00:01>FF'
-            scen_name = f'{experiment_name}_{method[0]}_{density}_{i+1}_{0}_{0}_NR'
+            scen_name = f'{experiment_name}_{method[1]}_{density}_{i+1}_{0}_{0}_NR'
             scenario_names.append(scen_name)
             with open(f'{folder_name}{scen_name}.scn', 'w') as f:
                 f.write(to_write)
@@ -64,7 +64,7 @@ for windmag in winds:
                         '00:00:00>IMPL WINDSIM CDRWIND\n' + \
                         f'00:00:00>SETWIND {windmag} {winddir}\n' + \
                         '00:00:01>FF'
-                scen_name = f'{experiment_name}_{method[0]}_{density}_{i+1}_{windmag}_{winddir}_CR'
+                scen_name = f'{experiment_name}_{method[1]}_{density}_{i+1}_{windmag}_{winddir}_CR'
                 scenario_names.append(scen_name)
                 with open(f'{folder_name}{scen_name}.scn', 'w') as f:
                     f.write(to_write)
