@@ -149,7 +149,7 @@ class M22CRCOOP(ConflictResolution):
                     # Get maximum and minimum velocity of ownship
                     vmin = ownship.perf.vmin[idx1]
                     # If we're in a turn, or close to one, the maximum speed is the turn speed
-                    if bs.traf.ap.inturn[idx1] or bs.traf.ap.dist2turn[idx1] < 50:
+                    if bs.traf.ap.inturn[idx1]:
                         vmax = bs.traf.actwp.nextturnspd[idx1] 
                     else:
                         vmax = ownship.perf.vmax[idx1]
@@ -250,17 +250,17 @@ class M22CRCOOP(ConflictResolution):
                 recd_speed[i] = self.cruise_spd
                 continue
             
-            elif own_has_priority:
-                # We can ignore this intruder.
-                recd_speed[i] = self.cruise_spd
-                continue
+            # elif own_has_priority:
+            #     # We can ignore this intruder.
+            #     recd_speed[i] = self.cruise_spd
+            #     continue
             else:
                 # We probably just have a normal crossing conflict, let's VO this
                 velocity_obstacle = self.get_VO(conf, ownship, intruder, idx1, idx2)
                 # Get maximum and minimum velocity of ownship
                 vmin = ownship.perf.vmin[idx1]
                 # If we're in a turn, or close to one, the maximum speed is the turn speed
-                if bs.traf.ap.inturn[idx1] or bs.traf.ap.dist2turn[idx1] < 50:
+                if bs.traf.ap.inturn[idx1]:
                     vmax = bs.traf.actwp.nextturnspd[idx1] 
                 else:
                     vmax = ownship.perf.vmax[idx1]
@@ -341,9 +341,9 @@ class M22CRCOOP(ConflictResolution):
             
         # We're done with the for loop, we have some decisions to make.
         # Easy if we don't have priority or have priority above all aircraft
-        if not any(prio) or sum(prio) < len(prio)/2:
+        if sum(prio) < len(prio)/2.:
             gs_new = min(min(recd_speed), bs.traf.ap.tas[idx1]) # Take minimum speed
-        elif all(prio) or sum(prio) > len(prio)/2:
+        elif sum(prio) > len(prio)/2.:
             gs_new = max(max(recd_speed), bs.traf.ap.tas[idx1])
         else:
             #Priority stalemate between everyone, just go with minimum I guess
@@ -569,7 +569,7 @@ class M22CRCOOP(ConflictResolution):
                 # Also check the distance and altitude between the two aircraft.
                 distance = self.norm(dist)
                 # We want enough distance between aircraft
-                dist_ok = (distance > self.rpz * 2) 
+                dist_ok = (distance > self.rpz * 1.2) 
                 # We also want enough altitude
                 alt_ok = abs(ownship.alt[idx1]-intruder.alt[idx2]) >= (2*self.cruiselayerdiff)
                 # hor_los:
@@ -608,14 +608,14 @@ class M22CRCOOP(ConflictResolution):
                 # autopilot speed is lower than the CR speed. If it is, then we need to update
                 # the speed to that value. Thus, either the conflict is still ok and CD won't be
                 # triggered again, or a new conflict will be triggered and CR will take over again.
-                if self.tas[idx1] > bs.traf.ap.tas[idx1]:
+                if bs.traf.ap.inturn[idx1]:
                     self.tas[idx1] = bs.traf.ap.tas[idx1]
                     
                 # However, if we have priority, we can resume normal operations
                 qdr = bs.traf.cd.qdr_mat[idx1, idx2]
                 qdr_intruder = ((qdr - ownship.trk[idx1]) + 180) % 360 - 180  
                 intr_in_back = (qdr_intruder < -180 + self.frnt_tol or 180 - self.frnt_tol < qdr_intruder)
-                if intr_in_back or self.check_prio(conf, ownship, intruder, idx1, idx2):
+                if intr_in_back:
                     # Set the speed to the autopilot one
                     self.tas[idx1] = bs.traf.ap.tas[idx1]
                 
