@@ -582,7 +582,7 @@ class M22CR(ConflictResolution):
                 # then they it is a bouncing conflict. ASAS should stay active until
                 # the bouncing stops.
                 is_bouncing = \
-                    abs(ownship.trk[idx1] - intruder.trk[idx2]) < self.cruiselayerdiff and \
+                    abs(ownship.trk[idx1] - intruder.trk[idx2]) < self.frnt_tol and \
                     hdist < conf.rpz[idx1] * self.resofach
                     
                 # Group some checks together
