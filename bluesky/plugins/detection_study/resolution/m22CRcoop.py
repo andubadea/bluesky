@@ -149,7 +149,7 @@ class M22CRCOOP(ConflictResolution):
                     # Get maximum and minimum velocity of ownship
                     vmin = ownship.perf.vmin[idx1]
                     # If we're in a turn, or close to one, the maximum speed is the turn speed
-                    if bs.traf.ap.inturn[idx1]:
+                    if bs.traf.ap.inturn[idx1] or bs.traf.ap.dist2turn[idx1] < 50:
                         vmax = bs.traf.actwp.nextturnspd[idx1] 
                     else:
                         vmax = ownship.perf.vmax[idx1]
@@ -260,7 +260,7 @@ class M22CRCOOP(ConflictResolution):
                 # Get maximum and minimum velocity of ownship
                 vmin = ownship.perf.vmin[idx1]
                 # If we're in a turn, or close to one, the maximum speed is the turn speed
-                if bs.traf.ap.inturn[idx1]:
+                if bs.traf.ap.inturn[idx1] or bs.traf.ap.dist2turn[idx1] < 50:
                     vmax = bs.traf.actwp.nextturnspd[idx1] 
                 else:
                     vmax = ownship.perf.vmax[idx1]
@@ -611,13 +611,13 @@ class M22CRCOOP(ConflictResolution):
                 if bs.traf.ap.inturn[idx1]:
                     self.tas[idx1] = bs.traf.ap.tas[idx1]
                     
-                # However, if we have priority, we can resume normal operations
-                qdr = bs.traf.cd.qdr_mat[idx1, idx2]
-                qdr_intruder = ((qdr - ownship.trk[idx1]) + 180) % 360 - 180  
-                intr_in_back = (qdr_intruder < -180 + self.frnt_tol or 180 - self.frnt_tol < qdr_intruder)
-                if intr_in_back:
-                    # Set the speed to the autopilot one
-                    self.tas[idx1] = bs.traf.ap.tas[idx1]
+                # # However, if we have priority, we can resume normal operations
+                # qdr = bs.traf.cd.qdr_mat[idx1, idx2]
+                # qdr_intruder = ((qdr - ownship.trk[idx1]) + 180) % 360 - 180  
+                # intr_in_back = (qdr_intruder < -180 + self.frnt_tol or 180 - self.frnt_tol < qdr_intruder)
+                # if intr_in_back:
+                #     # Set the speed to the autopilot one
+                #     self.tas[idx1] = bs.traf.ap.tas[idx1]
                 
             else:
                 # Switch ASAS off for ownship if there are no other conflicts

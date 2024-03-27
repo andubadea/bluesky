@@ -10,12 +10,12 @@ from shapely.affinity import translate
 def init_plugin():
     # Configuration parameters
     config = {
-        'plugin_name': 'M22CR',
+        'plugin_name': 'M22CRold',
         'plugin_type': 'sim'
     }
     return config
 
-class M22CR(ConflictResolution):
+class M22CRold(ConflictResolution):
     def __init__(self):
         super().__init__()
         self.enable_altitude_CR = False
@@ -384,26 +384,7 @@ class M22CR(ConflictResolution):
             return True
         
         return False
-    
-    def check_prio_all(self, conf, ownship, intruder, idx1):
-        """Returns True if ownship has priority over all of its intruders.
-        """
-        # Get all the idx of the intruders for this aircraft.
-        idx_pairs = self.get_pairs(conf, ownship, intruder, idx1)
-        for idx_pair in idx_pairs:
-            idx2 = intruder.id.index(conf.confpairs[idx_pair][1])
-            # Check if this intruder is in the back
-            qdr = bs.traf.cd.qdr_mat[idx1, idx2]
-            qdr_intruder = ((qdr - ownship.trk[idx1]) + 180) % 360 - 180  
-            intr_in_back = (qdr_intruder < -180 + self.frnt_tol or 180 - self.frnt_tol < qdr_intruder)
-            # Also check the other priority rules
-            other_prio = self.check_prio(conf, ownship, intruder, idx1, idx2)
-            if not intr_in_back or not other_prio:
-                # We don't have prio over all other aircraft
-                return False
-        
-        # If we reach this point, we have priority over all intruders
-        return True
+            
             
     def ac_above_below_check(self, conf, ownship, intruder, idx1, dist2others):
         """This function checks if the aircraft can ascend or descend in function of what
@@ -567,7 +548,7 @@ class M22CR(ConflictResolution):
                 # Also check the distance and altitude between the two aircraft.
                 distance = self.norm(dist)
                 # We want enough distance between aircraft
-                dist_ok = (distance > self.rpz * 1.2) 
+                dist_ok = (distance > self.rpz * 2) 
                 # We also want enough altitude
                 alt_ok = abs(ownship.alt[idx1]-intruder.alt[idx2]) >= (2*self.cruiselayerdiff)
                 # hor_los:
@@ -610,7 +591,10 @@ class M22CR(ConflictResolution):
                     self.tas[idx1] = bs.traf.ap.tas[idx1]
                     
                 # However, if we have priority, we can resume normal operations
-                if self.check_prio_all(conf, ownship, intruder, idx1):
+                qdr = bs.traf.cd.qdr_mat[idx1, idx2]
+                qdr_intruder = ((qdr - ownship.trk[idx1]) + 180) % 360 - 180  
+                intr_in_back = (qdr_intruder < -180 + self.frnt_tol or 180 - self.frnt_tol < qdr_intruder)
+                if intr_in_back or self.check_prio(conf, ownship, intruder, idx1, idx2):
                     # Set the speed to the autopilot one
                     self.tas[idx1] = bs.traf.ap.tas[idx1]
                 
