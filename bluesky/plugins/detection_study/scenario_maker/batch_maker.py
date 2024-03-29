@@ -13,7 +13,7 @@ densities = [50, 100, 150, 200, 250, 300, 350, 400, 450, 500, 550, 600]
 winds = [2,4,6,8]
 directions = [0, 90, 180, 270]
 cd_cr_methods = [['M22CD', 'M22CR'],['INTENTCD', 'DEFENSIVECR'], ['DEFENSIVECD', 'DEFENSIVECR']]
-cd_cr_methods = [['M22CD', 'M22CR']]
+cd_cr_methods = [['M22CD', 'M22CRP'],['M22CD', 'M22CRC']]
 
 for density in densities:
     for method in cd_cr_methods:
@@ -27,27 +27,27 @@ for density in densities:
                     '00:00:00>IMPL WINDSIM CDRWIND\n' + \
                     '00:00:00>SETWIND 0 0\n' + \
                     '00:00:01>FF'
-            scen_name = f'{experiment_name}_{method[0]}_{density}_{i}_{0}_{0}_CR'
+            scen_name = f'{experiment_name}_{method[1]}_{density}_{i}_{0}_{0}_CR'
             scenario_names.append(scen_name)
             with open(f'{folder_name}{scen_name}.scn', 'w') as f:
                 f.write(to_write)
 # #Noreso
-# for density in densities:
-#     for method in cd_cr_methods:
-#         for i in range(num_repetitions):
-#             to_write = f'00:00:00>TRAFFICNUMBER {density}\n' + \
-#                     f'00:00:00>SEED {i}\n' + \
-#                     f'00:00:00>CDMETHOD {method[0]}\n' + \
-#                     '00:00:00>STARTLOGS\n' + \
-#                     '00:00:00>STARTCDRLOGS\n' + \
-#                     '00:00:00>IMPL WINDSIM CDRWIND\n' + \
-#                     '00:00:00>SETWIND 0 0\n' + \
-#                     '00:00:01>FF'
-#             scen_name = f'{experiment_name}_{method[0]}_{density}_{i}_{0}_{0}_NR'
-#             scenario_names.append(scen_name)
-#             with open(f'{folder_name}{scen_name}.scn', 'w') as f:
-#                 f.write(to_write)
-#         break
+for density in densities:
+    for method in cd_cr_methods:
+        for i in range(num_repetitions):
+            to_write = f'00:00:00>TRAFFICNUMBER {density}\n' + \
+                    f'00:00:00>SEED {i}\n' + \
+                    f'00:00:00>CDMETHOD {method[0]}\n' + \
+                    '00:00:00>STARTLOGS\n' + \
+                    '00:00:00>STARTCDRLOGS\n' + \
+                    '00:00:00>IMPL WINDSIM CDRWIND\n' + \
+                    '00:00:00>SETWIND 0 0\n' + \
+                    '00:00:01>FF'
+            scen_name = f'{experiment_name}_{method[1]}_{density}_{i}_{0}_{0}_NR'
+            scenario_names.append(scen_name)
+            with open(f'{folder_name}{scen_name}.scn', 'w') as f:
+                f.write(to_write)
+        break
                 
 # Wind
 for windmag in winds:
@@ -64,7 +64,7 @@ for windmag in winds:
                         '00:00:00>IMPL WINDSIM CDRWIND\n' + \
                         f'00:00:00>SETWIND {windmag} {winddir}\n' + \
                         '00:00:01>FF'
-                scen_name = f'{experiment_name}_{method[0]}_{density}_{i}_{windmag}_{winddir}_CR'
+                scen_name = f'{experiment_name}_{method[1]}_{density}_{i}_{windmag}_{winddir}_CR'
                 scenario_names.append(scen_name)
                 with open(f'{folder_name}{scen_name}.scn', 'w') as f:
                     f.write(to_write)
