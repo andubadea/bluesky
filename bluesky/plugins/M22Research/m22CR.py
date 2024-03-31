@@ -18,7 +18,7 @@ def init_plugin():
 class M22CR(ConflictResolution):
     def __init__(self):
         super().__init__()
-        self.enable_altitude_CR = True
+        self.enable_altitude_CR = False
         self.cruiselayerdiff = 30 * ft
         self.frnt_tol = 20 #deg
         self.dist_tol = 80
@@ -141,77 +141,7 @@ class M22CR(ConflictResolution):
                         # Just stop
                         recd_speed[i] = 0*kts
                 else:
-                    # Velocity obstacle I guess
-                    velocity_obstacle = self.get_VO(conf, ownship, intruder, idx1, idx2)
-                    # Get maximum and minimum velocity of ownship
-                    vmin = ownship.perf.vmin[idx1]
-                    # If we're in a turn, or close to one, the maximum speed is the turn speed
-                    if bs.traf.ap.inturn[idx1] or bs.traf.ap.dist2turn[idx1] < 50:
-                        vmax = bs.traf.actwp.nextturnspd[idx1] 
-                    else:
-                        vmax = ownship.perf.vmax[idx1]
-                    # Create velocity line
-                    if (v1[0]**2 + v1[1]**2) > 0:
-                        v_dir = self.normalized(v1)
-                    else:
-                        # Just take the heading
-                        temp_vec = [np.sin(np.deg2rad(bs.traf.hdg[idx1])),np.cos(np.deg2rad(bs.traf.hdg[idx1]))]
-                        v_dir = self.normalized(temp_vec)
-                        
-                    v_line_min = v_dir * vmin
-                    v_line_max = v_dir * vmax
-                    v_line = LineString([v_line_min, v_line_max])
-                    
-                    # Get the intersection and process it
-                    intersection = velocity_obstacle.intersection(v_line)
-                    solutions = []
-                    if intersection:
-                        if type(intersection) == LineString:
-                            for velocity in list(intersection.coords):
-                                # Check whether to put velocity "negative" or "positive". 
-                                # Drones can fly backwards.
-                                if np.degrees(self.angle(velocity, v1)) < 1:
-                                    solutions.append(self.norm(velocity))
-                                else:
-                                    solutions.append(-self.norm(velocity))
-                        elif type(intersection) == MultiLineString or type(intersection) == GeometryCollection:
-                            for line in intersection:
-                                for velocity in list(line.coords):
-                                    # Check whether to put velocity "negative" or "positive". 
-                                    # Drones can fly backwards.
-                                    if np.degrees(self.angle(velocity, v1)) < 1:
-                                        solutions.append(self.norm(velocity))
-                                    else:
-                                        solutions.append(-self.norm(velocity))
-                        elif type(intersection) == MultiPoint.geoms:
-                            for p in intersection:
-                                velocity = [p.x, p.y]
-                                if np.degrees(self.angle(velocity, v1)) < 1:
-                                    solutions.append(self.norm(velocity))
-                                else:
-                                    solutions.append(-self.norm(velocity))
-                        else:
-                            # Maybe it's a point?
-                            velocity = [intersection.x, intersection.y]
-                            if np.degrees(self.angle(velocity, v1)) < 1:
-                                solutions.append(self.norm(velocity))
-                            else:
-                                solutions.append(-self.norm(velocity))
-                        
-                        # Divide the speeds in negatives and positives
-                        pos_speeds = [spd for spd in solutions if spd >= 0]
-                        neg_speeds = [spd for spd in solutions if spd < 0]
-                        # If there are positive ones, apply the smallest one. Otherwise, apply a negative speed
-                        if pos_speeds:
-                            recd_speed[i] = min(pos_speeds)
-                        elif neg_speeds:
-                            recd_speed[i] = max(neg_speeds)
-                        else:
-                            # Do nothing I guess
-                            recd_speed[i] = bs.traf.ap.tas[idx1]
-                    else:
-                        # No intersection, so we can't really do anything
-                        recd_speed[i] = bs.traf.ap.tas[idx1]
+                    recd_speed[i] = self.get_VO_speed(conf, ownship, intruder, idx1, idx2)
                     
                 if self.enable_altitude_CR:
                     # We can potentially perform an overtake manoeuver. Check if we can ascend.
@@ -246,78 +176,7 @@ class M22CR(ConflictResolution):
                 recd_speed[i] = self.cruise_spd
                 continue
             else:
-                # We probably just have a normal crossing conflict, let's VO this
-                velocity_obstacle = self.get_VO(conf, ownship, intruder, idx1, idx2)
-                # Get maximum and minimum velocity of ownship
-                vmin = ownship.perf.vmin[idx1]
-                # If we're in a turn, or close to one, the maximum speed is the turn speed
-                if bs.traf.ap.inturn[idx1] or bs.traf.ap.dist2turn[idx1] < 50:
-                    vmax = bs.traf.actwp.nextturnspd[idx1] 
-                else:
-                    vmax = ownship.perf.vmax[idx1]
-                # Create velocity line
-                if (v1[0]**2 + v1[1]**2) > 0:
-                    v_dir = self.normalized(v1)
-                else:
-                    # Just take the heading
-                    temp_vec = [np.sin(np.deg2rad(bs.traf.hdg[idx1])),np.cos(np.deg2rad(bs.traf.hdg[idx1]))]
-                    v_dir = self.normalized(temp_vec)
-                    
-                v_line_min = v_dir * vmin
-                v_line_max = v_dir * vmax
-                v_line = LineString([v_line_min, v_line_max])
-                
-                # Get the intersection and process it
-                intersection = velocity_obstacle.intersection(v_line)
-                solutions = []
-                if intersection:
-                    if type(intersection) == LineString:
-                        for velocity in list(intersection.coords):
-                            # Check whether to put velocity "negative" or "positive". 
-                            # Drones can fly backwards.
-                            if np.degrees(self.angle(velocity, v1)) < 1:
-                                solutions.append(self.norm(velocity))
-                            else:
-                                solutions.append(-self.norm(velocity))
-                    elif type(intersection) == MultiLineString or type(intersection) == GeometryCollection:
-                        for line in intersection:
-                            for velocity in list(line.coords):
-                                # Check whether to put velocity "negative" or "positive". 
-                                # Drones can fly backwards.
-                                if np.degrees(self.angle(velocity, v1)) < 1:
-                                    solutions.append(self.norm(velocity))
-                                else:
-                                    solutions.append(-self.norm(velocity))
-                    elif type(intersection) == MultiPoint:
-                        for p in intersection.geoms:
-                            velocity = [p.x, p.y]
-                            if np.degrees(self.angle(velocity, v1)) < 1:
-                                solutions.append(self.norm(velocity))
-                            else:
-                                solutions.append(-self.norm(velocity))
-                    else:
-                        # Maybe it's a point?
-                        velocity = [intersection.x, intersection.y]
-                        if np.degrees(self.angle(velocity, v1)) < 1:
-                            solutions.append(self.norm(velocity))
-                        else:
-                            solutions.append(-self.norm(velocity))
-                    
-                    # Divide the speeds in negatives and positives
-                    pos_speeds = [spd for spd in solutions if spd >= 0]
-                    neg_speeds = [spd for spd in solutions if spd < 0]
-                    # If there are positive ones, apply the smallest one. Otherwise, apply a negative speed
-                    if pos_speeds:
-                        recd_speed[i] = min(pos_speeds)
-                    elif neg_speeds:
-                        recd_speed[i] = max(neg_speeds)
-                    else:
-                        # Do nothing I guess
-                        recd_speed[i] = bs.traf.ap.tas[idx1]
-                else:
-                    # No intersection, so we can't really do anything
-                    recd_speed[i] = bs.traf.ap.tas[idx1]
-                    
+                recd_speed[i] = self.get_VO_speed(conf, ownship, intruder, idx1, idx2)
                 # If we do VO solving, don't change altitude
                 should_hold_altitude[i] = True
                 should_ascend[i] = False
@@ -343,6 +202,81 @@ class M22CR(ConflictResolution):
             # Maintain altitude
             alt_new = bs.traf.alt[idx1]
         return gs_new, alt_new
+    
+    def get_VO_speed(self, conf, ownship, intruder, idx1, idx2):
+        """Returns the velocity of the ownship (idx1) for the conflict with this intruder (idx2).
+        """
+        velocity_obstacle = self.get_VO(conf, ownship, intruder, idx1, idx2)
+        # Get maximum and minimum velocity of ownship
+        vmin = ownship.perf.vmin[idx1]
+        # If we're in a turn, or close to one, the maximum speed is the turn speed
+        if bs.traf.ap.inturn[idx1] or bs.traf.ap.dist2turn[idx1] < 50:
+            vmax = bs.traf.actwp.nextturnspd[idx1] 
+        else:
+            vmax = ownship.perf.vmax[idx1]
+        # Create velocity line
+        v1 = np.array([ownship.gseast[idx1], ownship.gsnorth[idx1]])
+        if (v1[0]**2 + v1[1]**2) > 0:
+            v_dir = self.normalized(v1)
+        else:
+            # Just take the heading
+            temp_vec = [np.sin(np.deg2rad(bs.traf.hdg[idx1])),np.cos(np.deg2rad(bs.traf.hdg[idx1]))]
+            v_dir = self.normalized(temp_vec)
+            
+        v_line_min = v_dir * vmin
+        v_line_max = v_dir * vmax
+        v_line = LineString([v_line_min, v_line_max])
+        
+        # Get the intersection and process it
+        intersection = velocity_obstacle.intersection(v_line)
+        solutions = []
+        if intersection:
+            if type(intersection) == LineString:
+                for velocity in list(intersection.coords):
+                    # Check whether to put velocity "negative" or "positive". 
+                    # Drones can fly backwards.
+                    if np.degrees(self.angle(velocity, v1)) < 1:
+                        solutions.append(self.norm(velocity))
+                    else:
+                        solutions.append(-self.norm(velocity))
+            elif type(intersection) == MultiLineString or type(intersection) == GeometryCollection:
+                for line in intersection:
+                    for velocity in list(line.coords):
+                        # Check whether to put velocity "negative" or "positive". 
+                        # Drones can fly backwards.
+                        if np.degrees(self.angle(velocity, v1)) < 1:
+                            solutions.append(self.norm(velocity))
+                        else:
+                            solutions.append(-self.norm(velocity))
+            elif type(intersection) == MultiPoint.geoms:
+                for p in intersection:
+                    velocity = [p.x, p.y]
+                    if np.degrees(self.angle(velocity, v1)) < 1:
+                        solutions.append(self.norm(velocity))
+                    else:
+                        solutions.append(-self.norm(velocity))
+            else:
+                # Maybe it's a point?
+                velocity = [intersection.x, intersection.y]
+                if np.degrees(self.angle(velocity, v1)) < 1:
+                    solutions.append(self.norm(velocity))
+                else:
+                    solutions.append(-self.norm(velocity))
+            
+            # Divide the speeds in negatives and positives
+            pos_speeds = [spd for spd in solutions if spd >= 0]
+            neg_speeds = [spd for spd in solutions if spd < 0]
+            # If there are positive ones, apply the smallest one. Otherwise, apply a negative speed
+            if pos_speeds:
+                return min(pos_speeds)
+            elif neg_speeds:
+                return max(neg_speeds)
+            else:
+                # Do nothing I guess
+                return bs.traf.ap.tas[idx1]
+        else:
+            # No intersection, so we can't really do anything
+            return bs.traf.ap.tas[idx1]
     
     def get_layer_above(self, idx):
         '''Get the layer above the current layer of the aircraft.'''
@@ -384,7 +318,26 @@ class M22CR(ConflictResolution):
             return True
         
         return False
-            
+    
+    def check_prio_all(self, conf, ownship, intruder, idx1):
+        """Returns True if ownship has priority over all of its intruders.
+        """
+        # Get all the idx of the intruders for this aircraft.
+        idx_pairs = self.get_pairs(conf, ownship, intruder, idx1)
+        for idx_pair in idx_pairs:
+            idx2 = intruder.id.index(conf.confpairs[idx_pair][1])
+            # Check if this intruder is in the back
+            qdr = bs.traf.cd.qdr_mat[idx1, idx2]
+            qdr_intruder = ((qdr - ownship.trk[idx1]) + 180) % 360 - 180  
+            intr_in_back = (qdr_intruder < -180 + self.frnt_tol or 180 - self.frnt_tol < qdr_intruder)
+            # Also check the other priority rules
+            other_prio = self.check_prio(conf, ownship, intruder, idx1, idx2)
+            if not intr_in_back or not other_prio:
+                # We don't have prio over all other aircraft
+                return False
+        
+        # If we reach this point, we have priority over all intruders
+        return True
             
     def ac_above_below_check(self, conf, ownship, intruder, idx1, dist2others):
         """This function checks if the aircraft can ascend or descend in function of what
@@ -548,7 +501,7 @@ class M22CR(ConflictResolution):
                 # Also check the distance and altitude between the two aircraft.
                 distance = self.norm(dist)
                 # We want enough distance between aircraft
-                dist_ok = (distance > self.rpz * 2) 
+                dist_ok = (distance > self.rpz * 1.2) 
                 # We also want enough altitude
                 alt_ok = abs(ownship.alt[idx1]-intruder.alt[idx2]) >= (2*self.cruiselayerdiff)
                 # hor_los:
@@ -563,7 +516,7 @@ class M22CR(ConflictResolution):
                 # then they it is a bouncing conflict. ASAS should stay active until
                 # the bouncing stops.
                 is_bouncing = \
-                    abs(ownship.trk[idx1] - intruder.trk[idx2]) < self.cruiselayerdiff and \
+                    abs(ownship.trk[idx1] - intruder.trk[idx2]) < self.frnt_tol and \
                     hdist < conf.rpz[idx1] * self.resofach
                     
                 # Group some checks together
@@ -591,10 +544,7 @@ class M22CR(ConflictResolution):
                     self.tas[idx1] = bs.traf.ap.tas[idx1]
                     
                 # However, if we have priority, we can resume normal operations
-                qdr = bs.traf.cd.qdr_mat[idx1, idx2]
-                qdr_intruder = ((qdr - ownship.trk[idx1]) + 180) % 360 - 180  
-                intr_in_back = (qdr_intruder < -180 + self.frnt_tol or 180 - self.frnt_tol < qdr_intruder)
-                if intr_in_back or self.check_prio(conf, ownship, intruder, idx1, idx2):
+                if self.check_prio_all(conf, ownship, intruder, idx1):
                     # Set the speed to the autopilot one
                     self.tas[idx1] = bs.traf.ap.tas[idx1]
                 
