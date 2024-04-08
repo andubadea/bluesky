@@ -202,7 +202,7 @@ class M22Delay(Entity):
         assert (mean >= 0 and probability >= 0)
         if 1 < probability <= 100:
             # Probably a percentage
-            probability = probability / 100
+            self.probability = probability / 100
         elif probability > 100:
             # Probably a mistake, set it as 0
             self.delay_probability = 0
