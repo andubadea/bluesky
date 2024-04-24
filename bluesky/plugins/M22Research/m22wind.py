@@ -5,6 +5,7 @@ direction for each and every edge within the graph, with a set mean and variance
 import bluesky as bs
 import numpy as np
 import geopandas as gpd
+import osmnx as ox
 
 from bluesky.tools.aero import kts
 from bluesky.traffic.windsim import WindSim
@@ -63,6 +64,7 @@ class M22Wind(WindSim):
             line = streets_gpd.loc[street_no]['geometry']
             # Get the weighted bearing of this
             streets_bearings[street_no] = self.weighted_bearing(line)
+            
         return streets_gpd, streets_bearings
 
     def weighted_bearing(self, line):
