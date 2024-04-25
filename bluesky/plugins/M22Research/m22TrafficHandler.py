@@ -25,7 +25,6 @@ def reset():
 class TrafficHandler(Entity):
     def __init__(self):
         super().__init__()
-        self.cruise_spd = 15
         self.cruiselayerdiff = 50 * ft
         
         # Logging related stuff

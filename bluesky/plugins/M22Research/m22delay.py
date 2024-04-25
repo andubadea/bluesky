@@ -36,7 +36,7 @@ class M22Delay(Entity):
         # Aircraft buffer
         self.aircraft_buffer = dict()
         
-        
+        self.cruise_spd = 15 #m/s
         
         with self.settrafarrays():
             self.create_time = []
@@ -86,7 +86,7 @@ class M22Delay(Entity):
             acidx = bs.traf.id.index(acid)
             ## Add route
             # Set the default cruise speed, turn speed, and rate
-            bs.traf.ap.cruisespd[acidx] = acspd
+            bs.traf.ap.cruisespd[acidx] = self.cruise_spd
             bs.traf.ap.route[acidx].addwptMode(acidx, 'TURNBANK', 25*ft)
             bs.traf.ap.route[acidx].addwptMode(acidx, 'TURNRAD', 0.00269978*ft)
             # Extract the street number and RTA info
@@ -142,7 +142,7 @@ class M22Delay(Entity):
             acidx = bs.traf.id.index(acid)
             ## Add route
             # Set the default cruise speed, turn speed, and rate
-            bs.traf.ap.cruisespd[acidx] = acspd
+            bs.traf.ap.cruisespd[acidx] = self.cruise_spd
             bs.traf.ap.route[acidx].addwptMode(acidx, 'TURNBANK', 25*ft)
             bs.traf.ap.route[acidx].addwptMode(acidx, 'TURNRAD', 0.00269978*ft)
             # Extract the street number and RTA info

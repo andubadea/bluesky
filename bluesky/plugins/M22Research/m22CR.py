@@ -23,7 +23,7 @@ class M22CR(ConflictResolution):
         self.frnt_tol = 20 #deg
         self.dist_tol = 80
         self.rpz = bs.traf.cd.rpz_def * 1.1 # For good measure
-        self.cruise_spd = bs.traf.TrafficHandler.cruise_spd
+        self.cruise_spd = bs.traf.m22delay.cruise_spd
         
     
     def resolve(self, conf, ownship, intruder):
