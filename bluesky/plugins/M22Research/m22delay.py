@@ -81,7 +81,7 @@ class M22Delay(Entity):
 
         if can_spawn_aircraft:
             # Spawn it then
-            bs.traf.cre(acid, actype, aclat, aclon, achdg, acalt, acspd)
+            bs.traf.cre(acid, actype, aclat, aclon, achdg, acalt, self.cruise_spd)
             # And now get its idx
             acidx = bs.traf.id.index(acid)
             ## Add route
@@ -137,7 +137,7 @@ class M22Delay(Entity):
             # Otherwise, spawn the aircraft
             _, _, _, actype, aclat, aclon, achdg, acalt, acspd, wpt_data = temp[acid]
             # Spawn it then
-            bs.traf.cre(acid, actype, aclat, aclon, achdg, acalt, acspd)
+            bs.traf.cre(acid, actype, aclat, aclon, achdg, acalt, self.cruise_spd)
             # And now get its idx and route
             acidx = bs.traf.id.index(acid)
             ## Add route
