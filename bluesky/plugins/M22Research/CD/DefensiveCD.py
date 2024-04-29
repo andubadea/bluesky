@@ -115,25 +115,6 @@ class DefensiveCD(ConflictDetection):
         # Initialise the coordinate transformer
         self.transform_coords = pyproj.Transformer.from_crs(crs_from=4326, crs_to=utm_crs, always_xy = True)
         
-        # Load the city
-        # Also load the city graph
-        nodes = gpd.read_file(f'bluesky/plugins/M22Research/Vienna/streets.gpkg', layer='nodes')
-        edges = gpd.read_file(f'bluesky/plugins/M22Research/Vienna/streets.gpkg', layer='edges')
-
-        # set the indices 
-        edges.set_index(['u', 'v', 'key'], inplace=True)
-        nodes.set_index(['osmid'], inplace=True)
-
-        # ensure that it has the correct value
-        nodes['x'] = nodes['geometry'].apply(lambda x: x.x)
-        nodes['y'] = nodes['geometry'].apply(lambda x: x.y)
-        
-        G = ox.graph_from_gdfs(nodes, edges)
-        streets_gpd = gpd.read_file(f'bluesky/plugins/M22Research/Vienna/street_groups.gpkg')
-        bs.traf.TrafficHandler.nodes = nodes
-        bs.traf.TrafficHandler.edges = edges
-        bs.traf.TrafficHandler.graph = G
-        
     def reset(self):
         super().reset()
         # New detection parameters
@@ -254,11 +235,11 @@ class DefensiveCD(ConflictDetection):
             # First of all, we can check if this pair is currently on the same path, and thus one is behind the other.
             # We can check this using the current edges of each aircraft.
             current_edge_1 = current_edges[idx1]
-            route_edges_1 = bs.traf.TrafficHandler.route_edges[idx1]
+            ac_edges_1 = bs.traf.TrafficHandler.ac_edges[idx1]
             current_edge_2 = current_edges[idx2]
             
             # Check if the current edge of ac2 is within the route of ac1
-            if current_edge_2 in route_edges_1:
+            if current_edge_2 in ac_edges_1:
                 # We can see who's in front and who's in the back by comparing the distances along the route
                 # of the ownship.
                 # We need the route of the ownship for this one in geometric form, so let's get it
@@ -508,7 +489,7 @@ class DefensiveCD(ConflictDetection):
     
     def get_current_edges(self):
         # Get all the edges for all aircraft
-        edges_trafarray = bs.traf.TrafficHandler.street_numbers
+        edges_trafarray = bs.traf.TrafficHandler.ac_edges
         #Initialise the edges
         current_edge = [None] * bs.traf.ntraf
         # We basically need to loop through all aircraft routes
@@ -517,10 +498,8 @@ class DefensiveCD(ConflictDetection):
             if len(acrte.wplat) == 0:
                 continue
             
-            edge_num = edges_trafarray[acidx][acrte.iactwp]
-            # Get the u and v
-            edge = bs.traf.TrafficHandler.streets_gpd.loc[edge_num]
-            current_edge[acidx] = [edge['u'], edge['v']]
+            u,v = edges_trafarray[acidx][acrte.iactwp].split('-')
+            current_edge[acidx] = [int(u), int(v)]
         return current_edge
     
     def get_ac_turn_info(self, acidx, intent):
@@ -608,8 +587,8 @@ class DefensiveCD(ConflictDetection):
             i = current_wpt_id_1
             prev_u, prev_v = current_edge[acidx1]
             nodes_to_check_1 = [prev_v] # Add the first V by default.
-            while total_length < dlookahead1 and i<len(bs.traf.TrafficHandler.route_edges[acidx1]):
-                u,v = bs.traf.TrafficHandler.route_edges[acidx1][i]
+            while total_length < dlookahead1 and i<len(bs.traf.TrafficHandler.ac_edges[acidx1]):
+                u,v = bs.traf.TrafficHandler.ac_edges[acidx1][i]
                 if u==prev_u and v==prev_v:
                     # Next waypoint belongs to the same edge, skip
                     i += 1

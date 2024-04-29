@@ -6,6 +6,8 @@ from bluesky.tools.misc import degto180
 from bluesky.tools.aero import kts, ft, fpm, nm
 from bluesky.core.simtime import timed_function
 import numpy as np
+import geopandas as gpd
+import osmnx as ox
 
 
 def init_plugin():
@@ -33,10 +35,12 @@ class TrafficHandler(Entity):
         self.confinside_all = 0
         self.deleted_aircraft = 0
         self.losmindist = dict()
+        self.G, self.edges, self.nodes = self.loadcity('Vienna')
         
         with self.settrafarrays():
             self.allocated_alt = []
             self.street_numbers = []
+            self.rte_edges = []
             self.distance2D = np.array([])
             self.distance3D = np.array([])
             self.distancealt = np.array([])
@@ -57,6 +61,7 @@ class TrafficHandler(Entity):
         self.confinside_all = 0
         self.deleted_aircraft = 0
         self.losmindist = dict()
+        self.G, self.edges, self.nodes = self.loadcity('Vienna')
         
         with self.settrafarrays():
             self.allocated_alt = []
@@ -190,3 +195,23 @@ class TrafficHandler(Entity):
         while self.ntraf>0:
             self.delete(0)
         return
+    
+    def loadcity(self, city):
+        # Load the city
+        # Also load the city graph
+        nodes = gpd.read_file(f'bluesky/plugins/M22Research/{city}/streets.gpkg', layer='nodes')
+        edges = gpd.read_file(f'bluesky/plugins/M22Research/{city}/streets.gpkg', layer='edges')
+
+        # set the indices 
+        edges.set_index(['u', 'v', 'key'], inplace=True)
+        nodes.set_index(['osmid'], inplace=True)
+
+        # ensure that it has the correct value
+        nodes['x'] = nodes['geometry'].apply(lambda x: x.x)
+        nodes['y'] = nodes['geometry'].apply(lambda x: x.y)
+        
+        G = ox.graph_from_gdfs(nodes, edges)
+        streets_gpd = gpd.read_file(f'bluesky/plugins/M22Research/{city}/street_groups.gpkg')
+        bs.traf.TrafficHandler.nodes = nodes
+        bs.traf.TrafficHandler.edges = edges
+        bs.traf.TrafficHandler.graph = G
