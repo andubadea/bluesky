@@ -183,7 +183,7 @@ class DefensiveCD(ConflictDetection):
     
     def detect(self, ownship, intruder):
         # Collect some useful vars
-        G = bs.traf.TrafficHandler.graph
+        G = bs.traf.TrafficHandler.G
         edges = bs.traf.TrafficHandler.edges
         # Do state-based detection for good measure
         confpairs_s, lospairs, inconf_s, tcpamax_s, qdr_s, \
@@ -235,7 +235,7 @@ class DefensiveCD(ConflictDetection):
             # First of all, we can check if this pair is currently on the same path, and thus one is behind the other.
             # We can check this using the current edges of each aircraft.
             current_edge_1 = current_edges[idx1]
-            ac_edges_1 = bs.traf.TrafficHandler.ac_edges[idx1]
+            ac_edges_1 = bs.traf.TrafficHandler.route_edges[idx1]
             current_edge_2 = current_edges[idx2]
             
             # Check if the current edge of ac2 is within the route of ac1
@@ -489,7 +489,7 @@ class DefensiveCD(ConflictDetection):
     
     def get_current_edges(self):
         # Get all the edges for all aircraft
-        edges_trafarray = bs.traf.TrafficHandler.ac_edges
+        edges_trafarray = bs.traf.TrafficHandler.route_edges
         #Initialise the edges
         current_edge = [None] * bs.traf.ntraf
         # We basically need to loop through all aircraft routes
@@ -498,8 +498,7 @@ class DefensiveCD(ConflictDetection):
             if len(acrte.wplat) == 0:
                 continue
             
-            u,v = edges_trafarray[acidx][acrte.iactwp].split('-')
-            current_edge[acidx] = [int(u), int(v)]
+            current_edge[acidx] = edges_trafarray[acidx][acrte.iactwp]
         return current_edge
     
     def get_ac_turn_info(self, acidx, intent):
@@ -587,8 +586,8 @@ class DefensiveCD(ConflictDetection):
             i = current_wpt_id_1
             prev_u, prev_v = current_edge[acidx1]
             nodes_to_check_1 = [prev_v] # Add the first V by default.
-            while total_length < dlookahead1 and i<len(bs.traf.TrafficHandler.ac_edges[acidx1]):
-                u,v = bs.traf.TrafficHandler.ac_edges[acidx1][i]
+            while total_length < dlookahead1 and i<len(bs.traf.TrafficHandler.route_edges[acidx1]):
+                u,v = bs.traf.TrafficHandler.route_edges[acidx1][i]
                 if u==prev_u and v==prev_v:
                     # Next waypoint belongs to the same edge, skip
                     i += 1
@@ -614,7 +613,7 @@ class DefensiveCD(ConflictDetection):
         included.
         '''
         # Get needed things
-        G = bs.traf.TrafficHandler.graph
+        G = bs.traf.TrafficHandler.G
         nodes = bs.traf.TrafficHandler.nodes
         
         if source_id not in G.nodes:

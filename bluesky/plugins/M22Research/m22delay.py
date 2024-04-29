@@ -90,11 +90,12 @@ class M22Delay(Entity):
             bs.traf.ap.route[acidx].addwptMode(acidx, 'TURNBANK', 25*ft)
             bs.traf.ap.route[acidx].addwptMode(acidx, 'TURNRAD', 0.00269978*ft)
             # Extract the street number and RTA info
-            bs.traf.TrafficHandler.rte_edges[acidx] = wpt_data[:,6]
+            bs.traf.TrafficHandler.route_edges[acidx] = []
             bs.traf.TrafficHandler.street_numbers[acidx] = []
             for edge in wpt_data[:,6]:
-                u,v = edge.split('-')
-                bs.traf.TrafficHandler.street_numbers[acidx].append(bs.traf.TrafficHandler.edges.at[(int(u), int(v), 0), 'stroke'])
+                u,v = [int(x) for x in edge.split('-')]
+                bs.traf.TrafficHandler.route_edges[acidx].append((u,v))
+                bs.traf.TrafficHandler.street_numbers[acidx].append(bs.traf.TrafficHandler.edges.at[(u,v,0), 'stroke'])
             # We need to format this stuff in the following way:
             # lat, lon, alt, spd, FLYTURN/FLYBY/FLYOVER, RTA
             # First, remove street info
@@ -150,11 +151,12 @@ class M22Delay(Entity):
             bs.traf.ap.route[acidx].addwptMode(acidx, 'TURNBANK', 25*ft)
             bs.traf.ap.route[acidx].addwptMode(acidx, 'TURNRAD', 0.00269978*ft)
             # Extract the street number and RTA info
-            bs.traf.TrafficHandler.rte_edges[acidx] = wpt_data[:,6]
+            bs.traf.TrafficHandler.route_edges[acidx] = []
             bs.traf.TrafficHandler.street_numbers[acidx] = []
             for edge in wpt_data[:,6]:
-                u,v = edge.split('-')
-                bs.traf.TrafficHandler.street_numbers[acidx].append(bs.traf.TrafficHandler.edges.at[(int(u), int(v), 0), 'stroke'])
+                u,v = [int(x) for x in edge.split('-')]
+                bs.traf.TrafficHandler.route_edges[acidx].append((u,v))
+                bs.traf.TrafficHandler.street_numbers[acidx].append(bs.traf.TrafficHandler.edges.at[(u,v,0), 'stroke'])
             # First, remove street info
             wpt_data_stripped = wpt_data[:,0:6]
             # Put RTA last

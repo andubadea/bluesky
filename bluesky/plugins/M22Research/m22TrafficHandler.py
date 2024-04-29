@@ -28,6 +28,7 @@ class TrafficHandler(Entity):
     def __init__(self):
         super().__init__()
         self.cruiselayerdiff = 50 * ft
+        self.spd = 15 #m/s
         
         # Logging related stuff
         self.prevconfpairs = set()
@@ -40,7 +41,7 @@ class TrafficHandler(Entity):
         with self.settrafarrays():
             self.allocated_alt = []
             self.street_numbers = []
-            self.rte_edges = []
+            self.route_edges = []
             self.distance2D = np.array([])
             self.distance3D = np.array([])
             self.distancealt = np.array([])
@@ -55,6 +56,9 @@ class TrafficHandler(Entity):
         self.distancealt[-n:] = [0]*n
         
     def reset(self):
+        self.cruiselayerdiff = 50 * ft
+        self.spd = 15 #m/s
+        
         # Logging related stuff
         self.prevconfpairs = set()
         self.prevlospairs = set()
@@ -66,6 +70,7 @@ class TrafficHandler(Entity):
         with self.settrafarrays():
             self.allocated_alt = []
             self.street_numbers = []
+            self.route_edges = []
             self.distance2D = np.array([])
             self.distance3D = np.array([])
             self.distancealt = np.array([])
@@ -211,7 +216,4 @@ class TrafficHandler(Entity):
         nodes['y'] = nodes['geometry'].apply(lambda x: x.y)
         
         G = ox.graph_from_gdfs(nodes, edges)
-        streets_gpd = gpd.read_file(f'bluesky/plugins/M22Research/{city}/street_groups.gpkg')
-        bs.traf.TrafficHandler.nodes = nodes
-        bs.traf.TrafficHandler.edges = edges
-        bs.traf.TrafficHandler.graph = G
+        return G, edges, nodes
