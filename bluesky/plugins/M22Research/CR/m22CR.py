@@ -19,11 +19,11 @@ class M22CR(ConflictResolution):
     def __init__(self):
         super().__init__()
         self.enable_altitude_CR = False
-        self.cruiselayerdiff = 30 * ft
+        self.cruiselayerdiff = 50 * ft
         self.frnt_tol = 20 #deg
         self.dist_tol = 80
-        self.rpz = bs.traf.cd.rpz_def * 1.2 # For good measure
-        self.cruise_spd = bs.traf.TrafficHandler.cruise_spd
+        self.rpz = bs.traf.cd.rpz_def * 1.1 # For good measure
+        self.cruise_spd = bs.traf.m22delay.cruise_spd
         
     
     def resolve(self, conf, ownship, intruder):
@@ -280,8 +280,7 @@ class M22CR(ConflictResolution):
     
     def get_layer_above(self, idx):
         '''Get the layer above the current layer of the aircraft.'''
-        possible_layers = [30,  60,  90, 120, 150, 180, 210, 240, 270, 300, 330, 360, 390,
-                            420, 450, 480]
+        possible_layers = np.arange(self.cruiselayerdiff, 501, self.cruiselayerdiff)
         
         layer_index = possible_layers.index(min(possible_layers, key = lambda x: abs(x-bs.traf.alt[idx]/ft)))
         if layer_index + 1 < len(possible_layers)-1:

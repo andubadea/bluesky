@@ -481,7 +481,7 @@ class Autopilot(Entity, replaceable=True):
         bs.traf.selspd = np.where(usecruisespd, bs.traf.actwp.cruisespd, bs.traf.selspd)
 
         # Below crossover altitude: CAS=const, above crossover altitude: Mach = const
-        self.tas = vcasormach2tas(bs.traf.selspd, bs.traf.alt)
+        self.tas = bs.traf.selspd
 
     def ComputeVNAV(self, idx, toalt, xtoalt, torta, xtorta):
         """
