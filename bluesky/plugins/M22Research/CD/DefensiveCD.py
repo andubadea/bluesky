@@ -360,10 +360,26 @@ class DefensiveCD(ConflictDetection):
                         continue
                     
                     if isinstance(intersection, MultiLineString):
-                        # Merge the line
+                        # Attempt to merge the line
                         intersection = linemerge(intersection)
-                        # Take the first point
-                        point_intersection = Point(intersection.coords.xy[0][0],intersection.coords.xy[1][0])
+                        
+                        if isinstance(intersection, MultiLineString):
+                            # Well that didn't work, means our intents actually meet in two places
+                            # So we'll extract the closest one on the ownship route
+                            mindist = 10000000 # big number
+                            point_intersection = None
+                            own_utm_lon, own_utm_lat = self.transform_coords.transform(intent_1.xy[0], intent_1.xy[1])
+                            own_rte_utm = LineString([*zip(own_utm_lon, own_utm_lat)])
+                            for geom in intersection.geoms:
+                                point_utm = Point(self.transform_coords.transform(geom.xy[0][0],geom.xy[1][0]))
+                                dist = own_rte_utm.project(point_utm)
+                                if dist < mindist:
+                                    mindist = dist
+                                    point_intersection = Point(geom.xy[0][0],geom.xy[1][0])
+                        
+                        else:
+                            # Take the first point
+                            point_intersection = Point(intersection.coords.xy[0][0],intersection.coords.xy[1][0])
                     
                     elif isinstance(intersection, Point):
                         #Good then
@@ -373,9 +389,18 @@ class DefensiveCD(ConflictDetection):
                         # Take first point
                         point_intersection = Point(intersection.coords.xy[0][0],intersection.coords.xy[1][0])
                         
-                    elif isinstance(intersection, MultiPoint):
-                        #First point I guess
-                        point_intersection = intersection.geoms[0]  
+                    elif isinstance(intersection, MultiPoint) or isinstance(intersection, GeometryCollection):
+                        # So we'll extract the closest one on the ownship route
+                        mindist = 10000000 # big number
+                        point_intersection = None
+                        own_utm_lon, own_utm_lat = self.transform_coords.transform(intent_1.xy[0], intent_1.xy[1])
+                        own_rte_utm = LineString([*zip(own_utm_lon, own_utm_lat)])
+                        for geom in intersection.geoms:
+                            point_utm = Point(self.transform_coords.transform(geom.xy[0][0],geom.xy[1][0]))
+                            dist = own_rte_utm.project(point_utm)
+                            if dist < mindist:
+                                mindist = dist
+                                point_intersection = Point(geom.xy[0][0],geom.xy[1][0])
                     
                     else:
                         #uhh, dunno
