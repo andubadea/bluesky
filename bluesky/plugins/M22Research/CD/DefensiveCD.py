@@ -224,6 +224,11 @@ class DefensiveCD(ConflictDetection):
         for i, pair in enumerate(acidx_int_pairs):
             # IDX1 is the ownship and IDX2 is the intruder
             idx1, idx2 = pair
+            
+            # Before doing anything, are they on different altitudes?
+            if abs(bs.traf.alt[idx1] - bs.traf.alt[idx2]) > self.hpz_def:
+                # Not a conflict
+                continue
                     
             # Get the problem nodes as well
             pair_nodes = problem_nodes[i]
