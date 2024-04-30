@@ -36,7 +36,7 @@ class M22Delay(Entity):
         # Aircraft buffer
         self.aircraft_buffer = dict()
         
-        self.cruise_spd = 15 #m/s
+        self.cruise_spd = bs.traf.TrafficHandler.spd
         
         with self.settrafarrays():
             self.create_time = []
