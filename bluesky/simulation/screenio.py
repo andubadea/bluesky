@@ -18,7 +18,7 @@ class ScreenIO:
     siminfo_rate = 1
 
     # Update rate of aircraft update messages [Hz]
-    acupdate_rate = 5
+    acupdate_rate = 0.5
 
     # =========================================================================
     # Functions
