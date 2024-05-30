@@ -43,7 +43,7 @@ class PerfBase(Entity, replaceable=True):
         super().create(n=n)
         # Set wide default limits, so that no envelope limiting occurs
         # when the actual performance model used doesn't support it
-        self.axmax[-n:] = 2.0  # Default acceleration limit is 2 m/s2
+        self.axmax[-n:] = 3.0  # Default acceleration limit is 2 m/s2
         self.hmax[-n:] = 1e6
         self.vmin[-n:] = -1e6
         self.vmax[-n:] = 1e6

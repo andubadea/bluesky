@@ -1,9 +1,6 @@
 import numpy as np
 import bluesky as bs
-import copy
 from bluesky.traffic.asas import ConflictResolution
-from bluesky.core import Entity
-from bluesky.tools.aero import kts
 from shapely.geometry import Point
 
 
