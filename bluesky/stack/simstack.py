@@ -147,6 +147,7 @@ def readscn(fname):
     with open(fname, "r") as fscen:
         prevline = ''
         for line in fscen:
+            print(line)
             line = line.strip()
             # Skip emtpy lines and comments
             if len(line) < 12 or line[0] == "#":
