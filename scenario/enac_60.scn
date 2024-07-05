@@ -1,0 +1,23 @@
+00:00:00.00>SCEN 60_op_sb
+00:00:00.00>PCALL ENAC/test_60.scn
+00:00:00.00>FF
+
+00:00:00.00>SCEN 60_op_sb_wind
+00:00:00.00>PCALL ENAC/test_60_wind.scn
+00:00:00.00>FF
+
+00:00:00.00>SCEN 60_op_sb_delay
+00:00:00.00>PCALL ENAC/test_60_delay.scn
+00:00:00.00>FF
+
+00:00:00.00>SCEN 60_op_w
+00:00:00.00>PCALL ENAC/test_60_w.scn
+00:00:00.00>FF
+
+00:00:00.00>SCEN 60_op_w_wind
+00:00:00.00>PCALL ENAC/test_60_wind_w.scn
+00:00:00.00>FF
+
+00:00:00.00>SCEN 60_op_w_delay
+00:00:00.00>PCALL ENAC/test_60_delay_w.scn
+00:00:00.00>FF

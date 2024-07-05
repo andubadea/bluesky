@@ -473,10 +473,16 @@ class Autopilot(Entity, replaceable=True):
         
         # Apply the cruise speed if the past or next waypoint doesn't have a speed constraint 
         # and if there is actually a cruise speed to apply
+        can_cruise = np.logical_or.reduce((justexitedturn,
+                                           np.logical_and(
+                                               np.logical_not(self.inturn),
+                                               np.logical_not(oldinturn))
+                                           ))
+        
         usecruisespd = np.logical_and.reduce((bs.traf.actwp.cruisespd > 0,
                                               bs.traf.actwp.spd < 0,
                                               np.logical_not(usenextspdcon),
-                                              justexitedturn))
+                                              can_cruise))
         
         bs.traf.selspd = np.where(usecruisespd, bs.traf.actwp.cruisespd, bs.traf.selspd)
 
