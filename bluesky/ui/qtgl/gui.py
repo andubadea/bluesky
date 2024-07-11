@@ -25,6 +25,7 @@ from bluesky.ui.qtgl.customevents import NUMCUSTOMEVENTS
 print(('Using Qt ' + QT_VERSION_STR + ' for windows and widgets'))
 
 def gui_msg_handler(msgtype, context, msg):
+    return
     if msgtype == QtMsgType.QtWarningMsg:
         print('Qt gui warning:', msg)
     elif msgtype == QtMsgType.QtCriticalMsg:

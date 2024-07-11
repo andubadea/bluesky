@@ -28,7 +28,7 @@ class DefensiveCR(ConflictResolution):
     def resolve(self, conf, ownship, intruder):
         # Some constants
         cruise_spd = bs.traf.TrafficHandler.spd
-        frnt_tol = 20
+        frnt_tol = 10
         spd_factor = 3
         # Get all the values from CD that we would need
         confpairs = conf.confpairs # Pair IDs in conflict
@@ -75,7 +75,7 @@ class DefensiveCR(ConflictResolution):
                 intruder_aligned_front = intruder_in_front and -frnt_tol < rel_trk_intruder < frnt_tol
                 
                 # Check if we're supposed to be waiting at a stopping point
-                if self.stopping_dict.get(ownship_id+intruder_id, False):
+                if self.stopping_dict.get((ownship_id,intruder_id), False):
                     # Is this a head-on conflict? Cuz then we can't really do anything about it.
                     # Determine a priority based on ACID and make the one with the lower one go.
                     v1 = np.array([ownship.gseast[ownship_idx], ownship.gsnorth[ownship_idx]])
@@ -172,7 +172,7 @@ class DefensiveCR(ConflictResolution):
                         # change the speed if the one we're about to set is smaller than the one that is already
                         # set.
                         # Check if we're supposed to be waiting at a stopping point
-                        if self.stopping_dict.get(ownship_id+intruder_id, False):
+                        if self.stopping_dict.get((ownship_id,intruder_id), False):
                             # Set the speed to 0, and wait for the conflict to finish
                             newgs[ownship_idx] = 0
                             continue
@@ -218,11 +218,10 @@ class DefensiveCR(ConflictResolution):
                     else:
                         # Let's slow down for the other aircraft to pass.
                         # Set the stopping point flag for this pair to True
-                        self.stopping_dict[ownship_id+intruder_id] = True
+                        self.stopping_dict[(ownship_id,intruder_id)] = True
                         # If the distance to the stopping point is 0, then we simply stop
                         distance_to_stopping_point_1 = dist_to_stop[pair_idx][i][0]
                         distance_to_start_stopping = self.distaccel(cruise_spd, 0, ownship_idx)*1.2 #buffer
-                        
                         if distance_to_stopping_point_1 < distance_to_start_stopping:
                             # Then simply stop
                             newgs[ownship_idx] = 0
@@ -232,6 +231,20 @@ class DefensiveCR(ConflictResolution):
                             # Set the speed in function of distance_to_stopping_point
                             newgs[ownship_idx] = min(newgs[ownship_idx], (distance_to_stopping_point_1/3/conf.rpz_def)*cruise_spd)
                             continue
+            
+            # In some situations, we have deadlocks because both aircraft think they need to wait. We solve them by
+            # allowing the aircraft with the lower ACID to pass.
+            # Is everyone standing still and are we supposed to be stopped?
+            if bs.traf.gs[ownship_idx] < 0.01 and \
+                bs.traf.gs[intruder_idx] < 0.01 and \
+                self.stopping_dict.get((ownship_id,intruder_id), False):
+                # If the ownship ACID is greater, then we delete the stopping dict for this intruder
+                # and make them go slow
+                if int(ownship_id.replace('D','')) < int(intruder_id.replace('D','')):
+                    self.stopping_dict.pop((ownship_id, intruder_id), False)
+                    newgs[ownship_idx] = 5
+                
+            
         
         return newtrack, newgs, newvs, newalt
     
@@ -298,7 +311,7 @@ class DefensiveCR(ConflictResolution):
             # If the ownship aircraft is deleted remove its conflict from the list
             if idx1 < 0:
                 delpairs.add(conflict)
-                self.stopping_dict.pop(bs.traf.id[idx1] + bs.traf.id[idx2], False)
+                self.stopping_dict.pop((bs.traf.id[idx1],bs.traf.id[idx2]), False)
                 continue
 
             if idx2 >= 0:
@@ -349,7 +362,7 @@ class DefensiveCR(ConflictResolution):
                 # If conflict is solved, remove it from the resopairs list
                 delpairs.add(conflict)
                 # Remove this pair from the stopping dict
-                self.stopping_dict.pop(bs.traf.id[idx1] + bs.traf.id[idx2], False)
+                self.stopping_dict.pop((bs.traf.id[idx1],bs.traf.id[idx2]), False)
 
         for idx, active in changeactive.items():
             # Loop a second time: this is to avoid that ASAS resolution is
