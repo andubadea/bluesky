@@ -133,11 +133,17 @@ class HaltSBCR(ConflictResolution):
                     if own_has_priority:
                         recd_speed[i] = self.cruise_spd
                     else:
+                        if bs.traf.id[idx1] == 'D928' and bs.traf.id[idx2] == 'D968':
+                            print('hi')
                         # Just stop
                         recd_speed[i] = 0*kts
-                else:
+                elif not own_has_priority:
                     # We will need to halt
                     recd_speed[i] = self.get_halt_speed(conf, ownship, intruder, idx1, idx2)
+                    if bs.traf.id[idx1] == 'D928' and bs.traf.id[idx2] == 'D968':
+                            print(recd_speed[i], recd_speed)
+                else:
+                    pass
                     
                 if self.enable_altitude_CR:
                     # We can potentially perform an overtake manoeuver. Check if we can ascend.
